@@ -1,0 +1,28 @@
+name: "Setup Fortran"
+description: "Setup Fortran compiler and toolchain"
+inputs:
+  compiler:
+    description: "Compiler toolchain"
+    required: true
+    default: "gcc"
+  version:
+    description: "Version of compiler toolchain"
+    required: false
+outputs:
+  fc:
+    description: "Path to Fortran compiler"
+    value: ${{ steps.setup.outputs.fc }}
+  cc:
+    description: "Path to C compiler"
+    value: ${{ steps.setup.outputs.cc }}
+runs:
+  using: "composite"
+  steps:
+    - id: setup
+      run: |
+        action_path=$(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
+        "$action_path/setup-fortran.sh"
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+        VERSION: ${{ inputs.version }}
