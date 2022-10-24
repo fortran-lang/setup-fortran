@@ -19,10 +19,56 @@ runs:
   using: "composite"
   steps:
     - id: setup
-      run: |
-        action_path=$(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
-        "$action_path/setup-fortran.sh"
+      name: Setup toolchain
       shell: bash
       env:
         COMPILER: ${{ inputs.compiler }}
         VERSION: ${{ inputs.version }}
+      run: |
+        action_path=$(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
+        source "$action_path/setup-fortran.sh"
+        
+        compiler=${COMPILER:-gcc}
+        platform=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+        case $compiler in
+          gcc)
+            version=${VERSION:-11}
+            ;;
+          *)
+            exit 1
+            ;;
+        esac
+
+        case $platform in
+          linux*)
+            install_gcc_apt
+            ;;
+          darwin*)
+            install_gcc_brew
+            ;;
+          mingw*)
+            install_gcc_choco
+            ;;
+          msys*)
+            install_gcc_choco
+            ;;
+          cygwin*)
+            install_gcc_choco
+            ;;
+          *)
+            echo "Unsupported platform: $platform"
+            exit 1
+            ;;
+        esac
+
+        which "${FC}"
+        which "${CC}"
+  
+        # set outputs
+        echo "fc=${FC}" >> $GITHUB_OUTPUT
+        echo "cc=${CC}" >> $GITHUB_OUTPUT
+        
+        # persist environment variables
+        echo "FC=${FC}" >> $GITHUB_ENV
+        echo "CC=${CC}" >> $GITHUB_ENV
