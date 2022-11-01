@@ -4,10 +4,22 @@
 
 Action to setup a Fortran compiler.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Usage](#usage)
+- [Options](#options)
+- [Outputs](#outputs)
+- [Environment variables](#environment-variables)
+- [Runner compatibility](#runner-compatibility)
+- [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 
 ## Usage
 
-This action allows setting up Fortran compilers on Ubuntu, MacOS and Windows runners.
+This action sets up a Fortran compiler on Ubuntu, MacOS and Windows runners.
 
 ```yaml
 jobs:
@@ -37,7 +49,27 @@ jobs:
 - *version*: Version of the compiler toolchain, available options for *gcc* are *5-12*
 
 
+## Outputs
+
+The action sets the following outputs:
+
+- `cc`: C compiler executable, e.g. `gcc`
+- `fc`: Fortran compiler executable, e.g. `gfortran`
+
+
+## Environment variables
+
+The same values are also set as environment variables:
+
+- `CC`
+- `FC`
+
+These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
+
+
 ## Runner compatibility
+
+Support for the GCC toolchain varies across GitHub-hosted runner images.
 
 <!-- compat starts -->
 
