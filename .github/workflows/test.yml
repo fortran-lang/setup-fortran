@@ -206,7 +206,7 @@ jobs:
           fi
 
       - name: Update README
-        if: steps.diff.outputs.diff == 'true'
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
         shell: python
         run: |
           import re
@@ -220,12 +220,12 @@ jobs:
             readme_path.open('w').write(r.sub(chunk, readme))
 
       - name: Print README diff
-        if: steps.diff.outputs.diff == 'true'
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
         run: |
           git diff README.md
 
       - name: Create pull request
-        if: steps.diff.outputs.diff == 'true'
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
