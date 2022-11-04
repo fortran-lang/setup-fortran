@@ -1,33 +1,243 @@
 name: Test
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+      - develop*
+  pull_request:
+    branches:
+      - main
+      - develop*
+  schedule:
+    - cron: '0 6 * * *'
 
 jobs:
   test:
+    name: Test compiler
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-22.04, ubuntu-20.04, ubuntu-18.04, macos-12, macos-11, windows-2022, windows-2019]
         compiler: [gcc]
-        version: [11, 10, 9, 8]
-
+        version: [12, 11, 10, 9, 8, 7, 6, 5]
     steps:
+
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Fortran
+        continue-on-error: true
         id: setup-fortran
         uses: ./
         with:
           compiler: ${{ matrix.compiler }}
           version: ${{ matrix.version }}
 
-      - name: Check Fortran compiler
-        run: |
-          ${{ env.FC }} --version
-          ${{ env.CC }} --version
+      - name: Check compiler version
+        if: steps.setup-fortran.outcome == 'success'
         shell: bash
         env:
           FC: ${{ steps.setup-fortran.outputs.fc }}
           CC: ${{ steps.setup-fortran.outputs.cc }}
+        run: |
+          fcv=$(${{ env.FC }} --version | head -n 1)
+          ccv=$(${{ env.CC }} --version | head -n 1)
+          
+          echo $fcv
+          echo $ccv
+          
+          fcv=$(echo "${fcv##*)}" | xargs)
+          ccv=$(echo "${ccv##*)}" | xargs)
+          
+          [[ $fcv == ${{ matrix.version }}* ]] || (echo "unexpected Fortran compiler version: $fcv"; exit 1)
+          [[ $ccv == ${{ matrix.version }}* ]] || (echo "unexpected C compiler version: $ccv"; exit 1)
+
+      - name: Test compile program (bash)
+        if: steps.setup-fortran.outcome == 'success'
+        shell: bash
+        env:
+          FC: ${{ steps.setup-fortran.outputs.fc }}
+          CC: ${{ steps.setup-fortran.outputs.cc }}
+        run: |
+          ${{ env.FC }} -o hw hw.f90
+          output=$(./hw '2>&1')
+          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected output: $output"; exit 1)
+
+      - name: Test compile program (Powershell Core)
+        if: steps.setup-fortran.outcome == 'success' && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          FC: ${{ steps.setup-fortran.outputs.fc }}
+          CC: ${{ steps.setup-fortran.outputs.cc }}
+        run: |
+          rm hw.exe
+          ${{ env.FC }} -o hw.exe hw.f90 
+          $output=$(& ".\hw.exe")
+          if ($output -match "hello world") {
+              write-output $output
+          } else {
+              write-output "unexpected output: $output"
+              exit 1
+          }
+      
+      - name: Test compile program (Powershell Desktop)
+        if: steps.setup-fortran.outcome == 'success' && runner.os == 'Windows'
+        shell: powershell
+        env:
+          FC: ${{ steps.setup-fortran.outputs.fc }}
+          CC: ${{ steps.setup-fortran.outputs.cc }}
+        run: |
+          rm hw.exe
+          ${{ env.FC }} -o hw.exe hw.f90 
+          $output=$(& ".\hw.exe")
+          if ($output -match "hello world") {
+              write-output $output
+          } else {
+              write-output "unexpected output: $output"
+              exit 1
+          }
+
+      - name: Test compile program (cmd)
+        if: steps.setup-fortran.outcome == 'success' && runner.os == 'Windows'
+        shell: cmd
+        env:
+          FC: ${{ steps.setup-fortran.outputs.fc }}
+          CC: ${{ steps.setup-fortran.outputs.cc }}
+        run: |
+          del hw.exe
+          ${{ env.FC }} -o hw.exe hw.f90 
+          for /f "tokens=* usebackq" %%f in (`.\hw.exe`) do @set "OUTPUT=%%f"
+          if "%OUTPUT%"=="hello world" (
+            echo %OUTPUT%
+          ) else (
+            echo unexpected output: %OUTPUT%
+            exit 1
+          )
+
+      - name: Create compatibility report
+        shell: bash
+        run: |
+          if [[ "${{ steps.setup-fortran.outcome }}" == "success" ]]; then
+            support="&check;"
+          else
+            support=""
+          fi
+          
+          mkdir compat
+          prefix="${{ matrix.os }},${{ matrix.compiler }},${{ matrix.version }}"
+          echo "$prefix,$support" >> "compat/${prefix//,/_}.csv"
+
+      - name: Upload compatibility report
+        uses: actions/upload-artifact@v3
+        with:
+          name: compat
+          path: compat/*.csv
+
+  compat:
+    name: Report compatibility
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install packages
+        run: |
+          pip install tabulate pandas
+
+      - name: Download reports
+        uses: actions/download-artifact@v3
+        with:
+          name: compat
+          path: compat
+
+      - name: Concatenate reports
+        run: |
+          echo "runner,compiler,version,support" > compat_long.csv
+          cat compat/*.csv >> compat_long.csv
+
+      - name: Make wide CSV and MD table
+        id: merge-reports
+        shell: python
+        run: |
+          import pandas as pd
+          df = pd.read_csv("compat_long.csv")
+          df = pd.pivot(df, index="runner", columns="version", values="support")
+          df = df.sort_values(by=["runner"])
+          df.to_csv("compat.csv")
+          with open("compat.md", "w") as file:
+            file.write(df.to_markdown().replace("nan", ""))
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: compat
+          path: |
+            compat.csv
+            compat.md
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if ! [ -f compat.csv ]; then
+            echo "diff=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          diff=$(git diff compat.csv)
+          if [[ $diff == "" ]]; then
+            echo "No changes found"
+            echo "diff=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes found:"
+            echo "$diff"
+            echo "diff=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update README
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
+        shell: python
+        run: |
+          import re
+          from pathlib import Path
+          readme_path = Path("README.md")
+          readme = readme_path.open().read()
+          with open("compat.md", "r") as compat:
+            table = ''.join(compat.readlines())
+            r = re.compile(r'<!\-\- compat starts \-\->.*<!\-\- compat ends \-\->', re.DOTALL)
+            chunk = '<!-- compat starts -->{}<!-- compat ends -->'.format('\n{}\n'.format(table))
+            readme_path.open('w').write(r.sub(chunk, readme))
+
+      - name: Print README diff
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
+        run: |
+          git diff README.md
+
+      - name: Create pull request
+        if: steps.diff.outputs.diff == 'true' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          now=$(date +'%Y-%m-%dT%H-%M-%S')
+          updated_branch="compat_$now"
+          default_branch="${{ github.event.repository.default_branch }}"
+          
+          git switch -c "$updated_branch"
+          git add compat.csv README.md
+          git commit -m "Update compatibility matrix"
+          git push -u origin "$updated_branch"
+          gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file compat.md

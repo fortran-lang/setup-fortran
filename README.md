@@ -1,11 +1,25 @@
 # Setup Fortran
 
-GitHub action to setup a Fortran compiler on the supported runners.
+[![Test](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml/badge.svg)](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml)
+
+Action to setup a Fortran compiler.
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Usage](#usage)
+- [Options](#options)
+- [Outputs](#outputs)
+- [Environment variables](#environment-variables)
+- [Runner compatibility](#runner-compatibility)
+- [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
 ## Usage
 
-This action allows to setup Fortran compilers on all Ubuntu, MacOS and Windows.
+This action sets up a Fortran compiler on Ubuntu, MacOS and Windows runners.
 
 ```yaml
 jobs:
@@ -31,11 +45,46 @@ jobs:
 
 ## Options
 
-- *compiler*: Compiler toolchain to setup,
-  available options are *gcc*.
+- *compiler*: Compiler toolchain to setup, available options are *gcc*
+- *version*: Version of the compiler toolchain, available options for *gcc* are *5-12*
 
-- *version*: Version of the compiler toolchain,
-  available options for *gcc* are 11, 10, 9, 8, 7 (Ubuntu and MacOS), 6 (MacOS), 5 (MacOS)
+
+## Outputs
+
+The action sets the following outputs:
+
+- `cc`: C compiler executable, e.g. `gcc`
+- `fc`: Fortran compiler executable, e.g. `gfortran`
+
+
+## Environment variables
+
+The same values are also set as environment variables:
+
+- `CC`
+- `FC`
+
+These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
+
+
+## Runner compatibility
+
+Support for the GCC toolchain varies across GitHub-hosted runner images.
+
+<!-- compat starts -->
+
+|                               | 5       | 6       | 7       | 8       | 9       | 10      | 11      | 12      |
+|-------------------------------|---------|---------|---------|---------|---------|---------|---------|---------|
+| ubuntu-22.04                  |         |         |         |         | &check; | &check; | &check; | &check; |
+| ubuntu-20.04 (ubuntu-latest)  |         |         | &check; | &check; | &check; | &check; | &check; |         |
+| ubuntu-18.04                  | &check; | &check; | &check; | &check; | &check; | &check; | &check; |         |
+| macos-12                      |         | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| macos-11 (macos-latest)       |         | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| macos-10.15                   |         | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| windows-2022 (windows-latest) |         |         |         | &check; | &check; | &check; | &check; | &check; |
+| windows-2019                  |         |         |         | &check; | &check; | &check; | &check; | &check; |
+
+<!-- compat ends -->
 
 
 ## License
