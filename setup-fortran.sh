@@ -9,7 +9,23 @@ install_gcc_brew()
   ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
   ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
 
-  # link lib dir for previous GCC versions to avoid missing .dylib issues
+  # get full version string of the major version we just installed
+  # sed not head to take first line avoids ruby broken pipe issues
+  # (https://stackoverflow.com/a/2845541/6514033)
+  full_version=$(brew info gfortran | sed -n 1p | cut -d' ' -f 4)
+
+  # link homebrew lib dir to common lib dir locations
+  brew_libdir=/usr/local/Cellar/gcc/${full_version}/lib/gcc/${version}
+  sudo mkdir -p /opt/local/lib
+  sudo ln -fs $brew_libdir /opt/local/lib/libgcc
+  if [ -e "$brew_libdir/libgfortran.3.dylib" ]; then
+    sudo ln -fs "$brew_libdir/libgfortran.3.dylib" /usr/local/lib/libgfortran.3.dylib
+  fi
+  if [ -e "$brew_libdir/libgfortran.5.dylib" ]; then
+    sudo ln -fs "$brew_libdir/libgfortran.5.dylib" /usr/local/lib/libgfortran.5.dylib
+  fi
+
+  # link lib dirs for previous GCC versions
   for (( i=12; i>4; i-- ))
   do
     gcc_lib_path="/usr/local/opt/gcc/lib/gcc/$i"
@@ -17,7 +33,7 @@ install_gcc_brew()
       echo "found $gcc_lib_path"
       for (( j=$i; j>4; j-- ))
       do
-        ln -fs /usr/local/opt/gcc/lib/gcc/$i /usr/local/opt/gcc/lib/gcc/$j
+	sudo ln -fs /usr/local/opt/gcc/lib/gcc/$i /usr/local/opt/gcc/lib/gcc/$j
       done
       break
     fi
