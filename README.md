@@ -29,24 +29,39 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        toolchain:
+          - {compiler: gcc, version: 11}
+          - {compiler: intel-classic, version: '2021.9'}
+        include:
+          - os: ubuntu-latest
+            toolchain: {compiler: intel, version: '2023.1'}
+        exclude:
+          - os: windows-latest
+            toolchain: {compiler: intel-classic, version: '2021.9'}
 
     steps:
-    - uses: awvwgk/setup-fortran@main
-      id: setup-fortran
-      with:
-        compiler: gcc
-        version: 11
+      - uses: awvwgk/setup-fortran@v1
+        id: setup-fortran
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
 
-    - run: ${{ env.FC }} --version
-      env:
-        FC: ${{ steps.setup-fortran.outputs.fc }}
+      - run: ${{ env.FC }} --version
+        env:
+          FC: ${{ steps.setup-fortran.outputs.fc }}
 ```
 
 
 ## Options
 
-- *compiler*: Compiler toolchain to setup, available options are *gcc*
-- *version*: Version of the compiler toolchain, available options for *gcc* are *5-12*
+- *compiler*: Compiler toolchain to setup, available options are
+  - *gcc* (for `gfortran`)
+  - *intel* (for `ifx`)
+  - *intel-classic* (for `ifort`)
+- *version*: Version of the compiler toolchain, available options are
+  - *5–12* for *gcc*
+  - *2021.1–2023.1* for *intel*
+  - *2021.1–2021.9* for *intel-classic*
 
 
 ## Outputs
@@ -81,6 +96,15 @@ Support for the GCC toolchain varies across GitHub-hosted runner images.
 | windows-2019 |  |      |      | &check; | &check; | &check; | &check; | &check; |
 | windows-2022 |  |      |      | &check; | &check; | &check; | &check; | &check; |
 <!-- compat ends -->
+
+
+Supported Intel toolchains:
+
+| runner    | compiler       | version |
+| :-------- | :------------- | :------ |
+| ubuntu-\* | intel          | 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
+| ubuntu-\* | intel-classic  | 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
+| macos-\*  | intel-classic  | 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1 |
 
 
 ## License

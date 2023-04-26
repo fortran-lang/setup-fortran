@@ -34,30 +34,17 @@ runs:
         case $compiler in
           gcc)
             version=${VERSION:-11}
+            install_gcc $platform
+            ;;
+          intel-classic)
+            version=${VERSION:-2023.1.0}
+            install_intel $platform true
+            ;;
+          intel)
+            version=${VERSION:-2023.1.0}
+            install_intel $platform false
             ;;
           *)
-            exit 1
-            ;;
-        esac
-
-        case $platform in
-          linux*)
-            install_gcc_apt
-            ;;
-          darwin*)
-            install_gcc_brew
-            ;;
-          mingw*)
-            install_gcc_choco
-            ;;
-          msys*)
-            install_gcc_choco
-            ;;
-          cygwin*)
-            install_gcc_choco
-            ;;
-          *)
-            echo "Unsupported platform: $platform"
             exit 1
             ;;
         esac
