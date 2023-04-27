@@ -22,7 +22,6 @@ jobs:
         os:
           - ubuntu-22.04
           - ubuntu-20.04
-          - macos-13-x1
           - macos-13
           - macos-12
           - macos-11
