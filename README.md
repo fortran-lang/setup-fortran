@@ -91,6 +91,7 @@ Support for the GCC toolchain varies across GitHub-hosted runner images.
 |:-------------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|
 | macos-11     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
 | macos-12     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| macos-13     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
 | ubuntu-20.04 |      | &check; | &check; | &check; | &check; | &check; |      |
 | ubuntu-22.04 |      |      |      | &check; | &check; | &check; | &check; |
 | windows-2019 |      |      | &check; | &check; | &check; | &check; | &check; |
