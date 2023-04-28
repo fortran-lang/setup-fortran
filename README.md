@@ -59,9 +59,11 @@ jobs:
   - *intel* (for `ifx`)
   - *intel-classic* (for `ifort`)
 - *version*: Version of the compiler toolchain, available options are
-  - *5–12* for *gcc*
+  - *5–13* for *gcc*
   - *2021.1–2023.1* for *intel*
   - *2021.1–2021.9* for *intel-classic*
+
+**Note:** version 13 of the GNU toolchain is not yet available on Windows.
 
 
 ## Outputs
