@@ -23,7 +23,7 @@ install_gcc_brew()
   ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
 
   # link lib dir for previous GCC versions to avoid missing .dylib issues
-  for (( i=12; i>4; i-- ))
+  for (( i=13; i>4; i-- ))
   do
     gcc_lib_path="/usr/local/opt/gcc/lib/gcc/$i"
     if [ -d $gcc_lib_path ]; then
@@ -90,46 +90,6 @@ install_gcc_choco()
   if [ -d "$FCDIR" ] && [ -f "$LNDIR/libgfortran-5.dll" ] && [ ! -f "$FCDIR/libgfortran-5.dll" ]; then
       ln -s "$LNDIR/libgfortran-5.dll" "$FCDIR/libgfortran-5.dll"
   fi
-}
-
-install_gcc_winlibs()
-{
-  repo="https://github.com/brechtsanders/winlibs_mingw/releases/download"
-  case $version in
-    12)
-      tag="12.2.0-14.0.6-10.0.0-ucrt-r2"
-      zip="winlibs-x86_64-posix-seh-gcc-12.2.0-mingw-w64ucrt-10.0.0-r2.zip"
-      ;;
-    11)
-      tag="11.2.0-12.0.1-9.0.0-r1"
-      zip="winlibs-x86_64-posix-seh-gcc-11.2.0-mingw-w64-9.0.0-r1.zip"
-      ;;
-    10)
-      tag="10.3.0-12.0.0-9.0.0-r2"
-      zip="winlibs-x86_64-posix-seh-gcc-10.3.0-mingw-w64-9.0.0-r2.zip"
-      ;;
-    9)
-      tag="9.4.0-9.0.0-r1"
-      zip="winlibs-x86_64-posix-seh-gcc-9.4.0-mingw-w64-9.0.0-r1.zip"
-      ;;
-    8)
-      tag="8.5.0-9.0.0-r1"
-      zip="winlibs-x86_64-posix-seh-gcc-8.5.0-mingw-w64-9.0.0-r1.zip"
-      ;;
-    *)
-      echo "Unsupported version: $version (choose 8-12)"
-      exit 1
-      ;;
-  esac
-
-  require_fetch
-  $fetch "$repo/$tag/$zip" > gcc.zip
-
-  unzip -qo gcc.zip "mingw64/bin/*" -d /
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc()
