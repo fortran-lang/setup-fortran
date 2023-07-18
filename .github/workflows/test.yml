@@ -73,6 +73,9 @@ jobs:
           # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.2'}}
           # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.1'}}
 
+          # currently only support ifort 2021.7.0 so version option ignored
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.7.0'}}
+
     steps:
 
       - name: Checkout repository

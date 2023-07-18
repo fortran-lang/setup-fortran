@@ -20,6 +20,7 @@ runs:
   steps:
     - id: setup
       name: Setup toolchain
+      if: (!(runner.os == 'Windows' && inputs.compiler == 'intel-classic'))
       shell: bash
       env:
         COMPILER: ${{ inputs.compiler }}
@@ -59,3 +60,8 @@ runs:
         # persist environment variables
         echo "FC=${FC}" >> $GITHUB_ENV
         echo "CC=${CC}" >> $GITHUB_ENV
+
+    - name: Setup Intel Fortran Compiler Classic (Windows)
+      if: runner.os == 'Windows' && inputs.compiler == 'intel-classic'
+      uses: modflowpy/install-intelfortran-action@v1
+
