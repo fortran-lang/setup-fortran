@@ -11,15 +11,48 @@ inputs:
 outputs:
   fc:
     description: "Path to Fortran compiler"
-    value: ${{ steps.setup.outputs.fc }}
+    value: ${{ steps.outputs.outputs.fc }}
   cc:
     description: "Path to C compiler"
-    value: ${{ steps.setup.outputs.cc }}
+    value: ${{ steps.outputs.outputs.cc }}
 runs:
   using: "composite"
   steps:
-    - id: setup
-      name: Setup toolchain
+
+    - name: Set oneAPI install dir
+      id: oneapi-root
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      shell: bash
+      run: echo "ONEAPI_ROOT=C:\Program Files (x86)\Intel\oneAPI" >> "$GITHUB_ENV"
+
+    # GNU tar can't handle symlinks on Windows, hide it so default Windows tar is used to restore cache
+    - name: Hide GNU tar
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      shell: bash
+      run: mv "C:\Program Files\Git\usr\bin\tar.exe" "$RUNNER_TEMP\tar.exe"
+
+    - name: Get Date
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      id: get-date
+      shell: bash
+      run: echo "date=$(/bin/date -u "+%Y%m%d")" >> "$GITHUB_OUTPUT"
+
+    - name: Restore cache
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      id: cache
+      uses: actions/cache/restore@v3
+      with:
+        path: ${{ env.ONEAPI_ROOT }}
+        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+
+    - name: Restore GNU tar
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      shell: bash
+      run: mv "$RUNNER_TEMP\tar.exe" 'C:\Program Files\Git\usr\bin\tar.exe'
+
+    - name: Setup toolchain
+      id: setup
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         COMPILER: ${{ inputs.compiler }}
@@ -49,13 +82,61 @@ runs:
             ;;
         esac
 
-        which "${FC}"
-        which "${CC}"
-  
-        # set outputs
-        echo "fc=${FC}" >> $GITHUB_OUTPUT
-        echo "cc=${CC}" >> $GITHUB_OUTPUT
-        
-        # persist environment variables
-        echo "FC=${FC}" >> $GITHUB_ENV
-        echo "CC=${CC}" >> $GITHUB_ENV
+        if ! ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
+          which "${FC}"
+          which "${CC}"
+          
+          # persist environment variables
+          echo "FC=${FC}" >> $GITHUB_ENV
+          echo "CC=${CC}" >> $GITHUB_ENV
+        fi
+
+    - name: Save cache
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel') && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v3
+      with:
+        path: ${{ env.ONEAPI_ROOT }}
+        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+
+    - name: Activate oneAPI
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      shell: cmd
+      run: |
+        for /f "tokens=* usebackq" %%f in (`dir /b "%ONEAPI_ROOT%\compiler\" ^| findstr /V latest ^| sort`) do @set "LATEST=%%f"
+        :: this script fails when install location is not the default
+        call "%ONEAPI_ROOT%\compiler\%LATEST%\env\vars.bat"
+        set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
+
+    - name: Set outputs and env vars
+      shell: bash
+      id: outputs
+      run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          if [[ "${{ inputs.compiler }}" == "intel" ]]; then
+            echo fc=ifx>>$GITHUB_OUTPUT
+            echo cc=icx>>$GITHUB_OUTPUT
+            echo FC=ifx>>$GITHUB_ENV
+            echo CC=icx>>$GITHUB_ENV
+          elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
+            echo fc=ifort>>$GITHUB_OUTPUT
+            echo cc=icl>>$GITHUB_OUTPUT
+            echo FC=ifort>>$GITHUB_ENV
+            echo CC=icl>>$GITHUB_ENV
+          else
+            echo fc=$FC>>$GITHUB_OUTPUT
+            echo cc=$CC>>$GITHUB_OUTPUT
+            echo FC=$FC>>$GITHUB_ENV%
+            echo CC=$CC>>$GITHUB_ENV%
+          fi
+        else
+          echo fc=$FC>>$GITHUB_OUTPUT
+          echo cc=$CC>>$GITHUB_OUTPUT
+          echo FC=$FC>>$GITHUB_ENV
+          echo CC=$CC>>$GITHUB_ENV
+        fi
+
+    # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
+    - name: Hide GNU linker (Windows)
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      shell: bash
+      run: mv "/usr/bin/link" "$RUNNER_TEMP/link"

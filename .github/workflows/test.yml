@@ -76,6 +76,18 @@ jobs:
           # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.2'}}
           # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.1'}}
 
+          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.2.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.1.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.0.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel, version: '2022.2.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel, version: '2022.1.0'}}
+
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.10.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.9.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.8.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.7.0'}}
+          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.6.0'}}
+
     steps:
 
       - name: Checkout repository
@@ -90,26 +102,37 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - name: Check compiler version
-        if: ${{ steps.setup-fortran.outcome == 'success' }}
+        if: steps.setup-fortran.outcome == 'success'
         shell: bash
         env:
           FC: ${{ steps.setup-fortran.outputs.fc }}
           CC: ${{ steps.setup-fortran.outputs.cc }}
         run: |
-          fcv=$(${{ env.FC }} --version | head -n 1)
-          ccv=$(${{ env.CC }} --version | head -n 1)
+          if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
+            # only last line of output captured by command substitution, write to temp file instead
+            ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
+            ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
+
+            fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
+            ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
+
+            fcv=${fcv#*Version }
+            fcv=${fcv%% Build*}
+            ccv=${ccv#*Version }
+            ccv=${ccv%% Build*}
+          else
+            fcv=$(${{ env.FC }} --version | head -n 1)
+            ccv=$(${{ env.CC }} --version | head -n 1)
+
+            fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
+            ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
+          fi
           
-          echo $fcv
-          echo $ccv
-          
-          fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
-          ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
-          
-          [[ $fcv == ${{ matrix.toolchain.version }}* ]] || (echo "unexpected Fortran compiler version: $fcv"; exit 1)
-          [[ $ccv == ${{ matrix.toolchain.version }}* ]] || (echo "unexpected C compiler version: $ccv"; exit 1)
+          [[ "$fcv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
+          [[ "$ccv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
 
       - name: Test compile program (bash)
-        if: ${{ steps.setup-fortran.outcome == 'success' }}
+        if: steps.setup-fortran.outcome == 'success'
         shell: bash
         env:
           FC: ${{ steps.setup-fortran.outputs.fc }}
