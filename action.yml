@@ -50,9 +50,15 @@ runs:
             ;;
         esac
 
+    - name: Setup Intel Fortran Compiler Classic (Windows)
+      if: runner.os == 'Windows' && inputs.compiler == 'intel-classic'
+      uses: modflowpy/install-intelfortran-action@v1
+    
+    - name: Set outputs and environment variables
+      run: |
         which "${FC}"
         which "${CC}"
-  
+
         # set outputs
         echo "fc=${FC}" >> $GITHUB_OUTPUT
         echo "cc=${CC}" >> $GITHUB_OUTPUT
@@ -60,8 +66,3 @@ runs:
         # persist environment variables
         echo "FC=${FC}" >> $GITHUB_ENV
         echo "CC=${CC}" >> $GITHUB_ENV
-
-    - name: Setup Intel Fortran Compiler Classic (Windows)
-      if: runner.os == 'Windows' && inputs.compiler == 'intel-classic'
-      uses: modflowpy/install-intelfortran-action@v1
-
