@@ -38,7 +38,7 @@ jobs:
           - {compiler: gcc, version:  6}
           # {compiler: gcc, version:  5}
         include:
-          - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.2.0'}}
+          - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.2'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.1'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.0'}}
           - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2022.2.1'}}
