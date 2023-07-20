@@ -143,6 +143,9 @@ intel_version_map_l()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.10.0 | 2021.10)
+        version=2023.2.0
+        ;;
       2021.9.0 | 2021.9)
         version=2023.1.0
         ;;
@@ -177,7 +180,7 @@ intel_version_map_l()
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
-      2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
+      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
         version=$actual_version.0
         ;;
       2021.1)
@@ -194,6 +197,9 @@ intel_version_map_m()
 {
   local actual_version=$1
   case $actual_version in
+    2021.10.0 | 2021.10)
+      version=2023.2.0
+      ;;
     2021.9.0 | 2021.9)
       version=2023.1.0
       ;;

@@ -31,13 +31,13 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         toolchain:
           - {compiler: gcc, version: 11}
-          - {compiler: intel-classic, version: '2021.9'}
+          - {compiler: intel-classic, version: '2021.10'}
         include:
           - os: ubuntu-latest
-            toolchain: {compiler: intel, version: '2023.1'}
+            toolchain: {compiler: intel, version: '2023.2'}
         exclude:
           - os: windows-latest
-            toolchain: {compiler: intel-classic, version: '2021.9'}
+            toolchain: {compiler: intel-classic, version: '2021.10'}
 
     steps:
       - uses: awvwgk/setup-fortran@v1
@@ -60,8 +60,8 @@ jobs:
   - *intel-classic* (for `ifort`)
 - *version*: Version of the compiler toolchain, available options are
   - *5–13* for *gcc*
-  - *2021.1–2023.1* for *intel*
-  - *2021.1–2021.9* for *intel-classic*
+  - *2021.1–2023.2* for *intel*
+  - *2021.1–2021.10* for *intel-classic*
 
 **Note:** version 13 of the GNU toolchain is not yet available on Windows.
 
@@ -105,7 +105,7 @@ Supported Intel toolchains:
 
 | runner    | compiler       | version |
 | :-------- | :------------- | :------ |
-| ubuntu-\* | intel          | 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
+| ubuntu-\* | intel          | 2023.2, 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
 | ubuntu-\* | intel-classic  | 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
 | macos-\*  | intel-classic  | 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1 |
 
