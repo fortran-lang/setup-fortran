@@ -51,7 +51,7 @@ jobs:
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1.2'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1'}}
 
-          - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2023.2.0'}}
+          - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.10'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.9'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.8'}}
           - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
