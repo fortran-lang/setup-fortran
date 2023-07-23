@@ -37,11 +37,11 @@ runs:
             install_gcc $platform
             ;;
           intel-classic)
-            version=${VERSION:-2023.1.0}
+            version=${VERSION:-2023.2.0}
             install_intel $platform true
             ;;
           intel)
-            version=${VERSION:-2023.1.0}
+            version=${VERSION:-2023.2.0}
             install_intel $platform false
             ;;
           *)

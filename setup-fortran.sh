@@ -143,6 +143,9 @@ intel_version_map_l()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.10.0 | 2021.10)
+        version=2023.2.0
+        ;;
       2021.9.0 | 2021.9)
         version=2023.1.0
         ;;
@@ -177,7 +180,7 @@ intel_version_map_l()
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
-      2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
+      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
         version=$actual_version.0
         ;;
       2021.1)
@@ -194,6 +197,9 @@ intel_version_map_m()
 {
   local actual_version=$1
   case $actual_version in
+    2021.10.0 | 2021.10)
+      version=2023.2.0
+      ;;
     2021.9.0 | 2021.9)
       version=2023.1.0
       ;;
@@ -299,6 +305,10 @@ install_intel_dmg()
     2023.1.0)
       MACOS_BASEKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2516a0a0-de4d-4f3d-9e83-545b32127dbb/m_BaseKit_p_2023.1.0.45568.dmg
       MACOS_HPCKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543.dmg
+      ;;
+    2023.2.0)
+      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/cd013e6c-49c4-488b-8b86-25df6693a9b7/m_BaseKit_p_2023.2.0.49398.dmg
+      MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443.dmg
       ;;
     *)
       exit 1
