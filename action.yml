@@ -135,6 +135,11 @@ runs:
           echo CC=$CC>>$GITHUB_ENV
         fi
 
+        # set flag to indicate that SETVARS has been run
+        if [[ "${{ inputs.compiler }}" =~ "intel" ]]; then
+          echo SETVARS_COMPLETED=1>>$GITHUB_ENV
+        fi
+
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')

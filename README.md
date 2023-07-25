@@ -108,7 +108,7 @@ Supported Intel toolchains:
 | windows-\* | intel | 2023.2, 2023.1, 2023.0, 2022.2.0, 2022.1.0 |
 | windows-\* | intel-classic | 2021.10.0, 2021.9.0, 2021.8.0, 2021.7.0, 2021.6.0 |
 
-**Note:** on macOS the `intel`/`ifx` compiler option is not suppoted, only `intel-classic` with the `ifort` compiler.
+**Note:** on macOS the `intel`/`ifx` compiler option is not supported, only `intel-classic` with the `ifort` compiler.
 
 ## License
 
