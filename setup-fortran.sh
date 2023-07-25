@@ -227,6 +227,49 @@ intel_version_map_m()
   esac
 }
 
+intel_version_map_w()
+{
+  local actual_version=$1
+  local classic=$2
+  if $classic; then
+    case $actual_version in
+      2021.10.0 | 2021.10)
+        version=2023.2.0
+        ;;
+      2021.9.0 | 2021.9)
+        version=2023.1.0
+        ;;
+      2021.8.0 | 2021.8)
+        version=2023.0.0
+        ;;
+      2021.7.0 | 2021.7)
+        version=2022.3.0
+        ;;
+      2021.6.0 | 2021.6)
+        version=2022.2.0
+        ;;
+      *)
+        version=$actual_version
+        ;;
+    esac
+  else
+    case $actual_version in
+      2023.2 | 2023.1 | 2023.0)
+        version=$actual_version.0
+        ;;
+      2022.2.0 | 2022.2)
+        version=2022.3.0
+        ;;
+      2022.1.0 | 2022.1)
+        version=2022.2.0
+        ;;
+      *)
+        version=$actual_version
+        ;;
+    esac
+  fi
+}
+
 install_intel_apt()
 {
   local version=$1
@@ -334,6 +377,58 @@ install_intel_dmg()
   export CXX="icpc"
 }
 
+install_intel_win()
+{
+  local version=$1
+  local classic=$2
+  intel_version_map_w $version $classic
+
+  case $version in
+    2023.2.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/438527fc-7140-422c-a851-389f2791816b/w_HPCKit_p_2023.2.0.49441_offline.exe
+      ;;
+    2023.1.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe
+      ;;
+    2023.0.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/19085/w_HPCKit_p_2023.0.0.25931_offline.exe
+      ;;
+    2022.3.1)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18976/w_HPCKit_p_2022.3.1.19755_offline.exe
+      ;;
+    2022.3.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe
+      ;;
+    2022.2.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe
+      ;;
+    # the installer versions below fail
+    # 2022.1.2)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18529/w_HPCKit_p_2022.1.2.116_offline.exe
+    #   ;;
+    # 2022.1.0)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18417/w_HPCKit_p_2022.1.0.93_offline.exe
+    #   ;;
+    # 2021.4.0)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18247/w_HPCKit_p_2021.4.0.3340_offline.exe
+    #   ;;
+    # 2021.3.0)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17940/w_HPCKit_p_2021.3.0.3227_offline.exe
+    #   ;;
+    # 2021.2.0)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17762/w_HPCKit_p_2021.2.0.2901_offline.exe
+    #   ;;
+    # 2021.1.0)
+    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17392/w_HPCKit_p_2021.1.0.2682_offline.exe
+    #   ;;
+    *)
+      exit 1
+      ;;
+  esac
+
+  "$GITHUB_ACTION_PATH/install-intel-windows.bat" $WINDOWS_HPCKIT_URL
+}
+
 install_intel()
 {
   local platform=$1
@@ -344,6 +439,15 @@ install_intel()
       ;;
     darwin*)
       install_intel_dmg $version
+      ;;
+    mingw*)
+      install_intel_win $version $classic
+      ;;
+    msys*)
+      install_intel_win $version $classic
+      ;;
+    cygwin*)
+      install_intel_win $version $classic
       ;;
     *)
       echo "Unsupported platform: $platform"
