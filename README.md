@@ -58,12 +58,8 @@ jobs:
   - *gcc* (for `gfortran`)
   - *intel* (for `ifx`)
   - *intel-classic* (for `ifort`)
-- *version*: Version of the compiler toolchain, available options are
-  - *5–13* for *gcc*
-  - *2021.1–2023.2* for *intel*
-  - *2021.1–2021.10* for *intel-classic*
+- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) chart below.
 
-**Note:** version 13 of the GNU toolchain is not yet available on Windows.
 
 
 ## Outputs
@@ -100,6 +96,7 @@ Support for the GCC toolchain varies across GitHub-hosted runner images.
 | windows-2022 |      |      | &check; | &check; | &check; | &check; | &check; |
 <!-- compat ends -->
 
+**Note:** version 13 of the GNU toolchain is not yet available on Windows.
 
 Supported Intel toolchains:
 
@@ -111,6 +108,7 @@ Supported Intel toolchains:
 | windows-\* | intel | 2023.2, 2023.1, 2023.0, 2022.2.0, 2022.1.0 |
 | windows-\* | intel-classic | 2021.10.0, 2021.9.0, 2021.8.0, 2021.7.0, 2021.6.0 |
 
+**Note:** on macOS the `intel`/`ifx` compiler option is not suppoted, only `intel-classic` with the `ifort` compiler.
 
 ## License
 
