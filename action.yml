@@ -1,4 +1,4 @@
-name: "Setup Fortran"
+name: "Setup Fortran and libraries"
 description: "Setup Fortran compiler and toolchain"
 inputs:
   compiler:
