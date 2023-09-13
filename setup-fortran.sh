@@ -287,7 +287,7 @@ install_intel_apt()
   sudo apt-get update
 
   sudo apt-get install \
-    intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version intel-oneapi-mkl
+    intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version intel-oneapi-mkl-$version
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
