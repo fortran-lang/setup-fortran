@@ -85,15 +85,15 @@ These are made available to subsequent workflow steps via the [`GITHUB_ENV` envi
 Support for the GCC toolchain varies across GitHub-hosted runner images.
 
 <!-- compat starts -->
-| runner       | 6       | 7       | 8       | 9       | 10      | 11      | 12      |
-|:-------------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|
-| macos-11     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| macos-12     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| macos-13     | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| ubuntu-20.04 |      | &check; | &check; | &check; | &check; | &check; |      |
-| ubuntu-22.04 |      |      |      | &check; | &check; | &check; | &check; |
-| windows-2019 |      |      | &check; | &check; | &check; | &check; | &check; |
-| windows-2022 |      |      | &check; | &check; | &check; | &check; | &check; |
+| runner       | 6       | 7       | 8       | 9       | 10      | 11      | 12      | 13      |
+|:-------------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|
+| macos-11     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| macos-12     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| macos-13     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
+| ubuntu-20.04 |      | &check; | &check; | &check; | &check; | &check; |      | &check; |
+| ubuntu-22.04 |      |      |      | &check; | &check; | &check; | &check; | &check; |
+| windows-2019 |      |      | &check; | &check; | &check; | &check; | &check; |      |
+| windows-2022 |      |      | &check; | &check; | &check; | &check; | &check; |      |
 <!-- compat ends -->
 
 **Note:** version 13 of the GNU toolchain is not yet available on Windows.
