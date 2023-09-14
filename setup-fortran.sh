@@ -287,7 +287,7 @@ install_intel_apt()
   sudo apt-get update
 
   sudo apt-get install \
-    intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version intel-oneapi-mkl
+    intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version intel-oneapi-mkl-$version
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
@@ -357,6 +357,17 @@ install_intel_dmg()
       exit 1
       ;;
   esac
+
+  require_fetch
+  $fetch $MACOS_BASEKIT_URL > m_BASEKit.dmg
+  hdiutil attach m_BASEKit.dmg
+  sudo /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
+    --action install \
+    --eula=accept \
+    --continue-with-optional-error=yes \
+    --log-dir=.
+  hdiutil detach /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)" -quiet
+  rm m_BASEKit.dmg
 
   require_fetch
   $fetch $MACOS_HPCKIT_URL > m_HPCKit.dmg
