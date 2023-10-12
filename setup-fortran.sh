@@ -131,6 +131,7 @@ CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
 OCL_ICD_FILENAMES=$OCL_ICD_FILENAMES
 INTEL_PYTHONHOME=$INTEL_PYTHONHOME
 CPATH=$CPATH
+SETVARS_COMPLETED=$SETVARS_COMPLETED
 EOF
   for path in ${PATH//:/ }; do
     echo $path >> $GITHUB_PATH
@@ -180,7 +181,7 @@ intel_version_map_l()
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
-      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
+      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.2)
         version=$actual_version.0
         ;;
       2021.1)
@@ -281,7 +282,6 @@ install_intel_apt()
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
-  unset $_KEY
   echo "deb https://apt.repos.intel.com/oneapi all main" \
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
@@ -427,6 +427,10 @@ install_intel_win()
   esac
 
   "$GITHUB_ACTION_PATH/install-intel-windows.bat" $WINDOWS_HPCKIT_URL
+
+  # don't call export_intel_vars here because the install may have
+  # been restored from cache. export variables in action.yml after
+  # installation or cache restore.
 }
 
 install_intel()

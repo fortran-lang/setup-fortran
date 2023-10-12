@@ -102,13 +102,13 @@ Supported Intel toolchains:
 
 | runner    | compiler       | version |
 | :-------- | :------------- | :------ |
-| ubuntu-\* | intel          | 2023.2, 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
+| ubuntu-\* | intel          | 2023.2, 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.2, 2021.1.2, 2021.1 |
 | ubuntu-\* | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
 | macos-\*  | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1 |
 | windows-\* | intel | 2023.2, 2023.1, 2023.0, 2022.2.0, 2022.1.0 |
 | windows-\* | intel-classic | 2021.10.0, 2021.9.0, 2021.8.0, 2021.7.0, 2021.6.0 |
 
-**Note:** on macOS the `intel`/`ifx` compiler option is not suppoted, only `intel-classic` with the `ifort` compiler.
+**Note:** on macOS the `intel`/`ifx` compiler option is not supported, only `intel-classic` with the `ifort` compiler.
 
 ## License
 

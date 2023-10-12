@@ -117,22 +117,25 @@ runs:
             echo cc=icx>>$GITHUB_OUTPUT
             echo FC=ifx>>$GITHUB_ENV
             echo CC=icx>>$GITHUB_ENV
+            echo CXX=icx>>$GITHUB_ENV
           elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
             echo fc=ifort>>$GITHUB_OUTPUT
             echo cc=icl>>$GITHUB_OUTPUT
             echo FC=ifort>>$GITHUB_ENV
             echo CC=icl>>$GITHUB_ENV
+            echo CXX=icl>>$GITHUB_ENV
           else
             echo fc=$FC>>$GITHUB_OUTPUT
             echo cc=$CC>>$GITHUB_OUTPUT
-            echo FC=$FC>>$GITHUB_ENV%
-            echo CC=$CC>>$GITHUB_ENV%
           fi
         else
           echo fc=$FC>>$GITHUB_OUTPUT
           echo cc=$CC>>$GITHUB_OUTPUT
-          echo FC=$FC>>$GITHUB_ENV
-          echo CC=$CC>>$GITHUB_ENV
+        fi
+
+        # intel oneapi flag to indicate env has been activated
+        if [[ "${{ inputs.compiler }}" =~ "intel" ]]; then
+          echo SETVARS_COMPLETED=1>>$GITHUB_ENV
         fi
 
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found

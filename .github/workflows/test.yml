@@ -38,6 +38,10 @@ jobs:
           - {compiler: gcc, version:  6}
           # {compiler: gcc, version:  5}
         include:
+          - {os: ubuntu-20.04, toolchain: {compiler: intel, version: '2023.2'}}
+          - {os: ubuntu-20.04, toolchain: {compiler: intel, version: '2022.2.1'}}
+          - {os: ubuntu-20.04, toolchain: {compiler: intel, version: '2021.4'}}
+
           - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.2'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.1'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.0'}}
@@ -50,6 +54,10 @@ jobs:
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.2'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1.2'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1'}}
+
+          - {os: ubuntu-20.04, toolchain: {compiler: intel-classic, version: '2021.10'}}
+          - {os: ubuntu-20.04, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
+          - {os: ubuntu-20.04, toolchain: {compiler: intel-classic, version: '2021.4'}}
 
           - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.10'}}
           # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.9'}}
