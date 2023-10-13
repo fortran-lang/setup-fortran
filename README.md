@@ -1,11 +1,15 @@
 # Setup Fortran
 
 [![Test](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml/badge.svg)](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![GitHub tag](https://img.shields.io/github/tag/fortran-lang/setup-fortran.svg)](https://github.com/fortran-lang/setup-fortran/tags/latest)
+
 
 Action to setup a Fortran compiler.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 
 - [Usage](#usage)
 - [Options](#options)
@@ -58,7 +62,7 @@ jobs:
   - *gcc* (for `gfortran`)
   - *intel* (for `ifx`)
   - *intel-classic* (for `ifort`)
-- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) chart below.
+- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
 
 
 
