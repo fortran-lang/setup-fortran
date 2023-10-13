@@ -44,7 +44,7 @@ jobs:
             toolchain: {compiler: intel-classic, version: '2021.10'}
 
     steps:
-      - uses: awvwgk/setup-fortran@v1
+      - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
         with:
           compiler: ${{ matrix.toolchain.compiler }}
