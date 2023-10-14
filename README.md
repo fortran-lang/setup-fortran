@@ -25,6 +25,8 @@ Action to setup a Fortran compiler.
 
 This action sets up a Fortran compiler on Ubuntu, MacOS and Windows runners.
 
+C/C++ compilers of the same toolchain/version are provided where possible, otherwise (if a standalone Fortran compiler is selected) defaulting to the preinstalled GCC.
+
 ```yaml
 jobs:
   test:
@@ -65,28 +67,29 @@ jobs:
 - *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
 
 
-
 ## Outputs
 
 The action sets the following outputs:
 
-- `cc`: C compiler executable, e.g. `gcc`
 - `fc`: Fortran compiler executable, e.g. `gfortran`
+- `cc`: C compiler executable, e.g. `gcc`
+- `cxx`: C++ compiler executable, e.g. `g++`
 
 
 ## Environment variables
 
 The same values are also set as environment variables:
 
-- `CC`
 - `FC`
+- `CC`
+- `CXX`
 
 These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
 
 
 ## Runner compatibility
 
-Support for the GCC toolchain varies across GitHub-hosted runner images.
+Toolchain support varies across GitHub-hosted runner images.
 
 <!-- compat starts -->
 | runner       | 6       | 7       | 8       | 9       | 10      | 11      | 12      | 13      |
@@ -104,17 +107,7 @@ Support for the GCC toolchain varies across GitHub-hosted runner images.
 
 **Note:** on `macos-13`, gcc 7-9 require flag `-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib`.
 
-Supported Intel toolchains:
-
-| runner    | compiler       | version |
-| :-------- | :------------- | :------ |
-| ubuntu-\* | intel          | 2023.2, 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.2, 2021.1.2, 2021.1 |
-| ubuntu-\* | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
-| macos-\*  | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1 |
-| windows-\* | intel | 2023.2, 2023.1, 2023.0, 2022.2.0, 2022.1.0 |
-| windows-\* | intel-classic | 2021.10.0, 2021.9.0, 2021.8.0, 2021.7.0, 2021.6.0 |
-
-**Note:** on macOS `ifx` is not supported, so the `intel` option redirects to `intel-classic` (`ifort`).
+**Note:** Intel's `ifx` compiler is not supported on macOS, so the `intel` option redirects to `intel-classic` (`ifort`).
 
 ## License
 

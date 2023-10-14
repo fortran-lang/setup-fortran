@@ -45,11 +45,12 @@ install_gcc_apt()
 {
   sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
   sudo apt-get update
-  sudo apt-get install -y gcc-${version} gfortran-${version}
+  sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
   sudo update-alternatives \
     --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
     --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
-    --slave /usr/bin/gcov gcov /usr/bin/gcov-${version}
+    --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
 
   export FC="gfortran"
   export CC="gcc"
