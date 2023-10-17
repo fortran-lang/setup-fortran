@@ -2,11 +2,11 @@ name: "Setup Fortran"
 description: "Setup Fortran compiler and toolchain"
 inputs:
   compiler:
-    description: "Compiler toolchain"
+    description: "Toolchain or compiler to install"
     required: true
     default: "gcc"
   version:
-    description: "Version of compiler toolchain"
+    description: "Version of toolchain or compiler"
     required: false
 outputs:
   fc:
@@ -21,25 +21,24 @@ outputs:
 runs:
   using: "composite"
   steps:
-
+    # On Windows runners the Intel toolchain is very slow to install,
+    # setup caching with daily key rotation. Steps are also needed to
+    # activate the oneAPI environment.
     - name: Set oneAPI install dir
       id: oneapi-root
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: bash
       run: echo "ONEAPI_ROOT=C:\Program Files (x86)\Intel\oneAPI" >> "$GITHUB_ENV"
-
     # GNU tar can't handle symlinks on Windows, hide it so default Windows tar is used to restore cache
     - name: Hide GNU tar
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: bash
       run: mv "C:\Program Files\Git\usr\bin\tar.exe" "$RUNNER_TEMP\tar.exe"
-
-    - name: Get Date
+    - name: Get date
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: get-date
       shell: bash
       run: echo "date=$(/bin/date -u "+%Y%m%d")" >> "$GITHUB_OUTPUT"
-
     - name: Restore cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: cache
@@ -47,12 +46,12 @@ runs:
       with:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
-
     - name: Restore GNU tar
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: bash
       run: mv "$RUNNER_TEMP\tar.exe" 'C:\Program Files\Git\usr\bin\tar.exe'
 
+    # Set up the selected toolchain or compiler
     - name: Setup toolchain
       id: setup
       if: steps.cache.outputs.cache-hit != 'true'
@@ -69,7 +68,7 @@ runs:
 
         case $compiler in
           gcc)
-            version=${VERSION:-11}
+            version=${VERSION:-13}
             install_gcc $platform
             ;;
           intel-classic)
@@ -92,13 +91,13 @@ runs:
           echo "CXX=${CXX}" >> $GITHUB_ENV
         fi
 
+    # save oneAPI cache and activate environment
     - name: Save cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel') && steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
-
     - name: Activate oneAPI
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: cmd
@@ -109,13 +108,12 @@ runs:
         :: this script fails when install location is not the default
         call "%ONEAPI_ROOT%\compiler\%LATEST%\env\vars.bat"
         set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
-
+    # Intel compilers may have restored from cache so env vars may not be set,
+    # set them then set outputs for all compilers/toolchains
     - name: Set outputs and env vars
       shell: bash
       id: outputs
       run: |
-        # on windows intel compilers may be restored
-        # from cache, don't know if env vars are set
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           if [[ "${{ inputs.compiler }}" == "intel" ]]; then
             echo fc=ifx>>$GITHUB_OUTPUT
@@ -146,7 +144,6 @@ runs:
         if [[ "${{ inputs.compiler }}" =~ "intel" ]]; then
           echo SETVARS_COMPLETED=1>>$GITHUB_ENV
         fi
-
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')

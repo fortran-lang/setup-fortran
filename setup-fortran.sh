@@ -60,6 +60,15 @@ install_gcc_apt()
 install_gcc_choco()
 {
   case $version in
+    13)
+      choco install mingw --version 13.2.0 --force
+      # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+      # so hide Strawberry compilers and manually add mingw bin dir to PATH
+      mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/gfortran"
+      mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/gcc"
+      mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/g++"
+      echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
+      ;;
     12)
       choco install mingw --version 12.2.0 --force
       ;;
@@ -76,7 +85,7 @@ install_gcc_choco()
       choco install mingw --version 8.5.0 --force
       ;;
     *)
-      echo "Unsupported version: $version (choose 8-12)"
+      echo "Unsupported version: $version (choose 8-13)"
       exit 1
       ;;
   esac

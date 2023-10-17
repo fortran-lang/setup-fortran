@@ -17,11 +17,12 @@ assert op.suffix == ".csv"
 df = pd.read_csv(ip)
 
 # pivot and sort
-df = pd.pivot(
+df = pd.pivot_table(
     df,
     index="runner",
     columns=["compiler", "version"],
     values="support",
+    sort=False
 ).sort_values(by=["runner"])
 
 # write wide CSV
