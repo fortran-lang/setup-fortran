@@ -14,10 +14,19 @@ require_fetch()
   fi
 }
 
-
 install_gcc_brew()
 {
-  brew install gcc@${version}
+  # check if gcc preinstalled via brew
+  cur=$(brew list --versions gcc | cut -d' ' -f2)
+  maj=$(echo $cur | cut -d'.' -f1)
+  # if already installed, nothing to do
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    # otherwise install selected version
+    brew install gcc@${version}
+  fi
+
   ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
   ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
   ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
@@ -43,9 +52,17 @@ install_gcc_brew()
 
 install_gcc_apt()
 {
-  sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-  sudo apt-get update
-  sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
+  # check if gcc preinstalled via apt
+  cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
+  maj=$(echo $cur | cut -d'.' -f1)
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+    sudo apt-get update
+    sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
+  fi
+
   sudo update-alternatives \
     --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
     --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
@@ -59,47 +76,65 @@ install_gcc_apt()
 
 install_gcc_choco()
 {
-  case $version in
-    13)
-      choco install mingw --version 13.2.0 --force
-      # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
-      # so hide Strawberry compilers and manually add mingw bin dir to PATH
-      mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/gfortran"
-      mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/gcc"
-      mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/g++"
-      echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
-      ;;
-    12)
-      choco install mingw --version 12.2.0 --force
-      ;;
-    11)
-      choco install mingw --version 11.2.0 --force
-      ;;
-    10)
-      choco install mingw --version 10.3.0 --force
-      ;;
-    9)
-      choco install mingw --version 9.4.0 --force
-      ;;
-    8)
-      choco install mingw --version 8.5.0 --force
-      ;;
-    *)
-      echo "Unsupported version: $version (choose 8-13)"
-      exit 1
-      ;;
-  esac
+  # check if mingw preinstalled via choco, falling back to check directly for gfortran
+  cur=$(choco list -e mingw -r | cut -d'|' -f2)
+  if [[ "$cur" == "" ]] && [[ "$(which gfortran)" != "" ]]; then
+    cur=$(gfortran --version | grep -woE '[0123456789.]+' | head -n 1)
+  fi
+  maj=$(echo $cur | cut -d'.' -f1)
+  # if already installed, nothing to do
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    # otherwise hide preinstalled mingw compilers
+    mkdir "$RUNNER_TEMP/mingw64"
+    mv /c/mingw64/bin/gfortran "$RUNNER_TEMP/mingw64/gfortran"
+    mv /c/mingw64/bin/gcc "$RUNNER_TEMP/mingw64/gcc"
+    mv /c/mingw64/bin/g++ "$RUNNER_TEMP/mingw64/g++"
+    # ...and install selected version
+    case $version in
+      13)
+        choco install mingw --version 13.2.0 --force
+        # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # so hide Strawberry compilers and manually add mingw bin dir to PATH
+        mkdir "$RUNNER_TEMP/strawberry"
+        mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
+        mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
+        mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
+        ;;
+      12)
+        choco install mingw --version 12.2.0 --force
+        ;;
+      11)
+        choco install mingw --version 11.2.0 --force
+        ;;
+      10)
+        choco install mingw --version 10.3.0 --force
+        ;;
+      9)
+        choco install mingw --version 9.4.0 --force
+        ;;
+      8)
+        choco install mingw --version 8.5.0 --force
+        ;;
+      *)
+        echo "Unsupported version: $version (choose 8-13)"
+        exit 1
+        ;;
+    esac
+  fi
 
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
-
-  # missing DLL can cause successfully compiled executables to fail at runtime
+  # missing DLL workaround
   FCDIR=/c/ProgramData/Chocolatey/bin
   LNDIR=/c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin
   if [ -d "$FCDIR" ] && [ -f "$LNDIR/libgfortran-5.dll" ] && [ ! -f "$FCDIR/libgfortran-5.dll" ]; then
       ln -s "$LNDIR/libgfortran-5.dll" "$FCDIR/libgfortran-5.dll"
   fi
+
+  export FC="gfortran"
+  export CC="gcc"
+  export CXX="g++"
 }
 
 install_gcc()

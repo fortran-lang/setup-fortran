@@ -1,0 +1,89 @@
+name: Test FC
+description: Test Fortran compiler compatibility
+inputs:
+  compiler:
+    description: "Toolchain or compiler to install"
+    required: true
+  version:
+    description: "Version of toolchain or compiler"
+    required: true
+runs:
+  using: "composite"
+  steps:
+
+    - name: Check compiler version
+      shell: bash
+      run: |
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
+          # only last line of output captured by command substitution, write to temp file instead
+          ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
+          fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
+          fcv=${fcv#*Version }
+          fcv=${fcv%% Build*}
+        else
+          fcv=$(${{ env.FC }} --version | head -n 1)
+          fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
+        fi
+        [[ "$fcv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
+
+    - name: Test compile (bash)
+      shell: bash
+      run: |
+        # macos-13/gfortran 7-9 compatibility workaround
+        args=""
+        if [ "$RUNNER_OS" == "macOS" ]; then
+          if [[ $(sw_vers -productVersion) == 13* ]] && \
+              [[ ${{ inputs.compiler }} == "gcc" ]] && \
+              [[ ${{ inputs.version }} =~ ^(7|8|9)$ ]]
+          then
+            args="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+          fi
+        fi
+
+        ${{ env.FC }} $args -o hw hw.f90
+        output=$(./hw '2>&1')
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
+        rm hw
+
+    - name: Test compile Fortran (pwsh)
+      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        ${{ env.FC }} -o hw.exe hw.f90 
+        $output=$(& ".\hw.exe")
+        if ($output -match "hello world") {
+            write-output $output
+        } else {
+            write-output "unexpected output: $output"
+            exit 1
+        }
+        rm hw.exe
+
+    - name: Test compile Fortran (powershell)
+      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      shell: powershell
+      run: |
+        ${{ env.FC }} -o hw.exe hw.f90 
+        $output=$(& ".\hw.exe")
+        if ($output -match "hello world") {
+            write-output $output
+        } else {
+            write-output "unexpected output: $output"
+            exit 1
+        }
+        rm hw.exe
+
+    - name: Test compile Fortran (cmd)
+      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      shell: cmd
+      run: |
+        ${{ env.FC }} -o hw.exe hw.f90 
+        for /f "tokens=* usebackq" %%f in (`.\hw.exe`) do @set "OUTPUT=%%f"
+        if "%OUTPUT%"=="hello world" (
+          echo %OUTPUT%
+        ) else (
+          echo unexpected output: %OUTPUT%
+          exit 1
+        )
+        del hw.exe
+    

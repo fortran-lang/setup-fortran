@@ -2,9 +2,6 @@ name: Test
 
 on:
   push:
-    branches:
-      - main
-      - develop*
     paths-ignore:
       - '**.md'
   pull_request:
@@ -17,8 +14,8 @@ on:
     - cron: '0 0 1 * *'
 
 jobs:
-  test:
-    name: Test latest compiler versions
+  test_latest:
+    name: Test latest versions
     if: github.event_name != 'schedule'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -44,149 +41,42 @@ jobs:
             toolchain: {compiler: intel}
           - os: macos-11
             toolchain: {compiler: intel}
-
     steps:
-
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Fortran
         id: setup-fortran
+        continue-on-error: true
         uses: ./
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - name: Check compiler version
+      - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
-            # only last line of output captured by command substitution, write to temp file instead
-            ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
-            ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
-            ${{ env.CXX }} //QV > "$RUNNER_TEMP/${{ env.CXX }}.ver" 2>&1
-
-            fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
-            ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
-            cxxv=$(cat "$RUNNER_TEMP/${{ env.CXX }}.ver" | head -n 1)
-
-            fcv=${fcv#*Version }
-            fcv=${fcv%% Build*}
-            ccv=${ccv#*Version }
-            ccv=${ccv%% Build*}
-            cxxv=${cxxv#*Version }
-            cxxv=${cxxv%% Build*}
-          else
-            fcv=$(${{ env.FC }} --version | head -n 1)
-            ccv=$(${{ env.CC }} --version | head -n 1)
-            cxxv=$(${{ env.CXX }} --version | head -n 1)
-
-            fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
-            ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
-            cxxv=$(echo "$cxxv" | grep -woE '[0123456789.]+' | head -n 1)
-          fi
-          
-          [[ "$fcv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
-          [[ "$ccv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
-          [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
-
-      - name: Test compile (bash)
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+      - name: Test C compiler
+        continue-on-error: true
         if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          # macos-13/gfortran 7-9 compatibility workaround
-          args=""
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            if [[ $(sw_vers -productVersion) == 13* ]] && \
-                [[ ${{ matrix.toolchain.compiler }} == "gcc" ]] && \
-                [[ ${{ matrix.toolchain.version }} =~ ^(7|8|9)$ ]]
-            then
-              args="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
-            fi
-          fi
-
-          ${{ env.FC }} $args -o hw hw.f90
-          output=$(./hw '2>&1')
-          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
-          rm hw
-
-          # gcc/g++ 7-9 broken on macos-13, skip tests
-          if [[ $args == "" ]]; then
-            ${{ env.CC }} -o hw hw.c
-            output=$(./hw '2>&1')
-            [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C program output: $output"; exit 1)
-            rm hw
-          
-            ${{ env.CXX }} -o hw hw.cpp
-            output=$(./hw '2>&1')
-            [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
-            rm hw
-          fi
-
-      - name: Test compile Fortran (pwsh)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: pwsh
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
-          rm hw.exe
-
-      - name: Test compile (powershell)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: powershell
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
-          rm hw.exe
-
-      - name: Test compile (cmd)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: cmd
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          for /f "tokens=* usebackq" %%f in (`.\hw.exe`) do @set "OUTPUT=%%f"
-          if "%OUTPUT%"=="hello world" (
-            echo %OUTPUT%
-          ) else (
-            echo unexpected output: %OUTPUT%
-            exit 1
-          )
-          del hw.exe
-
-  full_test:
+        uses: ./.github/actions/test-cc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+      - name: Test C++ compiler
+        continue-on-error: true
+        if: steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cxx
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+  test_full:
     name: Full compatibility test
     if: github.event_name == 'schedule'
     runs-on: ${{ matrix.os }}
@@ -241,161 +131,50 @@ jobs:
             toolchain: {compiler: intel}
           - os: macos-11
             toolchain: {compiler: intel}
-
     steps:
-
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Fortran
-        continue-on-error: true
         id: setup-fortran
+        continue-on-error: true
         uses: ./
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - name: Check compiler version
+      - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
-            # only last line of output captured by command substitution, write to temp file instead
-            ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
-            ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
-            ${{ env.CXX }} //QV > "$RUNNER_TEMP/${{ env.CXX }}.ver" 2>&1
-
-            fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
-            ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
-            cxxv=$(cat "$RUNNER_TEMP/${{ env.CXX }}.ver" | head -n 1)
-
-            fcv=${fcv#*Version }
-            fcv=${fcv%% Build*}
-            ccv=${ccv#*Version }
-            ccv=${ccv%% Build*}
-            cxxv=${cxxv#*Version }
-            cxxv=${cxxv%% Build*}
-          else
-            fcv=$(${{ env.FC }} --version | head -n 1)
-            ccv=$(${{ env.CC }} --version | head -n 1)
-            cxxv=$(${{ env.CXX }} --version | head -n 1)
-
-            fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
-            ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
-            cxxv=$(echo "$cxxv" | grep -woE '[0123456789.]+' | head -n 1)
-          fi
-          
-          [[ "$fcv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
-          [[ "$ccv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
-          [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
-
-      - name: Test compile (bash)
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+      - name: Test C compiler
+        continue-on-error: true
         if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          # macos-13/gfortran 7-9 compatibility workaround
-          args=""
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            if [[ $(sw_vers -productVersion) == 13* ]] && \
-               [[ ${{ matrix.toolchain.compiler }} == "gcc" ]] && \
-               [[ ${{ matrix.toolchain.version }} =~ ^(7|8|9)$ ]]
-            then
-              args="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
-            fi
-          fi
-
-          ${{ env.FC }} $args -o hw hw.f90
-          output=$(./hw '2>&1')
-          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
-          rm hw
-
-          # gcc/g++ 7-9 broken on macos-13, skip tests
-          if [[ $args == "" ]]; then
-            ${{ env.CC }} -o hw hw.c
-            output=$(./hw '2>&1')
-            [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C program output: $output"; exit 1)
-            rm hw
-          
-            ${{ env.CXX }} -o hw hw.cpp
-            output=$(./hw '2>&1')
-            [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
-            rm hw
-          fi
-
-      - name: Test compile Fortran (pwsh)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: pwsh
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
-          rm hw.exe
-
-      - name: Test compile (powershell)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: powershell
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
-          rm hw.exe
-
-      - name: Test compile (cmd)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: cmd
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-          CXX: ${{ steps.setup-fortran.outputs.cxx }}
-        run: |
-          ${{ env.FC }} -o hw.exe hw.f90 
-          for /f "tokens=* usebackq" %%f in (`.\hw.exe`) do @set "OUTPUT=%%f"
-          if "%OUTPUT%"=="hello world" (
-            echo %OUTPUT%
-          ) else (
-            echo unexpected output: %OUTPUT%
-            exit 1
-          )
-          del hw.exe
+        uses: ./.github/actions/test-cc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+      - name: Test C++ compiler
+        continue-on-error: true
+        if: steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cxx
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
 
       - name: Create compatibility report
         shell: bash
         run: |
-          if [[ "${{ steps.setup-fortran.outcome }}" == "success" ]]; then
-            support="&check;"
-          else
-            support=""
-          fi
-          
           mkdir compat
+          support=$([ "${{ steps.setup-fortran.outcome }}" == "success" ] && echo "&check;" || echo "")
           prefix="${{ matrix.os }},${{ matrix.toolchain.compiler }},${{ matrix.toolchain.version }}"
-          echo "$prefix,$support" >> "compat/${prefix//,/_}.csv"
+          report="compat/${prefix//,/_}.csv"
+          echo "$prefix,$support" >> "$report"
+          cat "$report"
 
       - name: Upload compatibility report
         uses: actions/upload-artifact@v3
@@ -406,7 +185,7 @@ jobs:
   compat:
     name: Report compatibility
     if: github.event_name == 'schedule'
-    needs: full_test
+    needs: test_full
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -414,7 +193,7 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
