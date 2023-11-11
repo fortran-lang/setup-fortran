@@ -1,0 +1,36 @@
+name: Test CXX
+description: Test CXX compiler compatibility
+inputs:
+  compiler:
+    description: "Toolchain or compiler to install"
+    required: true
+  version:
+    description: "Version of toolchain or compiler"
+    required: true
+runs:
+  using: "composite"
+  steps:
+
+    - name: Check compiler version
+      shell: bash
+      run: |
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
+          # only last line of output captured by command substitution, write to temp file instead
+          ${{ env.CXX }} //QV > "$RUNNER_TEMP/${{ env.CXX }}.ver" 2>&1
+          cxxv=$(cat "$RUNNER_TEMP/${{ env.CXX }}.ver" | head -n 1)
+          cxxv=${cxxv#*Version }
+          cxxv=${cxxv%% Build*}
+        else
+          cxxv=$(${{ env.CXX }} --version | head -n 1)
+          cxxv=$(echo "$cxxv" | grep -woE '[0123456789.]+' | head -n 1)
+        fi
+        [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
+    
+    - name: Test compile (bash)
+      shell: bash
+      run: |
+        ${{ env.CXX }} -o hw hw.cpp
+        output=$(./hw '2>&1')
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
+        rm hw
+      

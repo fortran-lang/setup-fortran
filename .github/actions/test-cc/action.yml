@@ -1,0 +1,36 @@
+name: Test CC
+description: Test C compiler compatibility
+inputs:
+  compiler:
+    description: "Toolchain or compiler to install"
+    required: true
+  version:
+    description: "Version of toolchain or compiler"
+    required: true
+runs:
+  using: "composite"
+  steps:
+
+    - name: Check compiler version
+      shell: bash
+      run: |
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
+          # only last line of output captured by command substitution, write to temp file instead
+          ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
+          ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
+          ccv=${ccv#*Version }
+          ccv=${ccv%% Build*}
+        else
+          ccv=$(${{ env.CC }} --version | head -n 1)
+          ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
+        fi
+        [[ "$ccv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
+    
+    - name: Test compile (bash)
+      shell: bash
+      run: |
+        ${{ env.CC }} -o hw hw.c
+        output=$(./hw '2>&1')
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C program output: $output"; exit 1)
+        rm hw
+      

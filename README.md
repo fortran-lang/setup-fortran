@@ -5,7 +5,7 @@
 [![GitHub tag](https://img.shields.io/github/tag/fortran-lang/setup-fortran.svg)](https://github.com/fortran-lang/setup-fortran/tags/latest)
 
 
-Action to setup a Fortran compiler.
+Set up a Fortran compiler on Ubuntu, macOS and Windows runners.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -22,10 +22,6 @@ Action to setup a Fortran compiler.
 
 
 ## Usage
-
-This action sets up a Fortran compiler on Ubuntu, MacOS and Windows runners.
-
-C/C++ compilers of the same toolchain/version are provided where possible, otherwise (if a standalone Fortran compiler is selected) defaulting to the preinstalled GCC.
 
 ```yaml
 jobs:
@@ -74,6 +70,8 @@ The action sets the following outputs:
 - `fc`: Fortran compiler executable, e.g. `gfortran`
 - `cc`: C compiler executable, e.g. `gcc`
 - `cxx`: C++ compiler executable, e.g. `g++`
+
+C/C++ compilers of the same toolchain/version are provided where possible, otherwise (if a standalone Fortran compiler is selected) defaulting to the preinstalled GCC. While this action attempts to guarantee Fortran compiler compatibility with all supported platform/toolchain/version combinations, no corresponding guarantee is made with regard to C/C++ compilers &mdash; use at your own risk.
 
 
 ## Environment variables
