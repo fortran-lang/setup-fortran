@@ -32,14 +32,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         toolchain:
-          - {compiler: gcc, version: 11}
+          - {compiler: gcc, version: 13}
+          - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
         include:
           - os: ubuntu-latest
-            toolchain: {compiler: intel, version: '2023.2'}
+            toolchain: {compiler: gcc, version: 12}
         exclude:
-          - os: windows-latest
-            toolchain: {compiler: intel-classic, version: '2021.10'}
+          - os: macos-latest
+            toolchain: {compiler: intel, version: '2023.2'}
 
     steps:
       - uses: fortran-lang/setup-fortran@v1
@@ -48,9 +49,9 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - run: ${{ env.FC }} --version
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
+      - run: |
+          ${{ env.FC }} ... # environment vars FC, CC, and CXX are set
+          ${{ steps.setup-fortran.outputs.fc }} ... # outputs work too
 ```
 
 
