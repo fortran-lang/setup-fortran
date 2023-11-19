@@ -50,8 +50,8 @@ jobs:
           version: ${{ matrix.toolchain.version }}
 
       - run: |
-          ${{ env.FC }} --version
-          ${{ steps.setup-fortran.outputs.fc }} --version
+          ${{ env.FC }} ... # environment vars FC, CC, and CXX are set
+          ${{ steps.setup-fortran.outputs.fc }} ... # outputs work too
 ```
 
 
