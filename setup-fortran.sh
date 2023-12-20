@@ -100,6 +100,7 @@ install_gcc_choco()
     # otherwise hide preinstalled mingw compilers
     mkdir "$RUNNER_TEMP/mingw64"
     mv /c/mingw64/bin/gfortran "$RUNNER_TEMP/mingw64/gfortran"
+    mv /c/mingw64/bin/libgfortran-5.dll "$RUNNER_TEMP/mingw64/libgfortran-5.dll"
     mv /c/mingw64/bin/gcc "$RUNNER_TEMP/mingw64/gcc"
     mv /c/mingw64/bin/g++ "$RUNNER_TEMP/mingw64/g++"
     # ...and install selected version

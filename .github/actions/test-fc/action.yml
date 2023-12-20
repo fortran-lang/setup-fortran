@@ -42,7 +42,23 @@ runs:
             args="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
           fi
         fi
+        
+        ${{ env.FC }} $args -o hw hw.f90
+        output=$(./hw '2>&1')
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
+        rm hw
 
+    - name: Test compile (bash) (intentionally failing)
+      if: ${{ runner.os == 'Windows' && inputs.compiler == 'gcc' && inputs.version == '11' }}
+      shell: bash
+      run: |
+        set -x
+
+        # Move the old libgfortran-5.dll back to its original place.
+        mv "$RUNNER_TEMP/mingw64/libgfortran-5.dll" /c/mingw64/bin/libgfortran-5.dll 
+        # Confirm that we find the gcc12 one ahead of the gcc11 one.
+        which -a libgfortran-5.dll
+        
         ${{ env.FC }} $args -o hw hw.f90
         output=$(./hw '2>&1')
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
