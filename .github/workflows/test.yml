@@ -33,14 +33,28 @@ jobs:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
+          - {compiler: nvidia-hpc, version: '23.11'}
         exclude:
-          # ifx not available for mac
-          - os: macos-13
-            toolchain: {compiler: intel}
-          - os: macos-12
-            toolchain: {compiler: intel}
-          - os: macos-11
-            toolchain: {compiler: intel}
+        # ifx not available for mac
+        - os: macos-13
+          toolchain: {compiler: intel}
+        - os: macos-12
+          toolchain: {compiler: intel}
+        - os: macos-11
+          toolchain: {compiler: intel}
+        # nvidia-hpc not available for mac
+        - os: macos-13
+          toolchain: {compiler: nvidia-hpc}
+        - os: macos-12
+          toolchain: {compiler: nvidia-hpc}
+        - os: macos-11
+          toolchain: {compiler: nvidia-hpc}
+        # nvidia-hpc not available for windows
+        - os: windows-2022
+          toolchain: {compiler: nvidia-hpc}
+        - os: windows-2019
+          toolchain: {compiler: nvidia-hpc}
+          
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -123,6 +137,12 @@ jobs:
           - {compiler: intel-classic, version: '2021.2'}
           - {compiler: intel-classic, version: '2021.1.2'}
           - {compiler: intel-classic, version: '2021.1'}
+          - {compiler: nvidia-hpc, version: '23.11'}
+          - {compiler: nvidia-hpc, version: '23.9'}
+          - {compiler: nvidia-hpc, version: '23.7'}
+          - {compiler: nvidia-hpc, version: '23.5'}
+          - {compiler: nvidia-hpc, version: '23.3'}
+          - {compiler: nvidia-hpc, version: '23.1'}
         exclude:
           # ifx not available for mac
           - os: macos-13
@@ -131,6 +151,18 @@ jobs:
             toolchain: {compiler: intel}
           - os: macos-11
             toolchain: {compiler: intel}
+          # nvidia-hpc not available for mac
+          - os: macos-13
+            toolchain: {compiler: nvidia-hpc}
+          - os: macos-12
+            toolchain: {compiler: nvidia-hpc}
+          - os: macos-11
+            toolchain: {compiler: nvidia-hpc}
+          # nvidia-hpc not available for windows
+          - os: windows-2022
+            toolchain: {compiler: nvidia-hpc}
+          - os: windows-2019
+            toolchain: {compiler: nvidia-hpc}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

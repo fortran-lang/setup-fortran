@@ -35,12 +35,17 @@ jobs:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
+          - {compiler: nvidia-hpc, version: '23.11'}
         include:
           - os: ubuntu-latest
             toolchain: {compiler: gcc, version: 12}
         exclude:
           - os: macos-latest
             toolchain: {compiler: intel, version: '2023.2'}
+          - os: macos-latest
+            toolchain: {compiler: nvidia-hpc, version: '23.11'}
+          - os: windows-latest
+            toolchain: {compiler: nvidia-hpc, version: '23.11'}
 
     steps:
       - uses: fortran-lang/setup-fortran@v1
@@ -61,6 +66,7 @@ jobs:
   - *gcc* (for `gfortran`)
   - *intel* (for `ifx`)
   - *intel-classic* (for `ifort`)
+  - *nvidia-hpc* (for `nvfortran`)
 - *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
 
 
