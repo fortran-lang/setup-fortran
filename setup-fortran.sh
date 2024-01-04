@@ -591,3 +591,89 @@ install_nvidiahpc()
   export CC="nvc"
   export CXX="nvc++"
 }
+
+export_nvidiahpc_vars()
+{
+    local version=$1
+
+    # to convert version format from X.Y to X-Y
+    local cversion=$(echo "$version" | tr '.' '-')
+
+  cat >> $GITHUB_ENV <<EOF
+NVARCH=`uname -s`_`uname -m`;
+NVCOMPILERS=/opt/nvidia/hpc_sdk;
+MANPATH=$MANPATH:$NVCOMPILERS/$NVARCH/$cversion/compilers/man;
+PATH=$NVCOMPILERS/$NVARCH/$cversion/compilers/bin:$PATH;
+PATH=$NVCOMPILERS/$NVARCH/$cversion/comm_libs/mpi/bin:$PATH
+MANPATH=$MANPATH:$NVCOMPILERS/$NVARCH/$cversion/comm_libs/mpi/man
+EOF
+  for path in ${PATH//:/ }; do
+    echo $path >> $GITHUB_PATH
+  done
+}
+
+install_nvidiahpc_apt()
+{
+  local version=$1
+
+  # install environment-modules
+  install_environment_modules_apt
+
+  # to convert version format from X.Y to X-Y
+  local cversion=$(echo "$version" | tr '.' '-')
+
+  # install NVIDIA HPC SDK
+  echo "Installing NVIDIA HPC SDK $version..."
+  curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+  echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+  sudo apt-get update -y
+  sudo apt-get install -y nvhpc-$cversion
+  echo "NVIDIA HPC SDK $version installed."
+
+  # load NVIDIA HPC SDK module
+  echo "Loading NVIDIA HPC SDK $version module..."
+  NVCOMPILERS=/opt/nvidia/hpc_sdk; export NVCOMPILERS
+  export MODULEPATH=$NVCOMPILERS/modulefiles:$MODULEPATH
+  module load nvhpc
+  echo "NVIDIA HPC SDK $version module loaded."
+
+  # set environment variables
+  echo "Setting environment variables..."
+  export_nvidiahpc_vars $version
+
+  # set environment variables
+  export FC="nvfortran"
+  export CC="nvc"
+  export CXX="nvc++"
+  echo "Environment variables set."
+}
+
+install_nvidiahpc()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_nvidiahpc_apt $version
+      ;;
+    darwin*)
+      echo "NVIDIA HPC SDK is not supported on macOS."
+      exit 1
+      ;;
+    mingw*)
+      echo "NVIDIA HPC SDK is not supported on Windows."
+      exit 1
+      ;;
+    msys*)
+      echo "NVIDIA HPC SDK is not supported on MSYS."
+      exit 1
+      ;;
+    cygwin*)
+      echo "NVIDIA HPC SDK is not supported on Cygwin."
+      exit 1
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+}
