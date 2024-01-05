@@ -14,13 +14,16 @@ runs:
     - name: Check compiler version
       shell: bash
       run: |
-        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]] && [[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
           ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
           fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
           fcv=${fcv#*Version }
           fcv=${fcv%% Build*}
-        else
+        elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ inputs.compiler }}" == "nvidia-hpc" ]]); then
+          # Get the compiler version and extract the version number
+          fcv=$(${{ env.FC }} --version 2>&1 | awk '/nvfortran/ {print $2}' | cut -d'-' -f1)
+        elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
           fcv=$(${{ env.FC }} --version | head -n 1)
           fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
         fi

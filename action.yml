@@ -70,6 +70,10 @@ runs:
             version=${VERSION:-2023.2.0}
             install_intel $platform false
             ;;
+          nvidia-hpc)
+            version=${VERSION:-23.11}
+            install_nvidiahpc $platform
+            ;;
           *)
             exit 1
             ;;
