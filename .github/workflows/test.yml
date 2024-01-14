@@ -11,90 +11,11 @@ on:
     paths-ignore:
       - '**.md'
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 0 * * 0'
 
 jobs:
-  test_latest:
-    name: Test latest versions
-    if: github.event_name != 'schedule'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-22.04
-          - ubuntu-20.04
-          - macos-13
-          - macos-12
-          - macos-11
-          - windows-2022
-          - windows-2019
-        toolchain:
-          - {compiler: gcc, version: 11}
-          - {compiler: gcc, version: 12}
-          - {compiler: gcc, version: 13}
-          - {compiler: intel, version: '2023.2'}
-          - {compiler: intel-classic, version: '2021.10'}
-          - {compiler: nvidia-hpc, version: '23.11'}
-        exclude:
-        # ifx not available for mac
-        - os: macos-13
-          toolchain: {compiler: intel}
-        - os: macos-12
-          toolchain: {compiler: intel}
-        - os: macos-11
-          toolchain: {compiler: intel}
-        # nvidia-hpc not available for mac
-        - os: macos-13
-          toolchain: {compiler: nvidia-hpc}
-        - os: macos-12
-          toolchain: {compiler: nvidia-hpc}
-        - os: macos-11
-          toolchain: {compiler: nvidia-hpc}
-        # nvidia-hpc not available for windows
-        - os: windows-2022
-          toolchain: {compiler: nvidia-hpc}
-        - os: windows-2019
-          toolchain: {compiler: nvidia-hpc}
-          
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Fortran
-        id: setup-fortran
-        continue-on-error: true
-        uses: ./
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-
-      - name: Test Fortran compiler
-        if: steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-fc
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-      
-      - name: Test C compiler
-        continue-on-error: true
-        if: steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-cc
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-      
-      - name: Test C++ compiler
-        continue-on-error: true
-        if: steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-cxx
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-      
-  test_full:
-    name: Full compatibility test
-    if: github.event_name == 'schedule'
+  test:
+    name: Test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -235,8 +156,8 @@ jobs:
 
   compat:
     name: Report compatibility
-    if: github.event_name == 'schedule'
-    needs: test_full
+    if: github.event_name != 'pull_request'
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -266,6 +187,7 @@ jobs:
           cat compat/*.csv >> long_compat.csv
 
       - name: Make wide CSV and MD table
+        working-directory: scripts
         run: python wide_compat_reports.py "long_compat.csv" "compat.csv"
 
       - name: Upload artifacts
@@ -295,6 +217,7 @@ jobs:
           fi
 
       - name: Update README
+        working-directory: scripts
         if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
         run: python update_compat_table.py "compat.md" "README.md"
 

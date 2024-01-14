@@ -30,6 +30,7 @@ runs:
         [[ "$fcv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
 
     - name: Test compile (bash)
+      working-directory: test
       shell: bash
       run: |
         # macos-13/gfortran 7-9 compatibility workaround
@@ -43,29 +44,19 @@ runs:
           fi
         fi
         
+        # hello world program
         ${{ env.FC }} $args -o hw hw.f90
         output=$(./hw '2>&1')
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
         rm hw
 
-    - name: Test compile (bash) (intentionally failing)
-      if: ${{ runner.os == 'Windows' && inputs.compiler == 'gcc' && inputs.version == '11' }}
-      shell: bash
-      run: |
-        set -x
-
-        # Move the old libgfortran-5.dll back to its original place.
-        mkdir -p /c/mingw64/bin/
-        [ -f "$RUNNER_TEMP/mingw64/bin/libgfortran-5.dll"   ] && mv "$RUNNER_TEMP/mingw64/bin/libgfortran-5.dll" /c/mingw64/bin/libgfortran-5.dll
-        # Confirm that we find the gcc12 one ahead of the gcc11 one.
-        which -a libgfortran-5.dll
-        
-        ${{ env.FC }} $args -o hw hw.f90
-        output=$(./hw '2>&1')
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
-        rm hw
+        # program reproducing https://github.com/fortran-lang/setup-fortran/pull/51
+        # expect crash at runtime so don't run, just compile. see link for details
+        ${{ env.FC }} $args -o bobyqa bobyqa.f90
+        rm bobyqa
 
     - name: Test compile Fortran (pwsh)
+      working-directory: test
       if: ${{ (success() || failure()) && runner.os == 'Windows' }}
       shell: pwsh
       run: |
@@ -80,6 +71,7 @@ runs:
         rm hw.exe
 
     - name: Test compile Fortran (powershell)
+      working-directory: test
       if: ${{ (success() || failure()) && runner.os == 'Windows' }}
       shell: powershell
       run: |
@@ -94,6 +86,7 @@ runs:
         rm hw.exe
 
     - name: Test compile Fortran (cmd)
+      working-directory: test
       if: ${{ (success() || failure()) && runner.os == 'Windows' }}
       shell: cmd
       run: |
