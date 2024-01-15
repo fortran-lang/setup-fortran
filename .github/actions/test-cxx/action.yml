@@ -27,18 +27,21 @@ runs:
         elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ matrix.toolchain.compiler}}" == "nvidia-hpc" ]]); then
           # Get the compiler version and extract the version number
           cxxv=$(${{ env.CXX }} --version 2>&1 | awk '/nvc++/ {print $2}' | cut -d'-' -f1)
-        elif ([[ "${{ matrix.toolchain.compiler}}" != "nvidia-hpc" ]]); then
+        elif ([[ "${{ matrix.toolchain.compiler}}" != "nvidia-hpc" ]] && [[ "${{ matrix.toolchain.compiler}}" != "lfortran" ]]); then
           cxxv=$(${{ env.CXX }} --version | head -n 1)
           cxxv=$(echo "$cxxv" | grep -woE '[0123456789.]+' | head -n 1)
         fi
-        [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
+        if ([[ "${{ matrix.toolchain.compiler}}" != "lfortran" ]]); then
+          [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
+        fi
     
     - name: Test compile (bash)
       working-directory: test
       shell: bash
       run: |
-        ${{ env.CXX }} -o hw hw.cpp
-        output=$(./hw '2>&1')
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
-        rm hw
-      
+        if ([[ "${{ matrix.toolchain.compiler}}" != "lfortran" ]]); then
+          ${{ env.CXX }} -o hw hw.cpp
+          output=$(./hw '2>&1')
+          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
+          rm hw
+        fi

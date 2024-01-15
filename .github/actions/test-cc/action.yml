@@ -27,18 +27,22 @@ runs:
         elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ inputs.compiler }}" == "nvidia-hpc" ]]); then
           # Get the compiler version and extract the version number
           ccv=$(${{ env.CC }} --version 2>&1 | awk '/nvc/ {print $2}' | cut -d'-' -f1)
-        elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
+        elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]] && [[ "${{ inputs.compiler }}" != "lfortran" ]]); then
           ccv=$(${{ env.CC }} --version | head -n 1)
           ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
         fi
-        [[ "$ccv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
+        if ([[ "${{ inputs.compiler }}" != "lfortran" ]]); then
+          [[ "$ccv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
+        fi
     
     - name: Test compile (bash)
       working-directory: test
       shell: bash
       run: |
-        ${{ env.CC }} -o hw hw.c
-        output=$(./hw '2>&1')
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C program output: $output"; exit 1)
-        rm hw
+        if ([[ "${{ inputs.compiler }}" != "lfortran" ]]); then
+          ${{ env.CC }} -o hw hw.c
+          output=$(./hw '2>&1')
+          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C program output: $output"; exit 1)
+          rm hw
+        fi
       
