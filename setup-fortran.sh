@@ -25,6 +25,28 @@ install_environment_modules_apt() {
   echo "Environment modules set up completed."
 }
 
+# Function to install miniconda on linux
+# https://docs.conda.io/projects/miniconda/en/latest/
+install_miniconda_lin() {
+  mkdir -p ~/miniconda3
+  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+  bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+  rm -rf ~/miniconda3/miniconda.sh
+  ~/miniconda3/bin/conda init bash
+}
+
+# Function to install miniconda on macOS
+# https://docs.conda.io/projects/miniconda/en/latest/
+install_miniconda_mac() {
+  mkdir -p ~/miniconda3
+  # curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o ~/miniconda3/miniconda.sh
+  curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
+  bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+  rm -rf ~/miniconda3/miniconda.sh
+  ~/miniconda3/bin/conda init bash
+  source ~/miniconda3/etc/profile.d/conda.sh
+}
+
 install_gcc_brew()
 {
   # check if gcc preinstalled via brew
@@ -669,6 +691,101 @@ install_nvidiahpc()
       ;;
     cygwin*)
       echo "NVIDIA HPC SDK is not supported on Cygwin."
+      exit 1
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+}
+
+install_lfortran_lin()
+{
+  local version=$1
+
+  # install miniconda
+  echo "Installing Miniconda..."
+  install_miniconda_lin
+  echo "Miniconda installed."
+
+  # create conda environment for lfortran
+  echo "Creating conda environment for lfortran..."
+  conda create -n lf
+  eval "$(conda shell.bash hook)"
+  conda activate lf
+  echo "Conda environment for lfortran created."
+
+  # install lfortran
+  echo "Installing lfortran..."
+  conda install -y lfortran=$version -c conda-forge
+  echo "lfortran installed."
+
+  # add lfortran to PATH
+  cat >> $GITHUB_ENV <<EOF
+PATH=/usr/share/miniconda/envs/lf/bin:$PATH;
+EOF
+  for path in ${PATH//:/ }; do
+    echo $path >> $GITHUB_PATH
+  done
+
+  # set environment variables
+  echo "Setting environment variables..."  
+  export FC="lfortran"
+  # export CC=""
+  # export CXX=""
+  echo "Environment variables set."
+}
+
+install_lfortran_mac()
+{
+  local version=$1
+
+  # install miniconda
+  install_miniconda_mac
+
+  # create conda environment for lfortran
+  echo "Creating conda environment for lfortran..."
+  conda create -n lf
+  eval "$(conda shell.bash hook)"
+  conda activate lf
+  echo "Conda environment for lfortran created."
+
+  # install lfortran
+  echo "Installing lfortran..."
+  conda install -y lfortran=$version -c conda-forge
+  echo "lfortran installed."
+
+  cat >> $GITHUB_ENV <<EOF
+PATH=/usr/local/miniconda3/envs/lf/bin:$PATH
+EOF
+  for path in ${PATH//:/ }; do
+      echo $path >> $GITHUB_PATH
+  done
+
+  # set environment variables
+  export FC="lfortran"
+  # export CC=""
+  # export CXX=""
+}
+
+install_lfortran()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_lfortran_lin $version
+      ;;
+    darwin*)
+      install_lfortran_mac $version
+      ;;
+    mingw*)
+      exit 1
+      ;;
+    msys*)
+      exit 1
+      ;;
+    cygwin*)
       exit 1
       ;;
     *)
