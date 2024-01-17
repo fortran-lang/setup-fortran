@@ -33,6 +33,11 @@ install_miniconda_lin() {
   bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
   rm -rf ~/miniconda3/miniconda.sh
 }
+
+# Function to install miniconda on windows
+# https://docs.conda.io/projects/miniconda/en/latest/
+install_miniconda_win() {
+  powershell.exe -Command "Invoke-WebRequest -Uri 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe' -OutFile 'C:\ProgramData\miniconda.exe'; Start-Process -Wait -FilePath 'C:\ProgramData\miniconda.exe' -ArgumentList '/InstallationType=JustMe', '/AddToPath=1', '/RegisterPython=0', '/S', '/D=C:\ProgramData\Miniconda3'"
 }
 
 # Function to install miniconda on macOS
