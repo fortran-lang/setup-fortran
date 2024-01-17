@@ -32,18 +32,16 @@ install_miniconda_lin() {
   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
   bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
   rm -rf ~/miniconda3/miniconda.sh
-  ~/miniconda3/bin/conda init bash
+}
 }
 
 # Function to install miniconda on macOS
 # https://docs.conda.io/projects/miniconda/en/latest/
 install_miniconda_mac() {
   mkdir -p ~/miniconda3
-  # curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -o ~/miniconda3/miniconda.sh
   curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
   bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
   rm -rf ~/miniconda3/miniconda.sh
-  ~/miniconda3/bin/conda init bash
   source ~/miniconda3/etc/profile.d/conda.sh
 }
 
@@ -705,21 +703,15 @@ install_lfortran_lin()
   local version=$1
 
   # install miniconda
-  echo "Installing Miniconda..."
   install_miniconda_lin
-  echo "Miniconda installed."
 
   # create conda environment for lfortran
-  echo "Creating conda environment for lfortran..."
   conda create -n lf
   eval "$(conda shell.bash hook)"
   conda activate lf
-  echo "Conda environment for lfortran created."
 
   # install lfortran
-  echo "Installing lfortran..."
   conda install -y lfortran=$version -c conda-forge
-  echo "lfortran installed."
 
   # add lfortran to PATH
   cat >> $GITHUB_ENV <<EOF
@@ -730,7 +722,10 @@ EOF
   done
 
   # set environment variables
-  echo "Setting environment variables..."  
+  export FC="lfortran"
+  # export CC=""
+  # export CXX=""
+}
   export FC="lfortran"
   # export CC=""
   # export CXX=""
@@ -745,16 +740,12 @@ install_lfortran_mac()
   install_miniconda_mac
 
   # create conda environment for lfortran
-  echo "Creating conda environment for lfortran..."
   conda create -n lf
   eval "$(conda shell.bash hook)"
   conda activate lf
-  echo "Conda environment for lfortran created."
 
   # install lfortran
-  echo "Installing lfortran..."
   conda install -y lfortran=$version -c conda-forge
-  echo "lfortran installed."
 
   cat >> $GITHUB_ENV <<EOF
 PATH=/usr/local/miniconda3/envs/lf/bin:$PATH
