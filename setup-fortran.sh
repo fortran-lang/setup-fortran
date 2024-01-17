@@ -731,10 +731,25 @@ EOF
   # export CC=""
   # export CXX=""
 }
+
+install_lfortran_win()
+{
+  local version=$1
+
+  # install miniconda
+  install_miniconda_win
+
+  # install lfortran in conda environment lf
+  C:/ProgramData/Miniconda3/Scripts/conda.exe create -n lf
+  C:/ProgramData/Miniconda3/Scripts/conda.exe install -n lf -y lfortran=$version -c conda-forge
+
+  # check lfortran version
+  C:/ProgramData/Miniconda3/envs/lf/Library/bin/lfortran.exe -h
+
+  # set environment variables
   export FC="lfortran"
   # export CC=""
   # export CXX=""
-  echo "Environment variables set."
 }
 
 install_lfortran_mac()
@@ -776,13 +791,13 @@ install_lfortran()
       install_lfortran_mac $version
       ;;
     mingw*)
-      exit 1
+      install_lfortran_win $version
       ;;
     msys*)
-      exit 1
+      install_lfortran_win $version
       ;;
     cygwin*)
-      exit 1
+      install_lfortran_win $version
       ;;
     *)
       echo "Unsupported platform: $platform"
