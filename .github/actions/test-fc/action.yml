@@ -47,12 +47,12 @@ runs:
         # hello world program
         ${{ env.FC }} $args -o hw hw.f90
         output=$(./hw '2>&1')
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program output: $output"; exit 1)
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw' output: $output"; exit 1)
         rm hw
 
-        # program reproducing https://github.com/fortran-lang/setup-fortran/pull/51
-        # expect crash at runtime so don't run, just compile. see link for details
         ${{ env.FC }} $args -o bobyqa bobyqa.f90
+        output=$(./bobyqa '2>&1')
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'bobyqa' output: $output"; exit 1)
         rm bobyqa
 
     - name: Test compile Fortran (pwsh)

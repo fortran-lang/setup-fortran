@@ -1,0 +1,83 @@
+os:
+  - ubuntu-22.04
+  - ubuntu-20.04
+  - macos-13
+  - macos-12
+  - macos-11
+  - windows-2022
+  - windows-2019
+toolchain:
+  - {compiler: gcc, version: 13}
+  - {compiler: gcc, version: 12}
+  - {compiler: gcc, version: 11}
+  - {compiler: gcc, version: 10}
+  - {compiler: gcc, version:  9}
+  - {compiler: gcc, version:  8}
+  - {compiler: gcc, version:  7}
+  - {compiler: gcc, version:  6}
+  - {compiler: intel, version: '2023.2'}
+  - {compiler: intel, version: '2023.1'}
+  - {compiler: intel, version: '2023.0'}
+  - {compiler: intel, version: '2022.2.1'}
+  - {compiler: intel, version: '2022.2'}
+  - {compiler: intel, version: '2022.1'}
+  - {compiler: intel, version: '2022.0'}
+  - {compiler: intel, version: '2021.4'}
+  - {compiler: intel, version: '2021.2'}
+  - {compiler: intel, version: '2021.1.2'}
+  - {compiler: intel, version: '2021.1'}
+  - {compiler: intel-classic, version: '2021.10'}
+  - {compiler: intel-classic, version: '2021.9'}
+  - {compiler: intel-classic, version: '2021.8'}
+  - {compiler: intel-classic, version: '2021.7.1'}
+  - {compiler: intel-classic, version: '2021.7'}
+  - {compiler: intel-classic, version: '2021.6'}
+  - {compiler: intel-classic, version: '2021.5'}
+  - {compiler: intel-classic, version: '2021.4'}
+  - {compiler: intel-classic, version: '2021.3'}
+  - {compiler: intel-classic, version: '2021.2'}
+  - {compiler: intel-classic, version: '2021.1.2'}
+  - {compiler: intel-classic, version: '2021.1'}
+  - {compiler: nvidia-hpc, version: '23.11'}
+  - {compiler: nvidia-hpc, version: '23.9'}
+  - {compiler: nvidia-hpc, version: '23.7'}
+  - {compiler: nvidia-hpc, version: '23.5'}
+  - {compiler: nvidia-hpc, version: '23.3'}
+  - {compiler: nvidia-hpc, version: '23.1'}
+  - {compiler: nvidia-hpc, version: '22.11'}
+  - {compiler: nvidia-hpc, version: '22.9'}
+  - {compiler: nvidia-hpc, version: '22.7'}
+  - {compiler: nvidia-hpc, version: '22.5'}
+  - {compiler: nvidia-hpc, version: '22.3'}
+  - {compiler: nvidia-hpc, version: '22.2'}
+  - {compiler: nvidia-hpc, version: '22.1'}
+  - {compiler: nvidia-hpc, version: '21.11'}
+  - {compiler: nvidia-hpc, version: '21.9'}
+  - {compiler: nvidia-hpc, version: '21.7'}
+  - {compiler: nvidia-hpc, version: '21.5'}
+  - {compiler: nvidia-hpc, version: '21.3'}
+  - {compiler: nvidia-hpc, version: '21.2'}
+  - {compiler: nvidia-hpc, version: '21.1'}
+  - {compiler: nvidia-hpc, version: '20.11'}
+  - {compiler: nvidia-hpc, version: '20.9'}
+  - {compiler: nvidia-hpc, version: '20.7'}
+exclude:
+  # ifx not available for mac
+  - os: macos-13
+    toolchain: {compiler: intel}
+  - os: macos-12
+    toolchain: {compiler: intel}
+  - os: macos-11
+    toolchain: {compiler: intel}
+  # nvidia-hpc not available for mac
+  - os: macos-13
+    toolchain: {compiler: nvidia-hpc}
+  - os: macos-12
+    toolchain: {compiler: nvidia-hpc}
+  - os: macos-11
+    toolchain: {compiler: nvidia-hpc}
+  # nvidia-hpc not available for windows
+  - os: windows-2022
+    toolchain: {compiler: nvidia-hpc}
+  - os: windows-2019
+    toolchain: {compiler: nvidia-hpc}

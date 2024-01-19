@@ -19,6 +19,6 @@ with open(compat_path, "r") as compat:
         r"<!\-\- compat starts \-\->.*<!\-\- compat ends \-\->",
         re.DOTALL,
     )
-    ct = '<!-- compat starts -->{}<!-- compat ends -->'.format('\n{}\n'.format(table))
+    ct = "<!-- compat starts -->{}<!-- compat ends -->".format("\n{}\n".format(table))
     readme = update_path.open().read()
     update_path.open("w").write(r.sub(ct, readme))
