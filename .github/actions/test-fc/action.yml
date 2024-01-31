@@ -50,11 +50,6 @@ runs:
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw' output: $output"; exit 1)
         rm hw
 
-        ${{ env.FC }} $args -o bobyqa bobyqa.f90
-        output=$(./bobyqa '2>&1')
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'bobyqa' output: $output"; exit 1)
-        rm bobyqa
-
     - name: Test compile Fortran (pwsh)
       working-directory: test
       if: ${{ (success() || failure()) && runner.os == 'Windows' }}

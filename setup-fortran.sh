@@ -98,7 +98,10 @@ install_gcc_choco()
     echo "GCC $version already installed"
   else
     # otherwise hide preinstalled mingw compilers
-    mv /c/mingw64 "$RUNNER_TEMP/"
+    mkdir "$RUNNER_TEMP/mingw64"
+    mv /c/mingw64/bin/gfortran "$RUNNER_TEMP/mingw64/gfortran"
+    mv /c/mingw64/bin/gcc "$RUNNER_TEMP/mingw64/gcc"
+    mv /c/mingw64/bin/g++ "$RUNNER_TEMP/mingw64/g++"
     # ...and install selected version
     case $version in
       13)
