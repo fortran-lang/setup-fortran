@@ -23,7 +23,7 @@ df = pd.pivot_table(
     columns=["compiler", "version"],
     values="support",
     sort=False,
-    aggfunc="first"
+    aggfunc="first",
 ).sort_values(by=["runner"])
 
 # write wide CSV

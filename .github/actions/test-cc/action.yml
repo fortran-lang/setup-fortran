@@ -30,6 +30,7 @@ runs:
         [[ "$ccv" == ${{ inputs.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
     
     - name: Test compile (bash)
+      working-directory: test
       shell: bash
       run: |
         ${{ env.CC }} -o hw hw.c

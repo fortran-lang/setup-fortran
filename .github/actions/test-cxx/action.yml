@@ -30,6 +30,7 @@ runs:
         [[ "$cxxv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CXX }} version: $cxxv") || (echo "unexpected ${{ env.CXX }} version: $cxxv"; exit 1)
     
     - name: Test compile (bash)
+      working-directory: test
       shell: bash
       run: |
         ${{ env.CXX }} -o hw hw.cpp
