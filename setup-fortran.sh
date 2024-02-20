@@ -28,19 +28,37 @@ install_environment_modules_apt() {
 install_gcc_brew()
 {
   # check if gcc preinstalled via brew
-  cur=$(brew list --versions gcc | cut -d' ' -f2)
-  maj=$(echo $cur | cut -d'.' -f1)
+  current=$(brew list --versions gcc | cut -d' ' -f2)
+  current_major=$(echo $current | cut -d'.' -f1)
   # if already installed, nothing to do
-  if [ "$maj" == "$version" ]; then
+  if [ "$current_major" == "$version" ]; then
     echo "GCC $version already installed"
   else
     # otherwise install selected version
     brew install gcc@${version}
   fi
 
-  ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
-  ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
-  ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
+  # link the selected version, but first try unlinking both
+  # without and with specified version (cover case in which
+  # multiple versions are already installed and/or linked)
+  brew unlink gcc
+  brew unlink gcc@${version}
+  brew link gcc@${version}
+
+  os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
+  # brew link doesn't create aliases without version numbers before gcc 13
+  if (( "$version" < 13 )); then
+    # default homebrew bin dir changed with macos 14
+    if (( "$os_ver" > 13 )); then
+      ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
+      ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
+      ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
+    else
+      ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
+      ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
+      ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
+    fi
+  fi
 
   # link lib dir for previous GCC versions to avoid missing .dylib issues
   for (( i=13; i>4; i-- ))
