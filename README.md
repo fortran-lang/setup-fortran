@@ -109,8 +109,6 @@ Toolchain support varies across GitHub-hosted runner images.
 | windows-2022 | &check;         | &check;         | &check;         | &check;         |             | &check;        | &check;        |                            | &check;                        |                            |                            |                            |                            | &check;                       |                              | &check;                       | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    | &check;               |                      | &check;               | &check;               | &check;               | &check;               |                        |                        |                        |                        |                       |                       |                       |                       |
 <!-- compat ends -->
 
-**Note:** on `macos-13`, `gfortran` 7-9 require flag `-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib`.
-
 **Note:** Intel's `ifx` compiler is not supported on macOS, so the `intel` option redirects to `intel-classic` (`ifort`).
 
 ## License
