@@ -1,11 +1,15 @@
 # Setup Fortran
 
-[![Test](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml/badge.svg)](https://github.com/awvwgk/setup-fortran/actions/workflows/test.yml)
+[![Test](https://github.com/fortran-lang/setup-fortran/actions/workflows/test.yml/badge.svg)](https://github.com/fortran-lang/setup-fortran/actions/workflows/test.yml)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![GitHub tag](https://img.shields.io/github/tag/fortran-lang/setup-fortran.svg)](https://github.com/fortran-lang/setup-fortran/tags/latest)
 
-Action to setup a Fortran compiler.
+
+Set up a Fortran compiler on Ubuntu, macOS and Windows runners.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 
 - [Usage](#usage)
 - [Options](#options)
@@ -19,8 +23,6 @@ Action to setup a Fortran compiler.
 
 ## Usage
 
-This action sets up a Fortran compiler on Ubuntu, MacOS and Windows runners.
-
 ```yaml
 jobs:
   test:
@@ -30,25 +32,31 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         toolchain:
-          - {compiler: gcc, version: 11}
+          - {compiler: gcc, version: 13}
+          - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
+          - {compiler: nvidia-hpc, version: '23.11'}
         include:
           - os: ubuntu-latest
-            toolchain: {compiler: intel, version: '2023.2'}
+            toolchain: {compiler: gcc, version: 12}
         exclude:
+          - os: macos-latest
+            toolchain: {compiler: intel, version: '2023.2'}
+          - os: macos-latest
+            toolchain: {compiler: nvidia-hpc, version: '23.11'}
           - os: windows-latest
-            toolchain: {compiler: intel-classic, version: '2021.10'}
+            toolchain: {compiler: nvidia-hpc, version: '23.11'}
 
     steps:
-      - uses: awvwgk/setup-fortran@v1
+      - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - run: ${{ env.FC }} --version
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
+      - run: |
+          ${{ env.FC }} ... # environment vars FC, CC, and CXX are set
+          ${{ steps.setup-fortran.outputs.fc }} ... # outputs work too
 ```
 
 
@@ -58,57 +66,51 @@ jobs:
   - *gcc* (for `gfortran`)
   - *intel* (for `ifx`)
   - *intel-classic* (for `ifort`)
-- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) chart below.
-
+  - *nvidia-hpc* (for `nvfortran`)
+- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
 
 
 ## Outputs
 
 The action sets the following outputs:
 
-- `cc`: C compiler executable, e.g. `gcc`
 - `fc`: Fortran compiler executable, e.g. `gfortran`
+- `cc`: C compiler executable, e.g. `gcc`
+- `cxx`: C++ compiler executable, e.g. `g++`
+
+C/C++ compilers of the same toolchain/version are provided where possible, otherwise (if a standalone Fortran compiler is selected) defaulting to the preinstalled GCC. While this action attempts to guarantee Fortran compiler compatibility with all supported platform/toolchain/version combinations, no corresponding guarantee is made with regard to C/C++ compilers &mdash; use at your own risk.
 
 
 ## Environment variables
 
 The same values are also set as environment variables:
 
-- `CC`
 - `FC`
+- `CC`
+- `CXX`
 
 These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
 
 
 ## Runner compatibility
 
-Support for the GCC toolchain varies across GitHub-hosted runner images.
+Toolchain support varies across GitHub-hosted runner images.
 
 <!-- compat starts -->
-| runner       | 6       | 7       | 8       | 9       | 10      | 11      | 12      | 13      |
-|:-------------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|:--------|
-| macos-11     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| macos-12     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| macos-13     | &check; | &check; | &check; | &check; | &check; | &check; | &check; | &check; |
-| ubuntu-20.04 |      | &check; | &check; | &check; | &check; | &check; |      | &check; |
-| ubuntu-22.04 |      |      |      | &check; | &check; | &check; | &check; | &check; |
-| windows-2019 |      |      | &check; | &check; | &check; | &check; | &check; |      |
-| windows-2022 |      |      | &check; | &check; | &check; | &check; | &check; |      |
+| runner       | gcc 10   | gcc 11   | gcc 12   | gcc 13   | gcc 7   | gcc 8   | gcc 9   | intel-classic 2021.1   | intel-classic 2021.10   | intel-classic 2021.2   | intel-classic 2021.3   | intel-classic 2021.4   | intel-classic 2021.5   | intel-classic 2021.6   | intel-classic 2021.7.1   | intel-classic 2021.7   | intel-classic 2021.8   | intel-classic 2021.9   | intel-classic 2021.1.2   | intel 2021.1.2   | intel 2021.1   | intel 2021.2   | intel 2021.4   | intel 2022.0   | intel 2022.1   | intel 2022.2.1   | intel 2022.2   | intel 2023.0   | intel 2023.1   | intel 2023.2   | nvidia-hpc 20.11   | nvidia-hpc 21.11   | nvidia-hpc 22.1   | nvidia-hpc 22.11   | nvidia-hpc 23.11   | nvidia-hpc 23.3   | nvidia-hpc 23.5   | nvidia-hpc 23.7   | nvidia-hpc 23.9   |
+|:-------------|:----------------|:----------------|:----------------|:----------------|:---------------|:---------------|:---------------|:------------------------------|:-------------------------------|:------------------------------|:------------------------------|:------------------------------|:------------------------------|:------------------------------|:--------------------------------|:------------------------------|:------------------------------|:------------------------------|:--------------------------------|:------------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:------------------------|:----------------------|:----------------------|:----------------------|:----------------------|:--------------------------|:--------------------------|:-------------------------|:--------------------------|:--------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|
+| macos-11     | &check;         | &check;         | &check;         | &check;         | &check;        | &check;        | &check;        | &check;                       | &check;                        | &check;                       | &check;                       | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                        |                        |                       |                        |                        |                       |                       |                       |                       |
+| macos-12     | &check;         | &check;         | &check;         |              | &check;        | &check;        | &check;        | &check;                       | &check;                        | &check;                       | &check;                       | &check;                       | &check;                       | &check;                       | &check;                         |                            | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                        |                        |                       |                        |                        |                       |                       |                       |                       |
+| macos-13     | &check;         | &check;         | &check;         | &check;         | &check;        | &check;        | &check;        | &check;                       | &check;                        | &check;                       | &check;                       | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                        |                        |                       |                        |                        |                       |                       |                       |                       |
+| ubuntu-20.04 | &check;         | &check;         |              | &check;         | &check;        | &check;        | &check;        | &check;                       | &check;                        | &check;                       |                            | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                       | &check;                         | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;                   | &check;                   | &check;                  | &check;                   | &check;                   | &check;                  | &check;                  | &check;                  | &check;                  |
+| ubuntu-22.04 | &check;         | &check;         | &check;         | &check;         |             |             | &check;        | &check;                       | &check;                        | &check;                       |                            | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                       | &check;                         | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;                   | &check;                   | &check;                  | &check;                   | &check;                   | &check;                  | &check;                  | &check;                  | &check;                  |
+| windows-2019 | &check;         | &check;         | &check;         | &check;         |             | &check;        | &check;        |                            | &check;                        |                            |                            |                            |                            | &check;                       |                              | &check;                       | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    | &check;               |                      | &check;               | &check;               | &check;               | &check;               |                        |                        |                       |                        |                        |                       |                       |                       |                       |
+| windows-2022 | &check;         | &check;         | &check;         | &check;         |             | &check;        | &check;        |                            | &check;                        |                            |                            |                            |                            | &check;                       |                              | &check;                       | &check;                       | &check;                       |                              |                      |                    |                    |                    |                    | &check;               |                      | &check;               | &check;               | &check;               | &check;               |                        |                        |                       |                        |                        |                       |                       |                       |                       |
 <!-- compat ends -->
 
-**Note:** version 13 of the GNU toolchain is not yet available on Windows.
+**Note:** on `macos-13`, `gfortran` 7-9 require flag `-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib`.
 
-Supported Intel toolchains:
-
-| runner    | compiler       | version |
-| :-------- | :------------- | :------ |
-| ubuntu-\* | intel          | 2023.2, 2023.1, 2023.0, <br/> 2022.2.1, 2022.2, 2022.1, 2022.0, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
-| ubuntu-\* | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1.2, 2021.1 |
-| macos-\*  | intel-classic  | 2021.10, 2021.9, 2021.8, <br/> 2021.7.1, 2021.7, 2021.6, 2021.5, <br/> 2021.4, 2021.3, 2021.2, 2021.1 |
-| windows-\* | intel | 2023.2, 2023.1, 2023.0, 2022.2.0, 2022.1.0 |
-| windows-\* | intel-classic | 2021.10.0, 2021.9.0, 2021.8.0, 2021.7.0, 2021.6.0 |
-
-**Note:** on macOS the `intel`/`ifx` compiler option is not suppoted, only `intel-classic` with the `ifort` compiler.
+**Note:** Intel's `ifx` compiler is not supported on macOS, so the `intel` option redirects to `intel-classic` (`ifort`).
 
 ## License
 
