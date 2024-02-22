@@ -14,10 +14,30 @@ require_fetch()
   fi
 }
 
+# Function to install environment-modules via apt
+# https://github.com/cea-hpc/modules
+install_environment_modules_apt() {
+  echo "Installing environment-modules package..."
+  sudo apt-get install -y environment-modules
+  echo "Environment-modules installed."
+  echo "Sourcing modules.sh script to set up environment modules..."
+  source /etc/profile.d/modules.sh
+  echo "Environment modules set up completed."
+}
 
 install_gcc_brew()
 {
-  brew install gcc@${version}
+  # check if gcc preinstalled via brew
+  cur=$(brew list --versions gcc | cut -d' ' -f2)
+  maj=$(echo $cur | cut -d'.' -f1)
+  # if already installed, nothing to do
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    # otherwise install selected version
+    brew install gcc@${version}
+  fi
+
   ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
   ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
   ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
@@ -43,13 +63,22 @@ install_gcc_brew()
 
 install_gcc_apt()
 {
-  sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-  sudo apt-get update
-  sudo apt-get install -y gcc-${version} gfortran-${version}
+  # check if gcc preinstalled via apt
+  cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
+  maj=$(echo $cur | cut -d'.' -f1)
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+    sudo apt-get update
+    sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
+  fi
+
   sudo update-alternatives \
     --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
     --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
-    --slave /usr/bin/gcov gcov /usr/bin/gcov-${version}
+    --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
 
   export FC="gfortran"
   export CC="gcc"
@@ -58,38 +87,62 @@ install_gcc_apt()
 
 install_gcc_choco()
 {
-  case $version in
-    12)
-      choco install mingw --version 12.2.0 --force
-      ;;
-    11)
-      choco install mingw --version 11.2.0 --force
-      ;;
-    10)
-      choco install mingw --version 10.3.0 --force
-      ;;
-    9)
-      choco install mingw --version 9.4.0 --force
-      ;;
-    8)
-      choco install mingw --version 8.5.0 --force
-      ;;
-    *)
-      echo "Unsupported version: $version (choose 8-12)"
-      exit 1
-      ;;
-  esac
+  # check if mingw preinstalled via choco, falling back to check directly for gfortran
+  cur=$(choco list -e mingw -r | cut -d'|' -f2)
+  if [[ "$cur" == "" ]] && [[ "$(which gfortran)" != "" ]]; then
+    cur=$(gfortran --version | grep -woE '[0123456789.]+' | head -n 1)
+  fi
+  maj=$(echo $cur | cut -d'.' -f1)
+  # if already installed, nothing to do
+  if [ "$maj" == "$version" ]; then
+    echo "GCC $version already installed"
+  else
+    # otherwise hide preinstalled mingw compilers
+    mv /c/mingw64 "$RUNNER_TEMP/"
+    # ...and install selected version
+    case $version in
+      13)
+        choco install mingw --version 13.2.0 --force
+        # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # so hide Strawberry compilers and manually add mingw bin dir to PATH
+        mkdir "$RUNNER_TEMP/strawberry"
+        mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
+        mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
+        mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
+        ;;
+      12)
+        choco install mingw --version 12.2.0 --force
+        ;;
+      11)
+        choco install mingw --version 11.2.0 --force
+        ;;
+      10)
+        choco install mingw --version 10.3.0 --force
+        ;;
+      9)
+        choco install mingw --version 9.4.0 --force
+        ;;
+      8)
+        choco install mingw --version 8.5.0 --force
+        ;;
+      *)
+        echo "Unsupported version: $version (choose 8-13)"
+        exit 1
+        ;;
+    esac
+  fi
 
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
-
-  # missing DLL can cause successfully compiled executables to fail at runtime
+  # missing DLL workaround
   FCDIR=/c/ProgramData/Chocolatey/bin
   LNDIR=/c/ProgramData/Chocolatey/lib/mingw/tools/install/mingw64/bin
   if [ -d "$FCDIR" ] && [ -f "$LNDIR/libgfortran-5.dll" ] && [ ! -f "$FCDIR/libgfortran-5.dll" ]; then
       ln -s "$LNDIR/libgfortran-5.dll" "$FCDIR/libgfortran-5.dll"
   fi
+
+  export FC="gfortran"
+  export CC="gcc"
+  export CXX="g++"
 }
 
 install_gcc()
@@ -131,6 +184,7 @@ CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
 OCL_ICD_FILENAMES=$OCL_ICD_FILENAMES
 INTEL_PYTHONHOME=$INTEL_PYTHONHOME
 CPATH=$CPATH
+SETVARS_COMPLETED=$SETVARS_COMPLETED
 EOF
   for path in ${PATH//:/ }; do
     echo $path >> $GITHUB_PATH
@@ -180,7 +234,7 @@ intel_version_map_l()
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
-      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.3 | 2021.2)
+      2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.2)
         version=$actual_version.0
         ;;
       2021.1)
@@ -281,7 +335,6 @@ install_intel_apt()
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
-  unset $_KEY
   echo "deb https://apt.repos.intel.com/oneapi all main" \
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
@@ -438,6 +491,10 @@ install_intel_win()
   esac
 
   "$GITHUB_ACTION_PATH/install-intel-windows.bat" $WINDOWS_HPCKIT_URL
+
+  # don't call export_intel_vars here because the install may have
+  # been restored from cache. export variables in action.yml after
+  # installation or cache restore.
 }
 
 install_intel()
@@ -459,6 +516,92 @@ install_intel()
       ;;
     cygwin*)
       install_intel_win $version $classic
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+}
+
+export_nvidiahpc_vars()
+{
+    local version=$1
+
+    # to convert version format from X.Y to X-Y
+    local cversion=$(echo "$version" | tr '.' '-')
+
+  cat >> $GITHUB_ENV <<EOF
+NVARCH=`uname -s`_`uname -m`;
+NVCOMPILERS=/opt/nvidia/hpc_sdk;
+MANPATH=$MANPATH:$NVCOMPILERS/$NVARCH/$cversion/compilers/man;
+PATH=$NVCOMPILERS/$NVARCH/$cversion/compilers/bin:$PATH;
+PATH=$NVCOMPILERS/$NVARCH/$cversion/comm_libs/mpi/bin:$PATH
+MANPATH=$MANPATH:$NVCOMPILERS/$NVARCH/$cversion/comm_libs/mpi/man
+EOF
+  for path in ${PATH//:/ }; do
+    echo $path >> $GITHUB_PATH
+  done
+}
+
+install_nvidiahpc_apt()
+{
+  local version=$1
+
+  # install environment-modules
+  install_environment_modules_apt
+
+  # to convert version format from X.Y to X-Y
+  local cversion=$(echo "$version" | tr '.' '-')
+
+  # install NVIDIA HPC SDK
+  echo "Installing NVIDIA HPC SDK $version..."
+  curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+  echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
+  sudo apt-get update -y
+  sudo apt-get install -y nvhpc-$cversion
+  echo "NVIDIA HPC SDK $version installed."
+
+  # load NVIDIA HPC SDK module
+  echo "Loading NVIDIA HPC SDK $version module..."
+  NVCOMPILERS=/opt/nvidia/hpc_sdk; export NVCOMPILERS
+  export MODULEPATH=$NVCOMPILERS/modulefiles:$MODULEPATH
+  module load nvhpc
+  echo "NVIDIA HPC SDK $version module loaded."
+
+  # set environment variables
+  echo "Setting environment variables..."
+  export_nvidiahpc_vars $version
+
+  # set environment variables
+  export FC="nvfortran"
+  export CC="nvc"
+  export CXX="nvc++"
+  echo "Environment variables set."
+}
+
+install_nvidiahpc()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_nvidiahpc_apt $version
+      ;;
+    darwin*)
+      echo "NVIDIA HPC SDK is not supported on macOS."
+      exit 1
+      ;;
+    mingw*)
+      echo "NVIDIA HPC SDK is not supported on Windows."
+      exit 1
+      ;;
+    msys*)
+      echo "NVIDIA HPC SDK is not supported on MSYS."
+      exit 1
+      ;;
+    cygwin*)
+      echo "NVIDIA HPC SDK is not supported on Cygwin."
+      exit 1
       ;;
     *)
       echo "Unsupported platform: $platform"

@@ -1,0 +1,4 @@
+.github/compat/*.json
+.github/compat/*.md
+**/.DS_Store
+venv/

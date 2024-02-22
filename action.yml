@@ -2,11 +2,11 @@ name: "Setup Fortran and libraries"
 description: "Setup Fortran compiler and toolchain"
 inputs:
   compiler:
-    description: "Compiler toolchain"
+    description: "Toolchain or compiler to install"
     required: true
     default: "gcc"
   version:
-    description: "Version of compiler toolchain"
+    description: "Version of toolchain or compiler"
     required: false
 outputs:
   fc:
@@ -15,28 +15,25 @@ outputs:
   cc:
     description: "Path to C compiler"
     value: ${{ steps.outputs.outputs.cc }}
+  cxx:
+    description: "Path to C++ compiler"
+    value: ${{ steps.outputs.outputs.cxx }}
 runs:
   using: "composite"
   steps:
-
+    # On Windows runners the Intel toolchain is very slow to install,
+    # setup caching with daily key rotation. Steps are also needed to
+    # activate the oneAPI environment.
     - name: Set oneAPI install dir
       id: oneapi-root
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: bash
       run: echo "ONEAPI_ROOT=C:\Program Files (x86)\Intel\oneAPI" >> "$GITHUB_ENV"
-
-    # GNU tar can't handle symlinks on Windows, hide it so default Windows tar is used to restore cache
-    - name: Hide GNU tar
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      shell: bash
-      run: mv "C:\Program Files\Git\usr\bin\tar.exe" "$RUNNER_TEMP\tar.exe"
-
-    - name: Get Date
+    - name: Get date
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: get-date
       shell: bash
       run: echo "date=$(/bin/date -u "+%Y%m%d")" >> "$GITHUB_OUTPUT"
-
     - name: Restore cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: cache
@@ -45,11 +42,7 @@ runs:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 
-    - name: Restore GNU tar
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      shell: bash
-      run: mv "$RUNNER_TEMP\tar.exe" 'C:\Program Files\Git\usr\bin\tar.exe'
-
+    # Set up the selected toolchain or compiler
     - name: Setup toolchain
       id: setup
       if: steps.cache.outputs.cache-hit != 'true'
@@ -66,7 +59,7 @@ runs:
 
         case $compiler in
           gcc)
-            version=${VERSION:-11}
+            version=${VERSION:-13}
             install_gcc $platform
             ;;
           intel-classic)
@@ -77,64 +70,75 @@ runs:
             version=${VERSION:-2023.2.0}
             install_intel $platform false
             ;;
+          nvidia-hpc)
+            version=${VERSION:-23.11}
+            install_nvidiahpc $platform
+            ;;
           *)
             exit 1
             ;;
         esac
 
-        if ! ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
-          which "${FC}"
-          which "${CC}"
-          
-          # persist environment variables
+        if ! ([[ "$RUNNER_OS" == "Windows" ]] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
+          # save environment variables
           echo "FC=${FC}" >> $GITHUB_ENV
           echo "CC=${CC}" >> $GITHUB_ENV
+          echo "CXX=${CXX}" >> $GITHUB_ENV
         fi
 
+    # save oneAPI cache and activate environment
     - name: Save cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel') && steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
-
     - name: Activate oneAPI
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: cmd
       run: |
+        ver | findstr /i "10\.0\.17" && set VS2019INSTALLDIR=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise
+        ver | findstr /i "10\.0\.20" && set VS2022INSTALLDIR=C:\Program Files\Microsoft Visual Studio\2022\Enterprise
         for /f "tokens=* usebackq" %%f in (`dir /b "%ONEAPI_ROOT%\compiler\" ^| findstr /V latest ^| sort`) do @set "LATEST=%%f"
         :: this script fails when install location is not the default
         call "%ONEAPI_ROOT%\compiler\%LATEST%\env\vars.bat"
         set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
-
+    # Intel compilers may have restored from cache so env vars may not be set,
+    # set them then set outputs for all compilers/toolchains
     - name: Set outputs and env vars
       shell: bash
       id: outputs
       run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
           if [[ "${{ inputs.compiler }}" == "intel" ]]; then
             echo fc=ifx>>$GITHUB_OUTPUT
             echo cc=icx>>$GITHUB_OUTPUT
+            echo cxx=icx>>$GITHUB_OUTPUT
             echo FC=ifx>>$GITHUB_ENV
             echo CC=icx>>$GITHUB_ENV
+            echo CXX=icx>>$GITHUB_ENV
           elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
             echo fc=ifort>>$GITHUB_OUTPUT
             echo cc=icl>>$GITHUB_OUTPUT
+            echo cxx=icl>>$GITHUB_OUTPUT
             echo FC=ifort>>$GITHUB_ENV
             echo CC=icl>>$GITHUB_ENV
+            echo CXX=icl>>$GITHUB_ENV
           else
             echo fc=$FC>>$GITHUB_OUTPUT
             echo cc=$CC>>$GITHUB_OUTPUT
-            echo FC=$FC>>$GITHUB_ENV%
-            echo CC=$CC>>$GITHUB_ENV%
+            echo cxx=$CXX>>$GITHUB_OUTPUT
           fi
         else
           echo fc=$FC>>$GITHUB_OUTPUT
           echo cc=$CC>>$GITHUB_OUTPUT
-          echo FC=$FC>>$GITHUB_ENV
-          echo CC=$CC>>$GITHUB_ENV
+          echo cxx=$CXX>>$GITHUB_OUTPUT
         fi
 
+        # intel oneapi flag to indicate env has been activated
+        if [[ "${{ inputs.compiler }}" =~ "intel" ]]; then
+          echo SETVARS_COMPLETED=1>>$GITHUB_ENV
+        fi
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')

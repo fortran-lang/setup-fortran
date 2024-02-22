@@ -1,221 +1,124 @@
 name: Test
-
+# Workflow has two modes: assert and report
+# Push and pull request run in assert mode.
+# Schedule and dispatch run in report mode.
 on:
   push:
-    branches:
-      - main
-      - develop*
+    paths-ignore:
+      - '**.md'
   pull_request:
     branches:
       - main
       - develop*
+    paths-ignore:
+      - '**.md'
   schedule:
-    - cron: '0 6 * * *'
-
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
 jobs:
+  options:
+    name: Set options
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set mode
+        id: mode
+        run: |
+          if [[ "$trigger" == "schedule" ]] || [[ "$trigger" == "workflow_dispatch" ]]; then
+            echo "mode=report" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=assert" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set matrix
+        working-directory: .github/compat
+        id: matrix
+        run: |
+          mode=${{ steps.mode.outputs.mode }}
+          if [[ "$mode" == "report" ]]; then
+            yq -o json matrix.yml > matrix.json
+          else
+            python matrix_json_from_csv.py "long_compat.csv" "matrix.json"
+          fi
+          matrix=$(cat matrix.json | jq -r tostring)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      # debugging
+      - name: Show matrix
+        run: echo "${{ toJSON(fromJSON(steps.matrix.outputs.matrix)) }}"
+    
   test:
-    name: Test compiler
+    name: Test
+    needs: options
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
     strategy:
       fail-fast: false
-      matrix:
-        os:
-          - ubuntu-22.04
-          - ubuntu-20.04
-          - macos-13
-          - macos-12
-          - macos-11
-          - windows-2022
-          - windows-2019
-        toolchain:
-          - {compiler: gcc, version: 13}
-          - {compiler: gcc, version: 12}
-          - {compiler: gcc, version: 11}
-          - {compiler: gcc, version: 10}
-          - {compiler: gcc, version:  9}
-          - {compiler: gcc, version:  8}
-          - {compiler: gcc, version:  7}
-          - {compiler: gcc, version:  6}
-          # {compiler: gcc, version:  5}
-        include:
-          - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.1'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2023.0'}}
-          - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2022.2.1'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2022.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2022.1'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2022.0'}}
-          - {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.4'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.3'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel, version: '2021.1'}}
-
-          - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.10'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.9'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.8'}}
-          - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.7'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.6'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.5'}}
-          - {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.4'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.3'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
-          # {os: ubuntu-22.04, toolchain: {compiler: intel-classic, version: '2021.1'}}
-
-          - {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.10'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.9'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.8'}}
-          - {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.7'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.6'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.5'}}
-          - {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.4'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.3'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.2'}}
-          # {os: macos-12, toolchain: {compiler: intel-classic, version: '2021.1'}}
-
-          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.2.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.1.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel, version: '2023.0.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel, version: '2022.2.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel, version: '2022.1.0'}}
-
-          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.10.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.9.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.8.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.7.0'}}
-          - {os: windows-2022, toolchain: {compiler: intel-classic, version: '2021.6.0'}}
-
+      matrix: ${{ fromJSON(needs.options.outputs.matrix) }}
     steps:
-
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Fortran
-        continue-on-error: ${{ matrix.toolchain.compiler == 'gcc' }}
         id: setup-fortran
+        continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
         uses: ./
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
 
-      - name: Check compiler version
+      - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-        run: |
-          if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
-            # only last line of output captured by command substitution, write to temp file instead
-            ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
-            ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
-
-            fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
-            ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
-
-            fcv=${fcv#*Version }
-            fcv=${fcv%% Build*}
-            ccv=${ccv#*Version }
-            ccv=${ccv%% Build*}
-          else
-            fcv=$(${{ env.FC }} --version | head -n 1)
-            ccv=$(${{ env.CC }} --version | head -n 1)
-
-            fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
-            ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
-          fi
-          
-          [[ "$fcv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.FC }} version: $fcv") || (echo "unexpected ${{ env.FC }} version: $fcv"; exit 1)
-          [[ "$ccv" == ${{ matrix.toolchain.version }}* ]] && (echo "found ${{ env.CC }} version: $ccv") || (echo "unexpected ${{ env.CC }} version: $ccv"; exit 1)
-
-      - name: Test compile program (bash)
-        if: steps.setup-fortran.outcome == 'success'
-        shell: bash
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-        run: |
-          ${{ env.FC }} -o hw hw.f90
-          output=$(./hw '2>&1')
-          [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected output: $output"; exit 1)
-
-      - name: Test compile program (Powershell Core)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: pwsh
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-        run: |
-          rm hw.exe
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
       
-      - name: Test compile program (Powershell Desktop)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: powershell
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-        run: |
-          rm hw.exe
-          ${{ env.FC }} -o hw.exe hw.f90 
-          $output=$(& ".\hw.exe")
-          if ($output -match "hello world") {
-              write-output $output
-          } else {
-              write-output "unexpected output: $output"
-              exit 1
-          }
-
-      - name: Test compile program (cmd)
-        if: ${{ steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' }}
-        shell: cmd
-        env:
-          FC: ${{ steps.setup-fortran.outputs.fc }}
-          CC: ${{ steps.setup-fortran.outputs.cc }}
-        run: |
-          del hw.exe
-          ${{ env.FC }} -o hw.exe hw.f90 
-          for /f "tokens=* usebackq" %%f in (`.\hw.exe`) do @set "OUTPUT=%%f"
-          if "%OUTPUT%"=="hello world" (
-            echo %OUTPUT%
-          ) else (
-            echo unexpected output: %OUTPUT%
-            exit 1
-          )
+      - name: Test C compiler
+        continue-on-error: true
+        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+      
+      - name: Test C++ compiler
+        continue-on-error: true
+        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cxx
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
 
       - name: Create compatibility report
+        if: needs.options.outputs.mode == 'report'
         shell: bash
         run: |
-          if [[ "${{ steps.setup-fortran.outcome }}" == "success" ]]; then
-            support="&check;"
-          else
-            support=""
-          fi
-          
-          mkdir compat
+          mkdir -p compat
+          support=$([ "${{ steps.setup-fortran.outcome }}" == "success" ] && echo "&check;" || echo "")
           prefix="${{ matrix.os }},${{ matrix.toolchain.compiler }},${{ matrix.toolchain.version }}"
-          echo "$prefix,$support" >> "compat/${prefix//,/_}.csv"
+          report="compat/${prefix//,/_}.csv"
+          echo "$prefix,$support" >> "$report"
+          cat "$report"
 
       - name: Upload compatibility report
-        if: ${{ matrix.toolchain.compiler == 'gcc' }}
+        if: needs.options.outputs.mode == 'report'
         uses: actions/upload-artifact@v3
         with:
           name: compat
           path: compat/*.csv
-
+  
   compat:
     name: Report compatibility
-    needs: test
+    needs: 
+      - options
+      - test
+    if: needs.options.outputs.mode == 'report'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -223,7 +126,7 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -231,8 +134,7 @@ jobs:
           python-version: 3.9
 
       - name: Install packages
-        run: |
-          pip install tabulate pandas
+        run: pip install -r requirements.txt
 
       - name: Download reports
         uses: actions/download-artifact@v3
@@ -242,30 +144,26 @@ jobs:
 
       - name: Concatenate reports
         run: |
-          echo "runner,compiler,version,support" > compat_long.csv
-          cat compat/*.csv >> compat_long.csv
+          echo "runner,compiler,version,support" > .github/compat/long_compat.csv
+          cat compat/*.csv >> .github/compat/long_compat.csv
 
-      - name: Make wide CSV and MD table
-        id: merge-reports
-        shell: python
+      - name: Make wide reports
+        working-directory: .github/compat
         run: |
-          import pandas as pd
-          df = pd.read_csv("compat_long.csv")
-          df = pd.pivot(df, index="runner", columns="version", values="support")
-          df = df.sort_values(by=["runner"])
-          df.to_csv("compat.csv")
-          with open("compat.md", "w") as file:
-            file.write(df.to_markdown().replace("nan", ""))
+          python wide_compat_reports.py "long_compat.csv" "compat.csv"
+          cat compat.md
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: compat
           path: |
-            compat.csv
-            compat.md
+            .github/compat/long_compat.csv
+            .github/compat/compat.csv
+            .github/compat/compat.md
 
       - name: Check for changes
+        working-directory: .github/compat
         id: diff
         run: |
           if ! [ -f compat.csv ]; then
@@ -285,22 +183,11 @@ jobs:
 
       - name: Update README
         if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
-        shell: python
-        run: |
-          import re
-          from pathlib import Path
-          readme_path = Path("README.md")
-          readme = readme_path.open().read()
-          with open("compat.md", "r") as compat:
-            table = ''.join(compat.readlines())
-            r = re.compile(r'<!\-\- compat starts \-\->.*<!\-\- compat ends \-\->', re.DOTALL)
-            chunk = '<!-- compat starts -->{}<!-- compat ends -->'.format('\n{}\n'.format(table))
-            readme_path.open('w').write(r.sub(chunk, readme))
+        run: python .github/compat/update_compat_table.py ".github/compat/compat.md" "README.md"
 
       - name: Print README diff
         if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
-        run: |
-          git diff README.md
+        run: git diff README.md
 
       - name: Create pull request
         if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
@@ -315,7 +202,7 @@ jobs:
           default_branch="${{ github.event.repository.default_branch }}"
           
           git switch -c "$updated_branch"
-          git add compat.csv README.md
+          git add .github/compat/compat.csv README.md
           git commit -m "Update compatibility matrix"
           git push -u origin "$updated_branch"
-          gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file compat.md
+          gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file .github/compat/compat.md
