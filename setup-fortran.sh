@@ -60,20 +60,6 @@ install_gcc_brew()
     fi
   fi
 
-  # link lib dir for previous GCC versions to avoid missing .dylib issues
-  for (( i=13; i>4; i-- ))
-  do
-    gcc_lib_path="/usr/local/opt/gcc/lib/gcc/$i"
-    if [ -d $gcc_lib_path ]; then
-      echo "found $gcc_lib_path"
-      for (( j=$i; j>4; j-- ))
-      do
-        ln -fs /usr/local/opt/gcc/lib/gcc/$i /usr/local/opt/gcc/lib/gcc/$j
-      done
-      break
-    fi
-  done
-
   export FC="gfortran"
   export CC="gcc"
   export CXX="g++"
