@@ -1,4 +1,5 @@
 runner,compiler,version,support
+macos-13,intel-classic,2021.5,&check;runner,compiler,version,support
 macos-11,gcc,10,&check;
 macos-11,gcc,11,&check;
 macos-11,gcc,12,&check;

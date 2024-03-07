@@ -35,6 +35,7 @@ jobs:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
+          - {compiler: intel-classic, version: '2021.10', install_mkl: 'true'}
           - {compiler: nvidia-hpc, version: '23.11'}
         include:
           - os: ubuntu-latest
@@ -68,6 +69,7 @@ jobs:
   - *intel-classic* (for `ifort`)
   - *nvidia-hpc* (for `nvfortran`)
 - *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
+- *install_mkl*: If MKL libraries should be installed alongsider the intel compiler. Defaults to `false`.
 
 
 ## Outputs
@@ -111,6 +113,8 @@ Toolchain support varies across GitHub-hosted runner images.
 **Note:** on `macos-13`, `gfortran` 7-9 require flag `-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib`.
 
 **Note:** Intel's `ifx` compiler is not supported on macOS, so the `intel` option redirects to `intel-classic` (`ifort`).
+
+**Note:** MKL libraries can only be installed for the Intel Fortran compiler, and only on linux and MacOS operating systems; with the exception of intel-classic 2021.5, for which no compatible library is available.
 
 ## License
 

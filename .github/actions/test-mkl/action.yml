@@ -1,0 +1,31 @@
+name: Test mkl
+description: Test installation of mkl libraries
+inputs:
+  compiler:
+    description: "Toolchain or compiler to install"
+    required: true
+  version:
+    description: "Version of toolchain or compiler"
+    required: true
+  install_mkl: 
+    description: "If MKL should be installed along with the compiler"
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Test compile and link mkl (bash)
+      working-directory: test
+      shell: bash
+      run: |
+        if [[ "${{ inputs.compiler }}" =~ "intel" ]] && [[ "${{ inputs.install_mkl }}" == "true" ]] && ([[ "${{ inputs.version }}" != "2021.5" ]] && [[ "$runner.os" != "macOS" ]]); then
+         if [ "$RUNNER_OS" == "macOS" ]; then
+           export DYLD_LIBRARY_PATH="${{ env.MKLLIB }}:$DYLD_LIBRARY_PATH"
+         fi
+         linking="-L${{ env.MKLLIB }} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
+         # hello world with blas call program
+         ${{ env.FC }} $args $linking -o hw_mkl hw_mkl.f90
+         output=$(./hw_mkl '2>&1')
+         [[ "$output" == *"hello world   9.00000000000000"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw_mkl' output: $output"; exit 1)
+         rm hw_mkl
+        fi

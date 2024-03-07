@@ -178,6 +178,8 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 LIBRARY_PATH=$LIBRARY_PATH
 INFOPATH=$INFOPATH
 MANPATH=$MANPATH
+MKLLIB=$MKLLIB
+DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH
 ONEAPI_ROOT=$ONEAPI_ROOT
 CLASSPATH=$CLASSPATH
 CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
@@ -247,6 +249,19 @@ intel_version_map_l()
   fi
 }
 
+mkl_version_map_l()
+{
+  local intel_version=$1
+  case $intel_version in
+    2021.1 | 2021.1.2)
+      mkl_version=2021.1.1
+      ;;
+    *)
+      mkl_version=$intel_version
+      ;;
+  esac
+}
+
 intel_version_map_m()
 {
   local actual_version=$1
@@ -277,6 +292,25 @@ intel_version_map_m()
       ;;
     *)
       version=$actual_version
+      ;;
+  esac
+}
+
+mkl_version_map_m()
+{
+  local intel_version=$1
+  case $intel_version in
+    2021.1.0 | 2021.2.0 | 2021.3.0 | 2021.4.0 | 2022.2.0 | 2022.3.0 | 2022.3.1 | 2023.0.0 )
+      mkl_version=2022.2.0
+      ;;
+    2022.1.0)
+      mkl_version=""
+      ;;
+    2023.1.0)
+      mkl_version=2023.1.0
+      ;;
+    *)
+      mkl_version=2023.2.0
       ;;
   esac
 }
@@ -328,7 +362,10 @@ install_intel_apt()
 {
   local version=$1
   local classic=$2
+  local mkl_version=$1
+  local install_mkl=$3
   intel_version_map_l $version $classic
+  mkl_version_map_l $version
 
   require_fetch
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
@@ -339,11 +376,16 @@ install_intel_apt()
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
 
-  sudo apt-get install \
-    intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version intel-oneapi-mkl-$version
+  if $install_mkl; then
+    sudo apt-get install \
+      intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version \
+      intel-oneapi-mkl-$mkl_version
+  else
+    sudo apt-get install \
+      intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
+  fi
 
   source /opt/intel/oneapi/setvars.sh
-  export_intel_vars
 
   if $classic; then
     export FC="ifort"
@@ -354,56 +396,52 @@ install_intel_apt()
     export CC="icx"
     export CXX="icpx"
   fi
+  if $install_mkl; then
+    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
+  fi
+  export_intel_vars
 }
 
 install_intel_dmg()
 {
   local version=$1
+  local mkl_version=$1
+  local install_mkl=$2
   intel_version_map_m $version
+  mkl_version_map_m $version
 
   case $version in
     2021.1.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17426/m_BaseKit_p_2021.1.0.2427.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17398/m_HPCKit_p_2021.1.0.2681.dmg
       ;;
     2021.2.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17714/m_BaseKit_p_2021.2.0.2855.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17643/m_HPCKit_p_2021.2.0.2903.dmg
       ;;
     2021.3.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17969/m_BaseKit_p_2021.3.0.3043.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17890/m_HPCKit_p_2021.3.0.3226.dmg
       ;;
     2021.4.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18256/m_BaseKit_p_2021.4.0.3384.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18242/m_HPCKit_p_2021.4.0.3389.dmg
       ;;
     2022.1.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18342/m_BaseKit_p_2022.1.0.92.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18341/m_HPCKit_p_2022.1.0.86.dmg
       ;;
     2022.2.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18675/m_BaseKit_p_2022.2.0.226_offline.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18681/m_HPCKit_p_2022.2.0.158_offline.dmg
       ;;
     2022.3.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18865/m_BaseKit_p_2022.3.0.8743.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18866/m_HPCKit_p_2022.3.0.8685.dmg
       ;;
     2022.3.1)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18971/m_BaseKit_p_2022.3.1.17244.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18977/m_HPCKit_p_2022.3.1.15344.dmg
       ;;
     2023.0.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/19080/m_BaseKit_p_2023.0.0.25441.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_HPCKit_p_2023.0.0.25440.dmg
       ;;
     2023.1.0)
-      MACOS_BASEKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2516a0a0-de4d-4f3d-9e83-545b32127dbb/m_BaseKit_p_2023.1.0.45568.dmg
       MACOS_HPCKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543.dmg
       ;;
     2023.2.0)
-      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/cd013e6c-49c4-488b-8b86-25df6693a9b7/m_BaseKit_p_2023.2.0.49398.dmg
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443.dmg
       ;;
     *)
@@ -411,19 +449,46 @@ install_intel_dmg()
       ;;
   esac
 
-  require_fetch
-  $fetch $MACOS_BASEKIT_URL > m_BASEKit.dmg
-  hdiutil attach m_BASEKit.dmg
-  sudo /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
-    --action install \
-    --eula=accept \
-    --continue-with-optional-error=yes \
-    --log-dir=.
-  hdiutil detach /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)" -quiet
-  rm m_BASEKit.dmg
+  case $mkl_version in
+    2022.2.0)
+      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18675/m_BaseKit_p_2022.2.0.226_offline.dmg
+      ;;
+    2023.1.0)
+      MACOS_BASEKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2516a0a0-de4d-4f3d-9e83-545b32127dbb/m_BaseKit_p_2023.1.0.45568.dmg
+      ;;
+    2023.2.0)
+      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/cd013e6c-49c4-488b-8b86-25df6693a9b7/m_BaseKit_p_2023.2.0.49398.dmg
+      ;;
+    "")
+      ;;
+    *)
+      exit 1
+      ;;
+  esac
+
+  if $install_mkl; then
+    if [ "$MACOS_BASEKIT_URL" == "" ]; then
+      echo "ERROR: MACOS_BASEKIT_URL is empty - please check the version mapping for MKL"
+      echo "SKIPPING MKL installation..."
+    else
+      require_fetch
+      $fetch $MACOS_BASEKIT_URL > m_BASEKit.dmg
+      ls -lh
+      hdiutil verify m_BASEKit.dmg
+      hdiutil attach m_BASEKit.dmg
+      sudo /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
+        --action install \
+        --eula=accept \
+        --continue-with-optional-error=yes \
+        --log-dir=.
+      hdiutil detach /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)" -quiet
+      rm m_BASEKit.dmg
+    fi
+  fi
 
   require_fetch
   $fetch $MACOS_HPCKIT_URL > m_HPCKit.dmg
+  hdiutil verify m_HPCKit.dmg
   hdiutil attach m_HPCKit.dmg
   sudo /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
     --action install \
@@ -434,11 +499,17 @@ install_intel_dmg()
   rm m_HPCKit.dmg
 
   source /opt/intel/oneapi/setvars.sh
-  export_intel_vars
 
   export FC="ifort"
   export CC="icc"
   export CXX="icpc"
+
+  if $install_mkl; then
+    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib"
+    export DYLD_LIBRARY_PATH="$MKLLIB":$DYLD_LIBRARY_PATH
+  fi
+
+  export_intel_vars
 }
 
 install_intel_win()
@@ -501,12 +572,13 @@ install_intel()
 {
   local platform=$1
   local classic=$2
+  local install_mkl=$3
   case $platform in
     linux*)
-      install_intel_apt $version $classic
+      install_intel_apt $version $classic $install_mkl
       ;;
     darwin*)
-      install_intel_dmg $version
+      install_intel_dmg $version $install_mkl
       ;;
     mingw*)
       install_intel_win $version $classic
