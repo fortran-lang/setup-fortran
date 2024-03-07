@@ -29,6 +29,7 @@ jobs:
       - name: Set mode
         id: mode
         run: |
+          trigger=${{ github.event_name }}
           if [[ "$trigger" == "schedule" ]] || [[ "$trigger" == "workflow_dispatch" ]]; then
             echo "mode=report" >> "$GITHUB_OUTPUT"
           else
@@ -72,6 +73,9 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
           install_mkl: true
+
+      # - name: Debug with tmate
+      #   uses: mxschmitt/action-tmate@v3
 
       - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
