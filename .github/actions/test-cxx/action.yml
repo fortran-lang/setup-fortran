@@ -14,6 +14,10 @@ runs:
     - name: Check compiler version
       shell: bash
       run: |
+        # check $CXX == $FPM_CXX
+        [[ "${{ env.CXX }}" == "${{ env.FPM_CXX }}" ]] && (echo "CXX and FPM_CXX match") || (echo "CXX and FPM_CXX don't match: ${{ env.CXX }} != ${{ env.FPM_CXX}}"; exit 1)
+
+        # check compiler version
         if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]] && [[ "${{ matrix.toolchain.compiler }}" != "nvidia-hpc" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
           ${{ env.CXX }} //QV > "$RUNNER_TEMP/${{ env.CXX }}.ver" 2>&1

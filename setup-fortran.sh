@@ -59,10 +59,6 @@ install_gcc_brew()
       ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
     fi
   fi
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc_apt()
@@ -83,10 +79,6 @@ install_gcc_apt()
     --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
     --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
     --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc_choco()
@@ -143,10 +135,6 @@ install_gcc_choco()
   if [ -d "$FCDIR" ] && [ -f "$LNDIR/libgfortran-5.dll" ] && [ ! -f "$FCDIR/libgfortran-5.dll" ]; then
       ln -s "$LNDIR/libgfortran-5.dll" "$FCDIR/libgfortran-5.dll"
   fi
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc()
@@ -173,6 +161,10 @@ install_gcc()
       exit 1
       ;;
   esac
+
+  export FC="gfortran"
+  export CC="gcc"
+  export CXX="g++"
 }
 
 export_intel_vars()
@@ -348,16 +340,6 @@ install_intel_apt()
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
-
-  if $classic; then
-    export FC="ifort"
-    export CC="icc"
-    export CXX="icpc"
-  else
-    export FC="ifx"
-    export CC="icx"
-    export CXX="icpx"
-  fi
 }
 
 install_intel_dmg()
@@ -428,10 +410,6 @@ install_intel_dmg()
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
-
-  export FC="ifort"
-  export CC="icc"
-  export CXX="icpc"
 }
 
 install_intel_win()
@@ -515,6 +493,16 @@ install_intel()
       exit 1
       ;;
   esac
+
+  if $classic; then
+    export FC="ifort"
+    export CC="icc"
+    export CXX="icpc"
+  else
+    export FC="ifx"
+    export CC="icx"
+    export CXX="icpx"
+  fi
 }
 
 export_nvidiahpc_vars()
@@ -563,14 +551,7 @@ install_nvidiahpc_apt()
   echo "NVIDIA HPC SDK $version module loaded."
 
   # set environment variables
-  echo "Setting environment variables..."
   export_nvidiahpc_vars $version
-
-  # set environment variables
-  export FC="nvfortran"
-  export CC="nvc"
-  export CXX="nvc++"
-  echo "Environment variables set."
 }
 
 install_nvidiahpc()
@@ -601,4 +582,8 @@ install_nvidiahpc()
       exit 1
       ;;
   esac
+
+  export FC="nvfortran"
+  export CC="nvc"
+  export CXX="nvc++"
 }

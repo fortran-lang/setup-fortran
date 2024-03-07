@@ -89,6 +89,12 @@ The same values are also set as environment variables:
 - `CC`
 - `CXX`
 
+Corresponding FPM environment variables are also set:
+
+- `FPM_FC`
+- `FPM_CC`
+- `FPM_CXX`
+
 These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
 
 
