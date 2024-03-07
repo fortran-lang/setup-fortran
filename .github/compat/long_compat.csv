@@ -93,6 +93,7 @@ ubuntu-20.04,intel,2022.2,&check;
 ubuntu-20.04,intel,2023.0,&check;
 ubuntu-20.04,intel,2023.1,&check;
 ubuntu-20.04,intel,2023.2,&check;
+ubuntu-20.04,intel,2024.0,&check;
 ubuntu-20.04,nvidia-hpc,20.11,&check;
 ubuntu-20.04,nvidia-hpc,20.7,
 ubuntu-20.04,nvidia-hpc,20.9,
@@ -136,6 +137,7 @@ ubuntu-22.04,intel,2022.2,&check;
 ubuntu-22.04,intel,2023.0,&check;
 ubuntu-22.04,intel,2023.1,&check;
 ubuntu-22.04,intel,2023.2,&check;
+ubuntu-22.04,intel,2024.0,&check;
 ubuntu-22.04,nvidia-hpc,20.11,&check;
 ubuntu-22.04,nvidia-hpc,20.7,
 ubuntu-22.04,nvidia-hpc,20.9,
@@ -179,6 +181,7 @@ windows-2019,intel,2022.2,&check;
 windows-2019,intel,2023.0,&check;
 windows-2019,intel,2023.1,&check;
 windows-2019,intel,2023.2,&check;
+windows-2019,intel,2024.0,&check;
 windows-2022,gcc,10,&check;
 windows-2022,gcc,11,&check;
 windows-2022,gcc,12,&check;
@@ -210,3 +213,4 @@ windows-2022,intel,2022.2,&check;
 windows-2022,intel,2023.0,&check;
 windows-2022,intel,2023.1,&check;
 windows-2022,intel,2023.2,&check;
+windows-2022,intel,2024.0,&check;
