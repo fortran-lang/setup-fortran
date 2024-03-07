@@ -8,6 +8,10 @@ inputs:
   version:
     description: "Version of toolchain or compiler"
     required: false
+  install_mkl:
+    description: "If MKL should be installed along with the compiler"
+    required: false
+    default: "false"
 outputs:
   fc:
     description: "Path to Fortran compiler"
@@ -68,6 +72,7 @@ runs:
       env:
         COMPILER: ${{ inputs.compiler }}
         VERSION: ${{ inputs.version }}
+        INSTALL_MKL: ${{ inputs.install_mkl }}
       run: |
         action_path=$(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
         source "$action_path/setup-fortran.sh"
@@ -87,11 +92,11 @@ runs:
             ;;
           intel-classic)
             version=${VERSION:-2023.2.0}
-            install_intel $platform true
+            install_intel $platform true ${{ inputs.install_mkl }}
             ;;
           intel)
             version=${VERSION:-2024.1}
-            install_intel $platform false
+            install_intel $platform false ${{ inputs.install_mkl }}
             ;;
           nvidia-hpc)
             version=${VERSION:-23.11}
