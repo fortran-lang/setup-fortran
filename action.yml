@@ -79,12 +79,9 @@ runs:
             ;;
         esac
 
-        if ! ([[ "$RUNNER_OS" == "Windows" ]] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
-          # save environment variables
-          echo "FC=${FC}" >> $GITHUB_ENV
-          echo "CC=${CC}" >> $GITHUB_ENV
-          echo "CXX=${CXX}" >> $GITHUB_ENV
-        fi
+        echo "FC=${FC}" >> $GITHUB_ENV
+        echo "CC=${CC}" >> $GITHUB_ENV
+        echo "CXX=${CXX}" >> $GITHUB_ENV
 
     # save oneAPI cache and activate environment
     - name: Save cache
@@ -103,42 +100,41 @@ runs:
         :: this script fails when install location is not the default
         call "%ONEAPI_ROOT%\compiler\%LATEST%\env\vars.bat"
         set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
-    # Intel compilers may have restored from cache so env vars may not be set,
-    # set them then set outputs for all compilers/toolchains
+
     - name: Set outputs and env vars
       shell: bash
       id: outputs
       run: |
+        # Intel compilers may have restored from cache so env vars may not be set
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           if [[ "${{ inputs.compiler }}" == "intel" ]]; then
-            echo fc=ifx>>$GITHUB_OUTPUT
-            echo cc=icx>>$GITHUB_OUTPUT
-            echo cxx=icx>>$GITHUB_OUTPUT
-            echo FC=ifx>>$GITHUB_ENV
-            echo CC=icx>>$GITHUB_ENV
-            echo CXX=icx>>$GITHUB_ENV
+            FC=ifx
+            CC=icx
+            CXX=icx
+            echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
-            echo fc=ifort>>$GITHUB_OUTPUT
-            echo cc=icl>>$GITHUB_OUTPUT
-            echo cxx=icl>>$GITHUB_OUTPUT
-            echo FC=ifort>>$GITHUB_ENV
-            echo CC=icl>>$GITHUB_ENV
-            echo CXX=icl>>$GITHUB_ENV
-          else
-            echo fc=$FC>>$GITHUB_OUTPUT
-            echo cc=$CC>>$GITHUB_OUTPUT
-            echo cxx=$CXX>>$GITHUB_OUTPUT
+            FC=ifort
+            CC=icl
+            CXX=icl
+            echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           fi
-        else
-          echo fc=$FC>>$GITHUB_OUTPUT
-          echo cc=$CC>>$GITHUB_OUTPUT
-          echo cxx=$CXX>>$GITHUB_OUTPUT
         fi
 
-        # intel oneapi flag to indicate env has been activated
-        if [[ "${{ inputs.compiler }}" =~ "intel" ]]; then
-          echo SETVARS_COMPLETED=1>>$GITHUB_ENV
-        fi
+        # set env vars
+        echo FC=$FC>>$GITHUB_ENV
+        echo CC=$CC>>$GITHUB_ENV
+        echo CXX=$CXX>>$GITHUB_ENV
+
+        # set fpm env vars
+        echo FPM_FC=$FC>>$GITHUB_ENV
+        echo FPM_CC=$CC>>$GITHUB_ENV
+        echo FPM_CXX=$CXX>>$GITHUB_ENV
+
+        # set action outputs
+        echo fc=$FC>>$GITHUB_OUTPUT
+        echo cc=$CC>>$GITHUB_OUTPUT
+        echo cxx=$CXX>>$GITHUB_OUTPUT
+        
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
