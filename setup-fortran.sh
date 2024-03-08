@@ -46,18 +46,15 @@ install_gcc_brew()
   brew link gcc@${version}
 
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-  # brew link doesn't create aliases without version numbers before gcc 13
-  if (( "$version" < 13 )); then
-    # default homebrew bin dir changed with macos 14
-    if (( "$os_ver" > 13 )); then
-      ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
-      ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
-      ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
-    else
-      ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
-      ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
-      ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
-    fi
+  # default homebrew bin dir changed with macos 14
+  if (( "$os_ver" > 13 )); then
+    ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
+    ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
+    ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
+  else
+    ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
+    ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
+    ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
   fi
 }
 
