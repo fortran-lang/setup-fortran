@@ -183,6 +183,7 @@ LIBRARY_PATH=$LIBRARY_PATH
 INFOPATH=$INFOPATH
 MANPATH=$MANPATH
 MKLLIB=$MKLLIB
+MKLROOT=$MKLROOT
 DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH
 ONEAPI_ROOT=$ONEAPI_ROOT
 CLASSPATH=$CLASSPATH
@@ -402,6 +403,7 @@ install_intel_apt()
   fi
   if $install_mkl; then
     export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
+    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
   fi
   export_intel_vars
 }
@@ -510,6 +512,7 @@ install_intel_dmg()
 
   if $install_mkl; then
     export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib"
+    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
     export DYLD_LIBRARY_PATH="$MKLLIB":$DYLD_LIBRARY_PATH
   fi
 

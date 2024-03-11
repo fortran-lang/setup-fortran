@@ -3,9 +3,9 @@ name: Test
 # Push and pull request run in assert mode.
 # Schedule and dispatch run in report mode.
 on:
-  # push:
-  #   paths-ignore:
-  #     - '**.md'
+  push:
+    paths-ignore:
+      - '**.md'
   pull_request:
     branches:
       - main
