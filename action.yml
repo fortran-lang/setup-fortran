@@ -57,6 +57,11 @@ runs:
         compiler=${COMPILER:-gcc}
         platform=$(uname -s | tr '[:upper:]' '[:lower:]')
 
+        if [[ "$RUNNER_OS" == "macOS" ]] && [[ "$compiler" == "intel" ]]; then
+          echo "Compiler 'intel' not supported on macOS, falling back to 'intel-classic'"
+          compiler="intel-classic"
+        fi
+
         case $compiler in
           gcc)
             version=${VERSION:-13}
@@ -67,7 +72,7 @@ runs:
             install_intel $platform true
             ;;
           intel)
-            version=${VERSION:-2023.2.0}
+            version=${VERSION:-2024.0}
             install_intel $platform false
             ;;
           nvidia-hpc)
