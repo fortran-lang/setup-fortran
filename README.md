@@ -35,7 +35,7 @@ jobs:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2023.2'}
           - {compiler: intel-classic, version: '2021.10'}
-          - {compiler: intel-classic, version: '2021.10', install_mkl: 'true'}
+          - {compiler: intel-classic, version: '2021.10'}
           - {compiler: nvidia-hpc, version: '23.11'}
         include:
           - os: ubuntu-latest
@@ -49,11 +49,13 @@ jobs:
             toolchain: {compiler: nvidia-hpc, version: '23.11'}
 
     steps:
-      - uses: fortran-lang/setup-fortran@v1
+      - uses: ssciwr/setup-fortran@v0.1
         id: setup-fortran
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          install_mkl: "true"
+
 
       - run: |
           ${{ env.FC }} ... # environment vars FC, CC, and CXX are set
