@@ -46,23 +46,16 @@ install_gcc_brew()
   brew link gcc@${version}
 
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-  # brew link doesn't create aliases without version numbers before gcc 13
-  if (( "$version" < 13 )); then
-    # default homebrew bin dir changed with macos 14
-    if (( "$os_ver" > 13 )); then
-      ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
-      ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
-      ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
-    else
-      ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
-      ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
-      ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
-    fi
+  # default homebrew bin dir changed with macos 14
+  if (( "$os_ver" > 13 )); then
+    ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
+    ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
+    ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
+  else
+    ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
+    ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
+    ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
   fi
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc_apt()
@@ -83,10 +76,6 @@ install_gcc_apt()
     --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
     --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
     --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc_choco()
@@ -143,10 +132,6 @@ install_gcc_choco()
   if [ -d "$FCDIR" ] && [ -f "$LNDIR/libgfortran-5.dll" ] && [ ! -f "$FCDIR/libgfortran-5.dll" ]; then
       ln -s "$LNDIR/libgfortran-5.dll" "$FCDIR/libgfortran-5.dll"
   fi
-
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
 }
 
 install_gcc()
@@ -173,6 +158,10 @@ install_gcc()
       exit 1
       ;;
   esac
+
+  export FC="gfortran"
+  export CC="gcc"
+  export CXX="g++"
 }
 
 export_intel_vars()
@@ -238,6 +227,10 @@ intel_version_map_l()
     esac
   else
     case $actual_version in
+      # 2024 versions omit patch version number in pkg name
+      2024.0*)
+        version=2024.0
+        ;;
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
@@ -347,6 +340,9 @@ intel_version_map_w()
     esac
   else
     case $actual_version in
+      2024 | 2024.0 | 2024.0.1)
+        version=2024.0.1
+        ;;
       2023.2 | 2023.1 | 2023.0)
         version=$actual_version.0
         ;;
@@ -381,13 +377,23 @@ install_intel_apt()
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
 
+  # c/cpp compiler package names changed with 2024+
+  case $version in
+    2024*)
+      compiler_package_name=$(intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version)
+      ;;
+    *)
+      compiler_package_name=$(intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version)
+      ;;
+  esac
+
   if $install_mkl; then
     sudo apt-get install \
-      intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version \
+      $compiler_package_name \
       intel-oneapi-mkl-$mkl_version
   else
     sudo apt-get install \
-      intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
+      $compiler_package_name
   fi
 
   source /opt/intel/oneapi/setvars.sh
@@ -405,6 +411,7 @@ install_intel_apt()
     export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
     export MKLROOT="$ONEAPI_ROOT/mkl/latest"
   fi
+
   export_intel_vars
 }
 
@@ -526,49 +533,40 @@ install_intel_win()
   intel_version_map_w $version $classic
 
   case $version in
+    2024.0.1)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7a6db8a1-a8b9-4043-8e8e-ca54b56c34e4/w_HPCKit_p_2024.0.1.35_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
     2023.2.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/438527fc-7140-422c-a851-389f2791816b/w_HPCKit_p_2023.2.0.49441_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
     2023.1.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
     2023.0.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/19085/w_HPCKit_p_2023.0.0.25931_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
     2022.3.1)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18976/w_HPCKit_p_2022.3.1.19755_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
     2022.3.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
     2022.2.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-compiler
       ;;
-    # the installer versions below fail
-    # 2022.1.2)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18529/w_HPCKit_p_2022.1.2.116_offline.exe
-    #   ;;
-    # 2022.1.0)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18417/w_HPCKit_p_2022.1.0.93_offline.exe
-    #   ;;
-    # 2021.4.0)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/18247/w_HPCKit_p_2021.4.0.3340_offline.exe
-    #   ;;
-    # 2021.3.0)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17940/w_HPCKit_p_2021.3.0.3227_offline.exe
-    #   ;;
-    # 2021.2.0)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17762/w_HPCKit_p_2021.2.0.2901_offline.exe
-    #   ;;
-    # 2021.1.0)
-    #   WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/17392/w_HPCKit_p_2021.1.0.2682_offline.exe
-    #   ;;
     *)
       exit 1
       ;;
   esac
 
-  "$GITHUB_ACTION_PATH/install-intel-windows.bat" $WINDOWS_HPCKIT_URL
+  "$GITHUB_ACTION_PATH/install-intel-windows.bat" $WINDOWS_HPCKIT_URL $WINDOWS_HPCKIT_COMPONENTS
 
   # don't call export_intel_vars here because the install may have
   # been restored from cache. export variables in action.yml after
@@ -601,6 +599,16 @@ install_intel()
       exit 1
       ;;
   esac
+
+  if $classic; then
+    export FC="ifort"
+    export CC="icc"
+    export CXX="icpc"
+  else
+    export FC="ifx"
+    export CC="icx"
+    export CXX="icpx"
+  fi
 }
 
 export_nvidiahpc_vars()
@@ -649,14 +657,7 @@ install_nvidiahpc_apt()
   echo "NVIDIA HPC SDK $version module loaded."
 
   # set environment variables
-  echo "Setting environment variables..."
   export_nvidiahpc_vars $version
-
-  # set environment variables
-  export FC="nvfortran"
-  export CC="nvc"
-  export CXX="nvc++"
-  echo "Environment variables set."
 }
 
 install_nvidiahpc()
@@ -687,4 +688,9 @@ install_nvidiahpc()
       exit 1
       ;;
   esac
+}
+
+  export FC="nvfortran"
+  export CC="nvc"
+  export CXX="nvc++"
 }

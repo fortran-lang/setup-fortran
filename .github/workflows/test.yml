@@ -6,6 +6,8 @@ on:
   push:
     paths-ignore:
       - '**.md'
+    tags-ignore:
+      - v**
   pull_request:
     branches:
       - main
@@ -195,15 +197,15 @@ jobs:
           fi
 
       - name: Update README
-        if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
+        if: ${{ steps.diff.outputs.diff == 'true' }}
         run: python .github/compat/update_compat_table.py ".github/compat/compat.md" "README.md"
 
       - name: Print README diff
-        if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
+        if: ${{ steps.diff.outputs.diff == 'true' }}
         run: git diff README.md
 
       - name: Create pull request
-        if: ${{ steps.diff.outputs.diff == 'true' && github.event_name == 'push' }}
+        if: ${{ steps.diff.outputs.diff == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
