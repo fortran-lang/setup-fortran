@@ -397,7 +397,7 @@ install_intel_apt()
   fi
 
   source /opt/intel/oneapi/setvars.sh
-
+  # these exports have been removed in later versions of the action?
   if $classic; then
     export FC="ifort"
     export CC="icc"
@@ -512,7 +512,8 @@ install_intel_dmg()
   rm m_HPCKit.dmg
 
   source /opt/intel/oneapi/setvars.sh
-
+ 
+  # these exports have been removed in later versions of the action?
   export FC="ifort"
   export CC="icc"
   export CXX="icpc"
