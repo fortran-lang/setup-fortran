@@ -171,10 +171,9 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 LIBRARY_PATH=$LIBRARY_PATH
 INFOPATH=$INFOPATH
 MANPATH=$MANPATH
-MKLLIB=$MKLLIB
 MKLROOT=$MKLROOT
-DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH
 ONEAPI_ROOT=$ONEAPI_ROOT
+MKLLIB=$MKLLIB
 CLASSPATH=$CLASSPATH
 CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
 OCL_ICD_FILENAMES=$OCL_ICD_FILENAMES
@@ -397,21 +396,6 @@ install_intel_apt()
   fi
 
   source /opt/intel/oneapi/setvars.sh
-  # these exports have been removed in later versions of the action?
-  if $classic; then
-    export FC="ifort"
-    export CC="icc"
-    export CXX="icpc"
-  else
-    export FC="ifx"
-    export CC="icx"
-    export CXX="icpx"
-  fi
-  if $install_mkl; then
-    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
-    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
-  fi
-
   export_intel_vars
 }
 
@@ -480,23 +464,7 @@ install_intel_dmg()
   esac
 
   if $install_mkl; then
-    if [ "$MACOS_BASEKIT_URL" == "" ]; then
-      echo "ERROR: MACOS_BASEKIT_URL is empty - please check the version mapping for MKL"
-      echo "SKIPPING MKL installation..."
-    else
-      require_fetch
-      $fetch $MACOS_BASEKIT_URL > m_BASEKit.dmg
-      ls -lh
-      hdiutil verify m_BASEKit.dmg
-      hdiutil attach m_BASEKit.dmg
-      sudo /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
-        --action install \
-        --eula=accept \
-        --continue-with-optional-error=yes \
-        --log-dir=.
-      hdiutil detach /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)" -quiet
-      rm m_BASEKit.dmg
-    fi
+    source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_BASEKIT_URL
   fi
 
   require_fetch
@@ -512,18 +480,6 @@ install_intel_dmg()
   rm m_HPCKit.dmg
 
   source /opt/intel/oneapi/setvars.sh
- 
-  # these exports have been removed in later versions of the action?
-  export FC="ifort"
-  export CC="icc"
-  export CXX="icpc"
-
-  if $install_mkl; then
-    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib"
-    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
-    export DYLD_LIBRARY_PATH="$MKLLIB":$DYLD_LIBRARY_PATH
-  fi
-
   export_intel_vars
 }
 
@@ -579,9 +535,11 @@ install_intel()
   local platform=$1
   local classic=$2
   local install_mkl=$3
+  mkl_subdir=""
   case $platform in
     linux*)
       install_intel_apt $version $classic $install_mkl
+      mkl_subdir="intel64"
       ;;
     darwin*)
       install_intel_dmg $version $install_mkl
@@ -609,6 +567,11 @@ install_intel()
     export FC="ifx"
     export CC="icx"
     export CXX="icpx"
+  fi
+
+  if $install_mkl; then
+    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/$mkl_subdir"
+    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
   fi
 }
 

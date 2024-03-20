@@ -92,6 +92,7 @@ runs:
         echo "FC=${FC}" >> $GITHUB_ENV
         echo "CC=${CC}" >> $GITHUB_ENV
         echo "CXX=${CXX}" >> $GITHUB_ENV
+        echo "MKLLIB=${MKLLIB}" >> $GITHUB_ENV
 
     # save oneAPI cache and activate environment
     - name: Save cache
@@ -134,6 +135,7 @@ runs:
         echo FC=$FC>>$GITHUB_ENV
         echo CC=$CC>>$GITHUB_ENV
         echo CXX=$CXX>>$GITHUB_ENV
+        echo "MKLLIB=$MKLLIB" >> $GITHUB_ENV
 
         # set fpm env vars
         echo FPM_FC=$FC>>$GITHUB_ENV
@@ -144,6 +146,7 @@ runs:
         echo fc=$FC>>$GITHUB_OUTPUT
         echo cc=$CC>>$GITHUB_OUTPUT
         echo cxx=$CXX>>$GITHUB_OUTPUT
+        echo MKLLIB=$MKLLIB>>$GITHUB_OUTPUT
         
     # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
