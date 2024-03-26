@@ -78,7 +78,7 @@ The action sets the following outputs:
 - `cc`: C compiler executable, e.g. `gcc`
 - `cxx`: C++ compiler executable, e.g. `g++`
 
-C/C++ compilers of the same toolchain/version are provided where possible, otherwise (if a standalone Fortran compiler is selected) defaulting to the preinstalled GCC. While this action attempts to guarantee Fortran compiler compatibility with all supported platform/toolchain/version combinations, no corresponding guarantee is made with regard to C/C++ compilers &mdash; use at your own risk.
+C/C++ compilers of the same toolchain/version are provided where available. If a standalone Fortran compiler is selected, the action will attempt to configure compatible C/C++ compilers (typically GCC, or MSVC on Windows), but this is not guaranteed &mdash; use at your own risk.
 
 
 ## Environment variables

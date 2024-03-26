@@ -25,29 +25,9 @@ install_environment_modules_apt() {
   echo "Environment modules set up completed."
 }
 
-# Function to install miniconda on linux
-# https://docs.conda.io/projects/miniconda/en/latest/
-install_miniconda_lin() {
-  mkdir -p ~/miniconda3
-  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-  bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-  rm -rf ~/miniconda3/miniconda.sh
-}
-
-# Function to install miniconda on windows
-# https://docs.conda.io/projects/miniconda/en/latest/
-install_miniconda_win() {
-  powershell.exe -Command "Invoke-WebRequest -Uri 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe' -OutFile 'C:\ProgramData\miniconda.exe'; Start-Process -Wait -FilePath 'C:\ProgramData\miniconda.exe' -ArgumentList '/InstallationType=JustMe', '/AddToPath=1', '/RegisterPython=0', '/S', '/D=C:\ProgramData\Miniconda3'"
-}
-
-# Function to install miniconda on macOS
-# https://docs.conda.io/projects/miniconda/en/latest/
-install_miniconda_mac() {
-  mkdir -p ~/miniconda3
-  curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o ~/miniconda3/miniconda.sh
-  bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-  rm -rf ~/miniconda3/miniconda.sh
-  source ~/miniconda3/etc/profile.d/conda.sh
+install_micromamba_brew() {
+  brew install micromamba
+  micromamba shell init
 }
 
 install_gcc_brew()
@@ -665,119 +645,35 @@ install_nvidiahpc_apt()
   # set environment variables
   echo "Setting environment variables..."
   export_nvidiahpc_vars $version
-
-  # set environment variables
-  export FC="nvfortran"
-  export CC="nvc"
-  export CXX="nvc++"
-  echo "Environment variables set."
 }
 
-install_nvidiahpc()
-{
-  local platform=$1
-  case $platform in
-    linux*)
-      install_nvidiahpc_apt $version
-      ;;
-    darwin*)
-      echo "NVIDIA HPC SDK is not supported on macOS."
-      exit 1
-      ;;
-    mingw*)
-      echo "NVIDIA HPC SDK is not supported on Windows."
-      exit 1
-      ;;
-    msys*)
-      echo "NVIDIA HPC SDK is not supported on MSYS."
-      exit 1
-      ;;
-    cygwin*)
-      echo "NVIDIA HPC SDK is not supported on Cygwin."
-      exit 1
-      ;;
-    *)
-      echo "Unsupported platform: $platform"
-      exit 1
-      ;;
-  esac
-}
-
-install_lfortran_lin()
+install_lfortran_l()
 {
   local version=$1
-
-  # install miniconda
-  install_miniconda_lin
-
-  # create conda environment for lfortran
-  conda create -n lf
-  eval "$(conda shell.bash hook)"
-  conda activate lf
-
-  # install lfortran
-  conda install -y lfortran=$version -c conda-forge
-
-  # add lfortran to PATH
-  cat >> $GITHUB_ENV <<EOF
-PATH=/usr/share/miniconda/envs/lf/bin:$PATH;
-EOF
-  for path in ${PATH//:/ }; do
-    echo $path >> $GITHUB_PATH
-  done
-
-  # set environment variables
-  export FC="lfortran"
-  # export CC=""
-  # export CXX=""
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA=conda
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
-install_lfortran_win()
+install_lfortran_w()
 {
   local version=$1
-
-  # install miniconda
-  install_miniconda_win
-
-  # install lfortran in conda environment lf
-  C:/ProgramData/Miniconda3/Scripts/conda.exe create -n lf
-  C:/ProgramData/Miniconda3/Scripts/conda.exe install -n lf -y lfortran=$version -c conda-forge
-
-  # check lfortran version
-  C:/ProgramData/Miniconda3/envs/lf/Library/bin/lfortran.exe -h
-
-  # set environment variables
-  export FC="lfortran"
-  # export CC=""
-  # export CXX=""
+  export CC="cl"
+  export CXX="cl"
+  export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
-install_lfortran_mac()
+install_lfortran_m()
 {
   local version=$1
-
-  # install miniconda
-  install_miniconda_mac
-
-  # create conda environment for lfortran
-  conda create -n lf
-  eval "$(conda shell.bash hook)"
-  conda activate lf
-
-  # install lfortran
-  conda install -y lfortran=$version -c conda-forge
-
-  cat >> $GITHUB_ENV <<EOF
-PATH=/usr/local/miniconda3/envs/lf/bin:$PATH
-EOF
-  for path in ${PATH//:/ }; do
-      echo $path >> $GITHUB_PATH
-  done
-
-  # set environment variables
-  export FC="lfortran"
-  # export CC=""
-  # export CXX=""
+  install_micromamba_brew
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
+  export CONDA=micromamba
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
 install_lfortran()
@@ -785,23 +681,26 @@ install_lfortran()
   local platform=$1
   case $platform in
     linux*)
-      install_lfortran_lin $version
+      install_lfortran_l $version
       ;;
     darwin*)
-      install_lfortran_mac $version
+      install_lfortran_m $version
       ;;
     mingw*)
-      install_lfortran_win $version
+      install_lfortran_w $version
       ;;
     msys*)
-      install_lfortran_win $version
+      install_lfortran_w $version
       ;;
     cygwin*)
-      install_lfortran_win $version
+      install_lfortran_w $version
       ;;
     *)
       echo "Unsupported platform: $platform"
       exit 1
       ;;
   esac
+
+  echo $($CONDA run -n base which lfortran | sed 's/lfortran//') >> $GITHUB_PATH
+  export FC="lfortran"
 }
