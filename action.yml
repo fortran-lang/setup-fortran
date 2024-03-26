@@ -42,6 +42,15 @@ runs:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 
+    - uses: mamba-org/setup-micromamba@v1
+      if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran')
+      with:
+        init-shell: >-
+          bash
+          powershell
+          cmd.exe
+        post-cleanup: 'all'
+
     # Set up the selected toolchain or compiler
     - name: Setup toolchain
       id: setup

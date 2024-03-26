@@ -25,11 +25,6 @@ install_environment_modules_apt() {
   echo "Environment modules set up completed."
 }
 
-install_micromamba_brew() {
-  brew install micromamba
-  micromamba shell init
-}
-
 install_gcc_brew()
 {
   # check if gcc preinstalled via brew
@@ -618,7 +613,6 @@ install_lfortran_w()
 install_lfortran_m()
 {
   local version=$1
-  install_micromamba_brew
   export CC="gcc"
   export CXX="g++"
   export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
