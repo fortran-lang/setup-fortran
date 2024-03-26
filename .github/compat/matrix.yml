@@ -72,16 +72,12 @@ exclude:
     toolchain: {compiler: intel}
   - os: macos-12
     toolchain: {compiler: intel}
-  - os: macos-11
-    toolchain: {compiler: intel}
   # nvidia-hpc not available for mac
   - os: macos-14
     toolchain: {compiler: nvidia-hpc}
   - os: macos-13
     toolchain: {compiler: nvidia-hpc}
   - os: macos-12
-    toolchain: {compiler: nvidia-hpc}
-  - os: macos-11
     toolchain: {compiler: nvidia-hpc}
   # nvidia-hpc not available for windows
   - os: windows-2022
