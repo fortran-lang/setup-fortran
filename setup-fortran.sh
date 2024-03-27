@@ -591,3 +591,60 @@ install_nvidiahpc()
   export CC="nvc"
   export CXX="nvc++"
 }
+
+install_lfortran_l()
+{
+  local version=$1
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA=conda
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran_w()
+{
+  local version=$1
+  export CC="cl"
+  export CXX="cl"
+  export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran_m()
+{
+  local version=$1
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
+  export CONDA=micromamba
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_lfortran_l $version
+      ;;
+    darwin*)
+      install_lfortran_m $version
+      ;;
+    mingw*)
+      install_lfortran_w $version
+      ;;
+    msys*)
+      install_lfortran_w $version
+      ;;
+    cygwin*)
+      install_lfortran_w $version
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+
+  echo $($CONDA run -n base which lfortran | sed 's/lfortran//') >> $GITHUB_PATH
+  export FC="lfortran"
+}

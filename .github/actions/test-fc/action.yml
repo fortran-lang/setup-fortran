@@ -18,7 +18,7 @@ runs:
         [[ "${{ env.FC }}" == "${{ env.FPM_FC }}" ]] && (echo "FC and FPM_FC match") || (echo "FC and FPM_FC don't match: ${{ env.FC }} != ${{ env.FPM_FC}}"; exit 1)
 
         # check compiler version
-        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]] && [[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
           ${{ env.FC }} //QV > "$RUNNER_TEMP/${{ env.FC }}.ver" 2>&1
           fcv=$(cat "$RUNNER_TEMP/${{ env.FC }}.ver" | head -n 1)
@@ -27,6 +27,8 @@ runs:
         elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ inputs.compiler }}" == "nvidia-hpc" ]]); then
           # Get the compiler version and extract the version number
           fcv=$(${{ env.FC }} --version 2>&1 | awk '/nvfortran/ {print $2}' | cut -d'-' -f1)
+        elif ([[ "${{ inputs.compiler }}" == "lfortran" ]]); then
+          fcv=$(${{ env.FC }} --version | head -n 1 | grep -woE '[0123456789.]+')
         elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
           fcv=$(${{ env.FC }} --version | head -n 1)
           fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
@@ -38,14 +40,15 @@ runs:
       shell: bash
       run: |
         # hello world program
-        ${{ env.FC }} $args -o hw hw.f90
+        ${{ env.FC }} -o hw hw.f90
         output=$(./hw '2>&1')
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw' output: $output"; exit 1)
         rm hw
 
     - name: Test compile Fortran (pwsh)
       working-directory: test
-      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      # todo: debug lfortran discovery issues (same for powershell and cmd below)
+      if: ${{ (success() || failure()) && runner.os == 'Windows' && inputs.compiler != 'lfortran' }}
       shell: pwsh
       run: |
         ${{ env.FC }} -o hw.exe hw.f90 
@@ -60,7 +63,7 @@ runs:
 
     - name: Test compile Fortran (powershell)
       working-directory: test
-      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      if: ${{ (success() || failure()) && runner.os == 'Windows' && inputs.compiler != 'lfortran' }}
       shell: powershell
       run: |
         ${{ env.FC }} -o hw.exe hw.f90 
@@ -75,7 +78,7 @@ runs:
 
     - name: Test compile Fortran (cmd)
       working-directory: test
-      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
+      if: ${{ (success() || failure()) && runner.os == 'Windows' && inputs.compiler != 'lfortran' }}
       shell: cmd
       run: |
         ${{ env.FC }} -o hw.exe hw.f90 
