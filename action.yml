@@ -42,6 +42,7 @@ runs:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 
+    # used to install lfortran on mac
     - uses: mamba-org/setup-micromamba@v1
       if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran')
       with:
