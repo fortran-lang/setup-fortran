@@ -369,7 +369,7 @@ install_intel_apt()
 
   require_fetch
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
-  $fetch https://apt.repos.intsource /opt/intel/oneapi/setvars.shel.com/intel-gpg-keys/$_KEY > $_KEY
+  $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
   echo "deb https://apt.repos.intel.com/oneapi all main" \
