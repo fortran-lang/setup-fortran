@@ -1,5 +1,5 @@
-MACOS_URL=$1
-install_mkl=$2
+install_mkl=$1
+MACOS_URL=$2
 if [ "$MACOS_URL" == "" ]; then
   echo "ERROR: MACOS URL is empty - please check the version mapping for mkl/intel compiler"
   echo "SKIPPING MKL/intel installation..."

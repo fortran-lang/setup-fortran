@@ -464,10 +464,10 @@ install_intel_dmg()
   esac
 
   if $install_mkl; then
-    source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_BASEKIT_URL true
+    source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" true $MACOS_BASEKIT_URL
   fi
 
-  source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_HPCKIT_URL false
+  source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" false $MACOS_HPCKIT_URL
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
