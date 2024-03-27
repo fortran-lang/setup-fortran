@@ -23,9 +23,13 @@ runs:
          # required for macOS 11, intel-classic 2021.1-2021.10
          # required for macOS 12, intel-classic 2021.1, 2021.4, 2021.6, 2021.10
          # for all others, setting DYLD path through environment works correctly
-           export DYLD_LIBRARY_PATH="${{ env.MKLLIB }}:$DYLD_LIBRARY_PATH"
+           MKLLIB="$MKLROOT/latest/lib"
+           export DYLD_LIBRARY_PATH="$MKLLIB:$DYLD_LIBRARY_PATH"
+         elif [ "$RUNNER_OS" == "Linux" ]; then
+           MKLLIB="$MKLROOT/latest/lib/intel64"
+           export LD_LIBRARY_PATH="$MKLLIB:$LD_LIBRARY_PATH"
          fi
-         linking="-L${{ env.MKLLIB }} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
+         linking="-L$MKLLIB -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
          # hello world with blas call program
          ${{ env.FC }} $args $linking -o hw_mkl hw_mkl.f90
          output=$(./hw_mkl '2>&1')
