@@ -18,7 +18,7 @@ runs:
         [[ "${{ env.CXX }}" == "${{ env.FPM_CXX }}" ]] && (echo "CXX and FPM_CXX match") || (echo "CXX and FPM_CXX don't match: ${{ env.CXX }} != ${{ env.FPM_CXX}}"; exit 1)
 
         # check compiler version
-        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]] && [[ "${{ matrix.toolchain.compiler }}" != "nvidia-hpc" ]]); then
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
           ${{ env.CXX }} //QV > "$RUNNER_TEMP/${{ env.CXX }}.ver" 2>&1
           cxxv=$(cat "$RUNNER_TEMP/${{ env.CXX }}.ver" | head -n 1)
@@ -27,6 +27,8 @@ runs:
         elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ matrix.toolchain.compiler}}" == "nvidia-hpc" ]]); then
           # Get the compiler version and extract the version number
           cxxv=$(${{ env.CXX }} --version 2>&1 | awk '/nvc++/ {print $2}' | cut -d'-' -f1)
+        elif ([[ "${{ inputs.compiler }}" == "lfortran" ]]); then
+          exit 0  # uses preinstalled gcc, skip version check
         elif ([[ "${{ matrix.toolchain.compiler}}" != "nvidia-hpc" ]]); then
           cxxv=$(${{ env.CXX }} --version | head -n 1)
           cxxv=$(echo "$cxxv" | grep -woE '[0123456789.]+' | head -n 1)

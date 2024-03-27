@@ -18,7 +18,7 @@ runs:
         [[ "${{ env.CC }}" == "${{ env.FPM_CC }}" ]] && (echo "CC and FPM_CC match") || (echo "CC and FPM_CC don't match: ${{ env.CC }} != ${{ env.FPM_CC}}"; exit 1)
 
         # check compiler version
-        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]] && [[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
+        if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ inputs.compiler }}" =~ "intel" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
           ${{ env.CC }} //QV > "$RUNNER_TEMP/${{ env.CC }}.ver" 2>&1
           ccv=$(cat "$RUNNER_TEMP/${{ env.CC }}.ver" | head -n 1)
@@ -27,6 +27,8 @@ runs:
         elif ([ "$RUNNER_OS" == "Linux" ] && [[ "${{ inputs.compiler }}" == "nvidia-hpc" ]]); then
           # Get the compiler version and extract the version number
           ccv=$(${{ env.CC }} --version 2>&1 | awk '/nvc/ {print $2}' | cut -d'-' -f1)
+        elif ([[ "${{ inputs.compiler }}" == "lfortran" ]]); then
+          exit 0  # uses preinstalled gcc, skip version check
         elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
           ccv=$(${{ env.CC }} --version | head -n 1)
           ccv=$(echo "$ccv" | grep -woE '[0123456789.]+' | head -n 1)
