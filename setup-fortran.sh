@@ -397,21 +397,6 @@ install_intel_apt()
   fi
 
   source /opt/intel/oneapi/setvars.sh
-
-  if $classic; then
-    export FC="ifort"
-    export CC="icc"
-    export CXX="icpc"
-  else
-    export FC="ifx"
-    export CC="icx"
-    export CXX="icpx"
-  fi
-  if $install_mkl; then
-    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
-    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
-  fi
-
   export_intel_vars
 }
 
@@ -452,7 +437,7 @@ install_intel_dmg()
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/irc_nas/19086/m_HPCKit_p_2023.0.0.25440.dmg
       ;;
     2023.1.0)
-      MACOS_HPCKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543.dmg
+      MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543.dmg
       ;;
     2023.2.0)
       MACOS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/edb4dc2f-266f-47f2-8d56-21bc7764e119/m_HPCKit_p_2023.2.0.49443.dmg
@@ -467,7 +452,7 @@ install_intel_dmg()
       MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18675/m_BaseKit_p_2022.2.0.226_offline.dmg
       ;;
     2023.1.0)
-      MACOS_BASEKIT_URL=https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2516a0a0-de4d-4f3d-9e83-545b32127dbb/m_BaseKit_p_2023.1.0.45568.dmg
+      MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2516a0a0-de4d-4f3d-9e83-545b32127dbb/m_BaseKit_p_2023.1.0.45568.dmg
       ;;
     2023.2.0)
       MACOS_BASEKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/cd013e6c-49c4-488b-8b86-25df6693a9b7/m_BaseKit_p_2023.2.0.49398.dmg
@@ -512,17 +497,6 @@ install_intel_dmg()
   rm m_HPCKit.dmg
 
   source /opt/intel/oneapi/setvars.sh
-
-  export FC="ifort"
-  export CC="icc"
-  export CXX="icpc"
-
-  if $install_mkl; then
-    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib"
-    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
-    export DYLD_LIBRARY_PATH="$MKLLIB":$DYLD_LIBRARY_PATH
-  fi
-
   export_intel_vars
 }
 
@@ -692,4 +666,61 @@ install_nvidiahpc()
   export FC="nvfortran"
   export CC="nvc"
   export CXX="nvc++"
+}
+
+install_lfortran_l()
+{
+  local version=$1
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA=conda
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran_w()
+{
+  local version=$1
+  export CC="cl"
+  export CXX="cl"
+  export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran_m()
+{
+  local version=$1
+  export CC="gcc"
+  export CXX="g++"
+  export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
+  export CONDA=micromamba
+  $CONDA install -c conda-forge -n base -y lfortran=$version
+}
+
+install_lfortran()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_lfortran_l $version
+      ;;
+    darwin*)
+      install_lfortran_m $version
+      ;;
+    mingw*)
+      install_lfortran_w $version
+      ;;
+    msys*)
+      install_lfortran_w $version
+      ;;
+    cygwin*)
+      install_lfortran_w $version
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+
+  echo $($CONDA run -n base which lfortran | sed 's/lfortran//') >> $GITHUB_PATH
+  export FC="lfortran"
 }

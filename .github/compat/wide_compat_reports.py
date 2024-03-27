@@ -22,7 +22,7 @@ df = pd.pivot_table(
     index="runner",
     columns=["compiler", "version"],
     values="support",
-    sort=False,
+    sort=True,
     aggfunc="first",
 ).sort_values(by=["runner"])
 
