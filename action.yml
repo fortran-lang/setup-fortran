@@ -46,6 +46,13 @@ runs:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 
+    # used to install lfortran on mac
+    - uses: mamba-org/setup-micromamba@v1
+      if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran')
+      with:
+        init-shell: bash
+        post-cleanup: 'all'
+
     # Set up the selected toolchain or compiler
     - name: Setup toolchain
       id: setup
@@ -62,6 +69,11 @@ runs:
         compiler=${COMPILER:-gcc}
         platform=$(uname -s | tr '[:upper:]' '[:lower:]')
 
+        if [[ "$RUNNER_OS" == "macOS" ]] && [[ "$compiler" == "intel" ]]; then
+          echo "Compiler 'intel' not supported on macOS, falling back to 'intel-classic'"
+          compiler="intel-classic"
+        fi
+
         case $compiler in
           gcc)
             version=${VERSION:-13}
@@ -72,12 +84,16 @@ runs:
             install_intel $platform true ${{ inputs.install_mkl }}
             ;;
           intel)
-            version=${VERSION:-2023.2.0}
+            version=${VERSION:-2024.0}
             install_intel $platform false ${{ inputs.install_mkl }}
             ;;
           nvidia-hpc)
             version=${VERSION:-23.11}
             install_nvidiahpc $platform
+            ;;
+          lfortran)
+            version=${VERSION:-0.30.0}
+            install_lfortran $platform
             ;;
           *)
             exit 1
@@ -139,9 +155,11 @@ runs:
         echo fc=$FC>>$GITHUB_OUTPUT
         echo cc=$CC>>$GITHUB_OUTPUT
         echo cxx=$CXX>>$GITHUB_OUTPUT
-        
-    # GitHub Actions prepends GNU linker to the PATH before all bash steps, hide it so MSVC linker is found
     - name: Hide GNU linker (Windows)
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      if: runner.os == 'Windows' && !contains(inputs.compiler, 'gcc')
       shell: bash
-      run: mv "/usr/bin/link" "$RUNNER_TEMP/link"
+      run: mv /usr/bin/link $RUNNER_TEMP/link
+
+    - name: Setup MSVC toolchain (Windows)
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
+      uses: ilammy/msvc-dev-cmd@v1
