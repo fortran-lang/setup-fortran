@@ -23,7 +23,7 @@ runs:
          # required for macOS 11, intel-classic 2021.1-2021.10
          # required for macOS 12, intel-classic 2021.1, 2021.4, 2021.6, 2021.10
          # for all others, setting DYLD path through environment works correctly
-           MKLLIB="$MKLROOT/latest/lib"
+           MKLLIB="$MKLROOT/lib"
            export DYLD_LIBRARY_PATH="$MKLLIB:$DYLD_LIBRARY_PATH"
          elif [ "$RUNNER_OS" == "Linux" ]; then
            MKLLIB="$MKLROOT/latest/lib/intel64"
