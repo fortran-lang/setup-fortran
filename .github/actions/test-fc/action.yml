@@ -58,22 +58,6 @@ runs:
         }
         rm hw.exe
 
-    - name: Test compile Fortran (pwsh)
-      working-directory: test
-      if: ${{ (success() || failure()) && runner.os == 'Windows' }}
-      shell: pwsh
-      run: |
-        ${{ env.FC }} -o hw.exe hw.f90 
-        $output=$(& ".\hw.exe")
-        if ($output -match "hello world") {
-            write-output $output
-        } else {
-            write-output "unexpected output: $output"
-            exit 1
-        }
-        rm hw.exe
-
-
     - name: Test compile Fortran (powershell)
       working-directory: test
       if: ${{ (success() || failure()) && runner.os == 'Windows' }}
