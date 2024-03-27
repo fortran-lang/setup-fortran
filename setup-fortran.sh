@@ -369,7 +369,7 @@ install_intel_apt()
 
   require_fetch
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
-  $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
+  $fetch https://apt.repos.intsource /opt/intel/oneapi/setvars.shel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
   echo "deb https://apt.repos.intel.com/oneapi all main" \
@@ -387,11 +387,11 @@ install_intel_apt()
   esac
 
   if $install_mkl; then
-    sudo apt-get install \
+    sudo apt-get install -y \
       intel-oneapi-compiler-{fortran,"$cpp_name"}-$version \
       intel-oneapi-mkl-$mkl_version
   else
-    sudo apt-get install \
+    sudo apt-get install -y \
       intel-oneapi-compiler-{fortran,"$cpp_name"}-$version 
   fi
 
@@ -464,20 +464,10 @@ install_intel_dmg()
   esac
 
   if $install_mkl; then
-    source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_BASEKIT_URL
+    source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_BASEKIT_URL true
   fi
 
-  require_fetch
-  $fetch $MACOS_HPCKIT_URL > m_HPCKit.dmg
-  hdiutil verify m_HPCKit.dmg
-  hdiutil attach m_HPCKit.dmg
-  sudo /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
-    --action install \
-    --eula=accept \
-    --continue-with-optional-error=yes \
-    --log-dir=.
-  hdiutil detach /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)" -quiet
-  rm m_HPCKit.dmg
+  source "$GITHUB_ACTION_PATH/install-mkl-macos.sh" $MACOS_HPCKIT_URL false
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
