@@ -74,6 +74,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          install_mkl: true
 
       # - name: Debug with tmate
       #   uses: mxschmitt/action-tmate@v3
@@ -85,6 +86,14 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
       
+      - name: Test MKL libraries
+        if: steps.setup-fortran.outcome == 'success' && runner.os != 'windows'
+        uses: ./.github/actions/test-mkl
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+          install_mkl: true
+
       - name: Test C compiler
         continue-on-error: true
         if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
