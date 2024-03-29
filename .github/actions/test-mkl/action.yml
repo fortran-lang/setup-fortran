@@ -18,17 +18,39 @@ runs:
       working-directory: test
       shell: bash
       run: |
-        if [[ "${{ inputs.compiler }}" =~ "intel" ]] && [[ "${{ inputs.install_mkl }}" == "true" ]] && ([[ "${{ inputs.version }}" != "2021.5" ]] && [[ "$runner.os" != "macOS" ]]); then
+        # check settings if mkl tests should be run
+        # mkl cannot be installed for 2021.5 on macos;
+        # and for macos-14 also not 2021.6-2021.9
+        mkl_tests=true
+        echo "$RUNNER_OS"
+        if [[ "${{ inputs.compiler }}" =~ "gcc" ]]; then mkl_tests=false; fi
+        if [[ "${{ inputs.compiler }}" =~ "lfortran" ]]; then mkl_tests=false; fi
+        if [[ "${{ inputs.compiler }}" =~ "nvidia" ]]; then mkl_tests=false; fi
+        if [[ "${{ inputs.install_mkl }}" == "false" ]]; then mkl_tests=false; fi
+        if [[ "${{ inputs.version }}" == "2021.5" ]] && [[ "$RUNNER_OS" == "macOS" ]]; then mkl_tests=false; fi
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          macos_version=$(sw_vers | grep "ProductVersion")
+          echo "$macos_version"
+          if [[ "$macos_version" =~ "14." ]] && [[ "${{ inputs.version }}" == '2021.6' || "${{ inputs.version }}" == '2021.7' || "${{ inputs.version }}" == '2021.7.1' || "${{ inputs.version }}" == '2021.8' ]]; then 
+            mkl_tests=false
+          fi
+        fi
+
+        # # now we know if we should, run the tests
+        if $mkl_tests; then
          if [ "$RUNNER_OS" == "macOS" ]; then
-         # required for macOS 11, intel-classic 2021.1-2021.10
-         # required for macOS 12, intel-classic 2021.1, 2021.4, 2021.6, 2021.10
-         # for all others, setting DYLD path through environment works correctly
-           export DYLD_LIBRARY_PATH="${{ env.MKLLIB }}:$DYLD_LIBRARY_PATH"
+           MKLLIB="$MKLROOT/lib"
+           export DYLD_LIBRARY_PATH="$MKLLIB:$DYLD_LIBRARY_PATH"
+         elif [ "$RUNNER_OS" == "Linux" ]; then
+           MKLLIB="$MKLROOT/latest/lib/intel64"
+           export LD_LIBRARY_PATH="$MKLLIB:$LD_LIBRARY_PATH"
          fi
-         linking="-L${{ env.MKLLIB }} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
+         linking="-L$MKLLIB -lmkl_intel_lp64 -lmkl_sequential -lmkl_core" 
          # hello world with blas call program
          ${{ env.FC }} $args $linking -o hw_mkl hw_mkl.f90
          output=$(./hw_mkl '2>&1')
          [[ "$output" == *"hello world   9.00000000000000"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw_mkl' output: $output"; exit 1)
          rm hw_mkl
+        else
+          echo "Skipping MKL tests"
         fi

@@ -87,7 +87,10 @@ jobs:
           version: ${{ matrix.toolchain.version }}
       
       - name: Test MKL libraries
-        if: steps.setup-fortran.outcome == 'success' && runner.os != 'windows'
+        # we could also exclude 2021.5 for all macos versions here
+        # this needs refactoring at some point - should the install
+        # fail if no mkl version exists?
+        if: steps.setup-fortran.outcome == 'success' && runner.os != 'windows' 
         uses: ./.github/actions/test-mkl
         with:
           compiler: ${{ matrix.toolchain.compiler }}

@@ -156,9 +156,7 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 LIBRARY_PATH=$LIBRARY_PATH
 INFOPATH=$INFOPATH
 MANPATH=$MANPATH
-MKLLIB=$MKLLIB
 MKLROOT=$MKLROOT
-DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH
 ONEAPI_ROOT=$ONEAPI_ROOT
 CLASSPATH=$CLASSPATH
 CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH
@@ -294,20 +292,39 @@ intel_version_map_m()
 mkl_version_map_m()
 {
   local intel_version=$1
-  case $intel_version in
-    2021.1.0 | 2021.2.0 | 2021.3.0 | 2021.4.0 | 2022.2.0 | 2022.3.0 | 2022.3.1 | 2023.0.0 )
-      mkl_version=2022.2.0
-      ;;
-    2022.1.0)
-      mkl_version=""
-      ;;
-    2023.1.0)
-      mkl_version=2023.1.0
-      ;;
-    *)
-      mkl_version=2023.2.0
-      ;;
-  esac
+  macos_version=$(sw_vers | grep "ProductVersion")
+  echo "Found macos version $macos_version"
+  if [[ "$macos_version" == *"14"* ]]; then
+    echo "MacOS 14 requires different basekit versions to work"
+    case $intel_version in 
+      # compiler versions 2021.1, 2021.2, 2021.3, 2021.4, 2021.10 work with latest basekit
+      2021.1.0 | 2021.2.0 | 2021.3.0 | 2021.4.0 | 2023.2.0)
+        mkl_version=2023.2.0
+        ;;
+      # compiler versions 2021.5, 2021.6, 2021.7, 2021.7.1, 2021.8, 2021.9 work with other basekits
+      2023.1.0)
+        mkl_version=2022.2.0
+        ;;
+      *)
+        mkl_version=""
+        ;;
+    esac
+  else   
+    case $intel_version in
+      2021.1.0 | 2021.2.0 | 2021.3.0 | 2021.4.0 | 2022.2.0 | 2022.3.0 | 2022.3.1 | 2023.0.0 )
+        mkl_version=2022.2.0
+        ;;
+      2022.1.0)
+        mkl_version=""
+        ;;
+      2023.1.0)
+        mkl_version=2023.1.0
+        ;;
+      *)
+        mkl_version=2023.2.0
+        ;;
+    esac
+  fi
 }
 
 intel_version_map_w()
@@ -482,36 +499,10 @@ install_intel_dmg()
   esac
 
   if $install_mkl; then
-    if [ "$MACOS_BASEKIT_URL" == "" ]; then
-      echo "ERROR: MACOS_BASEKIT_URL is empty - please check the version mapping for MKL"
-      echo "SKIPPING MKL installation..."
-    else
-      require_fetch
-      $fetch $MACOS_BASEKIT_URL > m_BASEKit.dmg
-      ls -lh
-      hdiutil verify m_BASEKit.dmg
-      hdiutil attach m_BASEKit.dmg
-      sudo /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
-        --action install \
-        --eula=accept \
-        --continue-with-optional-error=yes \
-        --log-dir=.
-      hdiutil detach /Volumes/"$(basename "$MACOS_BASEKIT_URL" .dmg)" -quiet
-      rm m_BASEKit.dmg
-    fi
+    source "$GITHUB_ACTION_PATH/install-intel-macos.sh" true $MACOS_BASEKIT_URL
   fi
 
-  require_fetch
-  $fetch $MACOS_HPCKIT_URL > m_HPCKit.dmg
-  hdiutil verify m_HPCKit.dmg
-  hdiutil attach m_HPCKit.dmg
-  sudo /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
-    --action install \
-    --eula=accept \
-    --continue-with-optional-error=yes \
-    --log-dir=.
-  hdiutil detach /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)" -quiet
-  rm m_HPCKit.dmg
+  source "$GITHUB_ACTION_PATH/install-intel-macos.sh" false $MACOS_HPCKIT_URL
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
@@ -573,9 +564,11 @@ install_intel()
   local platform=$1
   local classic=$2
   local install_mkl=$3
+  mkl_subdir=""
   case $platform in
     linux*)
       install_intel_apt $version $classic $install_mkl
+      mkl_subdir="intel64"
       ;;
     darwin*)
       install_intel_dmg $version $install_mkl
@@ -603,6 +596,11 @@ install_intel()
     export FC="ifx"
     export CC="icx"
     export CXX="icpx"
+  fi
+
+  if $install_mkl; then
+    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/$mkl_subdir"
+    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
   fi
 }
 
