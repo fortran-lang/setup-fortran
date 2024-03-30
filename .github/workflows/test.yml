@@ -12,6 +12,7 @@ on:
     branches:
       - main
       - develop*
+      - math
     paths-ignore:
       - '**.md'
   schedule:
