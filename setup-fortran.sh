@@ -304,10 +304,11 @@ mkl_version_map_m()
       2021.1.0 | 2021.2.0 | 2021.3.0 | 2021.4.0 | 2023.2.0)
         mkl_version=2023.2.0
         ;;
-      # compiler versions 2021.5, 2021.6, 2021.7, 2021.7.1, 2021.8, 2021.9 work with other basekits
+      # compiler versions 2021.9 works with other basekits
       2023.1.0)
-        mkl_version=2022.2.0
+        mkl_version=2023.1.0
         ;;
+      # all others don't work with any basekit
       *)
         mkl_version=""
         ;;
