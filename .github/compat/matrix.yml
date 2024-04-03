@@ -12,8 +12,6 @@ toolchain:
   - {compiler: gcc, version: 11}
   - {compiler: gcc, version: 10}
   - {compiler: gcc, version:  9}
-  - {compiler: gcc, version:  8}
-  - {compiler: gcc, version:  7}
   - {compiler: intel, version: '2024.0'}
   - {compiler: intel, version: '2023.2'}
   - {compiler: intel, version: '2023.1'}
