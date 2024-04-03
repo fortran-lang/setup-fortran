@@ -224,10 +224,6 @@ intel_version_map_l()
     esac
   else
     case $actual_version in
-      # 2024 versions omit patch version number in pkg name
-      2024.0*)
-        version=2024.0
-        ;;
       2022.0.0 | 2022.0)
         version=2022.0.2
         ;;
@@ -305,7 +301,10 @@ intel_version_map_w()
     esac
   else
     case $actual_version in
-      2024 | 2024.0 | 2024.0.1)
+      2024.1 | 2024.1.0)
+        version=2024.1.0
+        ;;
+      2024.0 | 2024.0.1)
         version=2024.0.1
         ;;
       2023.2 | 2023.1 | 2023.0)
@@ -432,6 +431,10 @@ install_intel_win()
   intel_version_map_w $version $classic
 
   case $version in
+    2024.1.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
     2024.0.1)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/7a6db8a1-a8b9-4043-8e8e-ca54b56c34e4/w_HPCKit_p_2024.0.1.35_offline.exe
       WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
