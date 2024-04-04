@@ -208,7 +208,7 @@ jobs:
           default_branch="${{ github.event.repository.default_branch }}"
           
           git switch -c "$updated_branch"
-          git add .github/compat/compat.csv README.md
+          git add .github/compat/*compat.csv README.md
           git commit -m "Update compatibility matrix"
           git push -u origin "$updated_branch"
           gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file .github/compat/compat.md
