@@ -27,7 +27,7 @@ macos-13,intel-classic,2021.1.2,
 macos-13,intel-classic,2021.1,&check;
 macos-13,intel-classic,2021.10,&check;
 macos-13,intel-classic,2021.2,&check;
-macos-13,intel-classic,2021.3,&check;
+macos-13,intel-classic,2021.3,
 macos-13,intel-classic,2021.4,&check;
 macos-13,intel-classic,2021.5,&check;
 macos-13,intel-classic,2021.6,&check;
@@ -113,7 +113,7 @@ ubuntu-20.04,nvidia-hpc,23.7,&check;
 ubuntu-20.04,nvidia-hpc,23.9,&check;
 ubuntu-22.04,gcc,10,&check;
 ubuntu-22.04,gcc,11,&check;
-ubuntu-22.04,gcc,12,&check;
+ubuntu-22.04,gcc,12,
 ubuntu-22.04,gcc,13,&check;
 ubuntu-22.04,gcc,9,&check;
 ubuntu-22.04,intel-classic,2021.1.2,&check;
@@ -149,11 +149,11 @@ ubuntu-22.04,nvidia-hpc,20.7,
 ubuntu-22.04,nvidia-hpc,20.9,
 ubuntu-22.04,nvidia-hpc,21.1,
 ubuntu-22.04,nvidia-hpc,21.11,&check;
+ubuntu-22.04,nvidia-hpc,21.7,
 ubuntu-22.04,nvidia-hpc,21.9,
+ubuntu-22.04,nvidia-hpc,22.1,
 ubuntu-22.04,nvidia-hpc,22.11,&check;
 ubuntu-22.04,nvidia-hpc,22.2,
-ubuntu-22.04,nvidia-hpc,22.3,
-ubuntu-22.04,nvidia-hpc,22.5,
 ubuntu-22.04,nvidia-hpc,22.7,
 ubuntu-22.04,nvidia-hpc,23.1,
 ubuntu-22.04,nvidia-hpc,23.11,&check;
