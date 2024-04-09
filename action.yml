@@ -46,9 +46,20 @@ runs:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 
-    # used to install lfortran on mac
-    - uses: mamba-org/setup-micromamba@v1
+    # Use micromamba for lfortran install on mac. Check if micromamba already
+    # exists, only install it if needed. If we install it, clean it up after.
+    - name: Check for micromamba
+      id: check-umamba
       if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran')
+      shell: bash
+      run: |
+        if [ "$(command -v micromamba)" ]; then
+          echo "install=false" >> $GITHUB_OUTPUT
+        else
+          echo "install=true" >> $GITHUB_OUTPUT
+        fi
+    - uses: mamba-org/setup-micromamba@v1
+      if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran') && steps.check-umamba.outputs.install == 'true'
       with:
         init-shell: bash
         post-cleanup: 'all'

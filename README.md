@@ -66,10 +66,11 @@ jobs:
 ## Options
 
 - *compiler*: Compiler toolchain to setup, available options are
-  - *gcc* (for `gfortran`)
-  - *intel* (for `ifx`)
-  - *intel-classic* (for `ifort`)
-  - *nvidia-hpc* (for `nvfortran`)
+  - *gcc* for `gfortran`
+  - *intel* for `ifx`
+  - *intel-classic* for `ifort`
+  - *lfortran* for `lfortran`
+  - *nvidia-hpc* for `nvfortran`
 - *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
 - *install_mkl*: If MKL libraries should be installed alongsider the intel compiler. Defaults to `false`.
 
