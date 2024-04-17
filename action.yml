@@ -95,7 +95,7 @@ runs:
             install_intel $platform true ${{ inputs.install_mkl }}
             ;;
           intel)
-            version=${VERSION:-2024.0}
+            version=${VERSION:-2024.1}
             install_intel $platform false ${{ inputs.install_mkl }}
             ;;
           nvidia-hpc)
@@ -103,7 +103,7 @@ runs:
             install_nvidiahpc $platform
             ;;
           lfortran)
-            version=${VERSION:-0.30.0}
+            version=${VERSION:-0.33.0}
             install_lfortran $platform
             ;;
           *)
