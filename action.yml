@@ -123,9 +123,7 @@ runs:
       run: |
         ver | findstr /i "10\.0\.17" && set VS2019INSTALLDIR=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise
         ver | findstr /i "10\.0\.20" && set VS2022INSTALLDIR=C:\Program Files\Microsoft Visual Studio\2022\Enterprise
-        for /f "tokens=* usebackq" %%f in (`dir /b "%ONEAPI_ROOT%\compiler\" ^| findstr /V latest ^| sort`) do @set "LATEST=%%f"
-        :: this script fails when install location is not the default
-        call "%ONEAPI_ROOT%\compiler\%LATEST%\env\vars.bat"
+        call "%ONEAPI_ROOT%\setvars.bat"
         set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
 
     - name: Set outputs and env vars
