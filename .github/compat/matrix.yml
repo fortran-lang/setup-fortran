@@ -25,6 +25,8 @@ toolchain:
   - {compiler: intel, version: '2021.2'}
   - {compiler: intel, version: '2021.1.2'}
   - {compiler: intel, version: '2021.1'}
+  - {compiler: intel-classic, version: '2021.12'}
+  - {compiler: intel-classic, version: '2021.11'}
   - {compiler: intel-classic, version: '2021.10'}
   - {compiler: intel-classic, version: '2021.9'}
   - {compiler: intel-classic, version: '2021.8'}
@@ -64,6 +66,19 @@ toolchain:
   - {compiler: nvidia-hpc, version: '20.9'}
   - {compiler: nvidia-hpc, version: '20.7'}
 exclude:
+  # intel-classic >= 2021.10.0 not available for mac
+  - os: macos-14
+    toolchain: {compiler: intel-classic, version: 2021.12.0}
+  - os: macos-13
+    toolchain: {compiler: intel-classic, version: 2021.12.0}
+  - os: macos-12
+    toolchain: {compiler: intel-classic, version: 2021.12.0}
+  - os: macos-14
+    toolchain: {compiler: intel-classic, version: 2021.11.0}
+  - os: macos-13
+    toolchain: {compiler: intel-classic, version: 2021.11.0}
+  - os: macos-12
+    toolchain: {compiler: intel-classic, version: 2021.11.0}
   # ifx not available for mac
   - os: macos-14
     toolchain: {compiler: intel}
