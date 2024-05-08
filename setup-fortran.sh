@@ -345,7 +345,7 @@ install_intel_apt()
   intel_version_map_l $version $classic
 
   require_fetch
-  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
+  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
