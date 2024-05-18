@@ -27,27 +27,12 @@ install_environment_modules_apt() {
 
 install_gcc_brew()
 {
-  # check if gcc preinstalled via brew
-  current=$(brew list --versions gcc | cut -d' ' -f2)
-  current_major=$(echo $current | cut -d'.' -f1)
-  # if already installed, nothing to do
-  if [ "$current_major" == "$version" ]; then
-    echo "GCC $version already installed"
-  else
-    # otherwise install selected version
-    brew install gcc@${version}
-  fi
+  brew install --force gcc@${version}
 
-  # link the selected version, but first try unlinking both
-  # without and with specified version (cover case in which
-  # multiple versions are already installed and/or linked)
-  brew unlink gcc
-  brew unlink gcc@${version}
-  brew link gcc@${version}
-
+  # make an unversioned symlink
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-  # default homebrew bin dir changed with macos 14
   if (( "$os_ver" > 13 )); then
+    # default homebrew bin dir changed with macos 14
     ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
     ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
     ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
