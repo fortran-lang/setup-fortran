@@ -175,6 +175,12 @@ intel_version_map_l()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.12.0 | 2021.12)
+        version=2024.1
+        ;;
+      2021.11.0 | 2021.11)
+        version=2024.0
+        ;;
       2021.10.0 | 2021.10)
         version=2023.2.0
         ;;
@@ -214,6 +220,12 @@ intel_version_map_l()
         ;;
       2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.2)
         version=$actual_version.0
+        ;;
+      2024.1 | 2024.1.0)
+        version=2024.1
+        ;;
+      2024.0 | 2024.0.0)
+        version=2024.0
         ;;
       2021.1)
         version=2021.1.1
@@ -265,6 +277,12 @@ intel_version_map_w()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.12.0 | 2021.12)
+        version=2024.1.0
+        ;;
+      2021.11.0 | 2021.11)
+        version=2024.0.1
+        ;;
       2021.10.0 | 2021.10)
         version=2023.2.0
         ;;
@@ -289,7 +307,7 @@ intel_version_map_w()
       2024.1 | 2024.1.0)
         version=2024.1.0
         ;;
-      2024.0 | 2024.0.1)
+      2024.0 | 2024.0.0)
         version=2024.0.1
         ;;
       2023.2 | 2023.1 | 2023.0)
@@ -315,7 +333,7 @@ install_intel_apt()
   intel_version_map_l $version $classic
 
   require_fetch
-  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
+  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
