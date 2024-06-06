@@ -44,7 +44,7 @@ jobs:
         run: |
           mode=${{ steps.mode.outputs.mode }}
           if [[ "$mode" == "report" ]]; then
-            yq -o json matrix.yml > matrix.json
+            yq -o json windows-intel-matrix.yml > matrix.json
           else
             python matrix_json_from_csv.py "long_compat.csv" "matrix.json"
           fi
