@@ -8,10 +8,10 @@ inputs:
   version:
     description: "Version of toolchain or compiler"
     required: false
-  cache-key:
+  cache_key:
     description: "Windows Intel Cache Key"
     required: false
-    default: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+    default: ""
 outputs:
   fc:
     description: "Path to Fortran compiler"
@@ -22,6 +22,7 @@ outputs:
   cxx:
     description: "Path to C++ compiler"
     value: ${{ steps.outputs.outputs.cxx }}
+
 runs:
   using: "composite"
   steps:
@@ -38,13 +39,26 @@ runs:
       id: get-date
       shell: bash
       run: echo "date=$(/bin/date -u "+%Y%m%d")" >> "$GITHUB_OUTPUT"
+    - name: Generate cache_key
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
+      id: generate-cache-key
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.cache_key }}" ]; then
+          echo "No cache key provided. Generating default key."
+          cache_key="${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ env.date }}"
+        else
+          cache_key="${{ inputs.cache_key }}"
+        fi
+        echo "Using cache key: $cache_key"
+        echo "::set-output name=cache_key::$cache_key"
     - name: Restore cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: cache
       uses: actions/cache/restore@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ inputs.cache-key }}
+        key: ${{ steps.generate-cache-key.outputs.cache_key }}
 
     # Use micromamba for lfortran install on mac. Check if micromamba already
     # exists, only install it if needed. If we install it, clean it up after.
@@ -120,7 +134,8 @@ runs:
       uses: actions/cache/save@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ inputs.cache-key }}
+        key: ${{ steps.generate-cache-key.outputs.cache_key }}
+
     - name: Activate oneAPI
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: cmd
