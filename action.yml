@@ -8,6 +8,10 @@ inputs:
   version:
     description: "Version of toolchain or compiler"
     required: false
+  cache-key:
+    description: "Windows Intel Cache Key"
+    required: false
+    default: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
 outputs:
   fc:
     description: "Path to Fortran compiler"
@@ -40,7 +44,7 @@ runs:
       uses: actions/cache/restore@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+        key: ${{ inputs.cache-key }}
 
     # Use micromamba for lfortran install on mac. Check if micromamba already
     # exists, only install it if needed. If we install it, clean it up after.
@@ -116,7 +120,7 @@ runs:
       uses: actions/cache/save@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+        key: ${{ inputs.cache-key }}
     - name: Activate oneAPI
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: cmd
