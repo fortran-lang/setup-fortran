@@ -27,27 +27,12 @@ install_environment_modules_apt() {
 
 install_gcc_brew()
 {
-  # check if gcc preinstalled via brew
-  current=$(brew list --versions gcc | cut -d' ' -f2)
-  current_major=$(echo $current | cut -d'.' -f1)
-  # if already installed, nothing to do
-  if [ "$current_major" == "$version" ]; then
-    echo "GCC $version already installed"
-  else
-    # otherwise install selected version
-    brew install gcc@${version}
-  fi
+  brew install --force gcc@${version}
 
-  # link the selected version, but first try unlinking both
-  # without and with specified version (cover case in which
-  # multiple versions are already installed and/or linked)
-  brew unlink gcc
-  brew unlink gcc@${version}
-  brew link gcc@${version}
-
+  # make an unversioned symlink
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-  # default homebrew bin dir changed with macos 14
   if (( "$os_ver" > 13 )); then
+    # default homebrew bin dir changed with macos 14
     ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
     ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
     ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
@@ -191,6 +176,12 @@ intel_version_map_l()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.12.0 | 2021.12)
+        version=2024.1
+        ;;
+      2021.11.0 | 2021.11)
+        version=2024.0
+        ;;
       2021.10.0 | 2021.10)
         version=2023.2.0
         ;;
@@ -230,6 +221,12 @@ intel_version_map_l()
         ;;
       2023.2 | 2023.1 | 2023.0 | 2022.2 | 2022.1 | 2021.4 | 2021.2)
         version=$actual_version.0
+        ;;
+      2024.1 | 2024.1.0)
+        version=2024.1
+        ;;
+      2024.0 | 2024.0.0)
+        version=2024.0
         ;;
       2021.1)
         version=2021.1.1
@@ -333,6 +330,12 @@ intel_version_map_w()
   local classic=$2
   if $classic; then
     case $actual_version in
+      2021.12.0 | 2021.12)
+        version=2024.1.0
+        ;;
+      2021.11.0 | 2021.11)
+        version=2024.0.1
+        ;;
       2021.10.0 | 2021.10)
         version=2023.2.0
         ;;
@@ -386,7 +389,7 @@ install_intel_apt()
   mkl_version_map_l $version
 
   require_fetch
-  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB"
+  local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
   sudo apt-key add $_KEY
   rm $_KEY
@@ -397,23 +400,34 @@ install_intel_apt()
   # c/cpp compiler package names changed with 2024+
   case $version in
     2024*)
-      cpp_name=dpcpp-cpp
+      sudo apt-get install \
+        intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
       ;;
     *)
-      cpp_name=dpcpp-cpp-and-cpp-classic
+      sudo apt-get install \
+        intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
       ;;
   esac
-
   if $install_mkl; then
-    sudo apt-get install -y \
-      intel-oneapi-compiler-{fortran,"$cpp_name"}-$version \
-      intel-oneapi-mkl-$mkl_version
-  else
-    sudo apt-get install -y \
-      intel-oneapi-compiler-{fortran,"$cpp_name"}-$version 
+      sudo apt-get install intel-oneapi-mkl-$mkl_version
   fi
 
   source /opt/intel/oneapi/setvars.sh
+
+  if $classic; then
+    export FC="ifort"
+    export CC="icc"
+    export CXX="icpc"
+  else
+    export FC="ifx"
+    export CC="icx"
+    export CXX="icpx"
+  fi
+  if $install_mkl; then
+    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
+    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
+  fi
+
   export_intel_vars
 }
 
