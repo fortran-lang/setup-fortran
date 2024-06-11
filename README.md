@@ -49,7 +49,7 @@ jobs:
             toolchain: {compiler: nvidia-hpc, version: '23.11'}
 
     steps:
-      - uses: ssciwr/setup-fortran@v0.1
+      - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
         with:
           compiler: ${{ matrix.toolchain.compiler }}
