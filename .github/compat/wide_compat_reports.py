@@ -5,6 +5,7 @@ and makes a Markdown table from the wide format report.
 
 from pathlib import Path
 import pandas as pd
+import semver
 import sys
 
 ip = Path(sys.argv[1])  # input file path
@@ -16,7 +17,7 @@ assert op.suffix == ".csv"
 # read long CSV
 df = pd.read_csv(ip)
 
-# pivot and sort
+# pivot and sort index by runner
 df = pd.pivot_table(
     df,
     index="runner",
@@ -25,6 +26,25 @@ df = pd.pivot_table(
     sort=True,
     aggfunc="first",
 ).sort_values(by=["runner"])
+
+# group by compiler and sort by versions
+grouped_versions = {}
+for compiler in df.columns.get_level_values("compiler").unique():
+    versions = df.loc[:, (compiler,)].columns.get_level_values("version").unique()
+    # Parse and sort versions using semver
+    versions = sorted(
+        versions,
+        key=lambda x: semver.VersionInfo.parse(x, optional_minor_and_patch=True),
+    )
+    grouped_versions[compiler] = versions
+
+sorted_columns = []
+for compiler in grouped_versions:
+    sorted_columns.extend(
+        [(compiler, version) for version in grouped_versions[compiler]]
+    )
+
+df = df[sorted_columns]
 
 # write wide CSV
 df.to_csv(op)
