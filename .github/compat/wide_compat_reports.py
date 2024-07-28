@@ -16,7 +16,7 @@ assert op.suffix == ".csv"
 # read long CSV
 df = pd.read_csv(ip)
 
-# pivot and sort index by runner
+# pivot and sort by runners
 df = pd.pivot_table(
     df,
     index="runner",
