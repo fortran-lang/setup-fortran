@@ -16,7 +16,7 @@ assert op.suffix == ".csv"
 # read long CSV
 df = pd.read_csv(ip)
 
-# pivot and sort
+# pivot and sort by runners
 df = pd.pivot_table(
     df,
     index="runner",
@@ -25,6 +25,22 @@ df = pd.pivot_table(
     sort=True,
     aggfunc="first",
 ).sort_values(by=["runner"])
+
+
+# group by compiler and sort by versions
+grouped_versions = {}
+for compiler in df.columns.get_level_values("compiler").unique():
+    versions = df.loc[:, (compiler,)].columns.get_level_values("version").unique()
+    versions = sorted(versions, key=lambda version: tuple(map(int, version.split("."))))
+    grouped_versions[compiler] = versions
+
+sorted_columns = []
+for compiler in grouped_versions:
+    sorted_columns.extend(
+        [(compiler, version) for version in grouped_versions[compiler]]
+    )
+
+df = df[sorted_columns]
 
 # write wide CSV
 df.to_csv(op)

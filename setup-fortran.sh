@@ -397,6 +397,11 @@ install_intel_apt()
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
 
+  # first install mkl, then the compilers, to keep setvars clean
+  if $install_mkl; then
+      sudo apt-get install intel-oneapi-mkl-$mkl_version
+  fi
+
   # c/cpp compiler package names changed with 2024+
   case $version in
     2024*)
@@ -408,26 +413,7 @@ install_intel_apt()
         intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
       ;;
   esac
-  if $install_mkl; then
-      sudo apt-get install intel-oneapi-mkl-$mkl_version
-  fi
-
   source /opt/intel/oneapi/setvars.sh
-
-  if $classic; then
-    export FC="ifort"
-    export CC="icc"
-    export CXX="icpc"
-  else
-    export FC="ifx"
-    export CC="icx"
-    export CXX="icpx"
-  fi
-  if $install_mkl; then
-    export MKLLIB="$ONEAPI_ROOT/mkl/latest/lib/intel64"
-    export MKLROOT="$ONEAPI_ROOT/mkl/latest"
-  fi
-
   export_intel_vars
 }
 
