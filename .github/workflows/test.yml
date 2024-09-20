@@ -12,6 +12,7 @@ on:
     branches:
       - main
       - develop*
+      - math
     paths-ignore:
       - '**.md'
   schedule:
@@ -74,6 +75,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          install_mkl: true
 
       # - name: Debug with tmate
       #   uses: mxschmitt/action-tmate@v3
@@ -85,6 +87,17 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
       
+      - name: Test MKL libraries
+        # we could also exclude 2021.5 for all macos versions here
+        # this needs refactoring at some point - should the install
+        # fail if no mkl version exists?
+        if: steps.setup-fortran.outcome == 'success' && runner.os != 'windows' 
+        uses: ./.github/actions/test-mkl
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+          install_mkl: true
+
       - name: Test C compiler
         continue-on-error: true
         if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
