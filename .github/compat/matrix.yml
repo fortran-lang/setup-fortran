@@ -71,27 +71,19 @@ exclude:
     toolchain: {compiler: intel-classic, version: 2021.12.0}
   - os: macos-13
     toolchain: {compiler: intel-classic, version: 2021.12.0}
-  - os: macos-12
-    toolchain: {compiler: intel-classic, version: 2021.12.0}
   - os: macos-14
     toolchain: {compiler: intel-classic, version: 2021.11.0}
   - os: macos-13
-    toolchain: {compiler: intel-classic, version: 2021.11.0}
-  - os: macos-12
     toolchain: {compiler: intel-classic, version: 2021.11.0}
   # ifx not available for mac
   - os: macos-14
     toolchain: {compiler: intel}
   - os: macos-13
     toolchain: {compiler: intel}
-  - os: macos-12
-    toolchain: {compiler: intel}
   # nvidia-hpc not available for mac
   - os: macos-14
     toolchain: {compiler: nvidia-hpc}
   - os: macos-13
-    toolchain: {compiler: nvidia-hpc}
-  - os: macos-12
     toolchain: {compiler: nvidia-hpc}
   # nvidia-hpc not available for windows
   - os: windows-2022
