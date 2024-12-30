@@ -3,7 +3,6 @@ os:
   - ubuntu-20.04
   - macos-14
   - macos-13
-  - macos-12
   - windows-2022
   - windows-2019
 toolchain:
@@ -12,6 +11,7 @@ toolchain:
   - {compiler: gcc, version: 11}
   - {compiler: gcc, version: 10}
   - {compiler: gcc, version:  9}
+  - {compiler: intel, version: '2025.0'}
   - {compiler: intel, version: '2024.1'}
   - {compiler: intel, version: '2024.0'}
   - {compiler: intel, version: '2023.2'}
