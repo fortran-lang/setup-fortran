@@ -227,6 +227,9 @@ intel_version_map_l()
       2024.0 | 2024.0.0)
         version=2024.0
         ;;
+      2025.0 | 2025.0.1)
+        version=2025.0
+        ;;
       2021.1)
         version=2021.1.1
         ;;
@@ -304,6 +307,9 @@ intel_version_map_w()
     esac
   else
     case $actual_version in
+      2025.0 | 2025.0.1)
+        version=2025.0.1
+        ;;
       2024.1 | 2024.1.0)
         version=2024.1.0
         ;;
@@ -343,7 +349,7 @@ install_intel_apt()
 
   # c/cpp compiler package names changed with 2024+
   case $version in
-    2024*)
+    2024* | 2025*)
       sudo apt-get install \
         intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
       ;;
@@ -434,6 +440,10 @@ install_intel_win()
   intel_version_map_w $version $classic
 
   case $version in
+    2025.0.1)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a37c30c3-a846-4371-a85d-603e9a9eb94c/intel-oneapi-hpc-toolkit-2025.0.1.48_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
     2024.1.0)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe
       WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
