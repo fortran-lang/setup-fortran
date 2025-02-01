@@ -90,7 +90,7 @@ runs:
             install_intel $platform true
             ;;
           intel)
-            version=${VERSION:-2024.1}
+            version=${VERSION:-2025.0}
             install_intel $platform false
             ;;
           nvidia-hpc)

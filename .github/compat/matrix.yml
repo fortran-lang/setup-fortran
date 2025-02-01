@@ -1,16 +1,14 @@
 os:
+  - ubuntu-24.04
   - ubuntu-22.04
-  - ubuntu-20.04
   - macos-14
   - macos-13
   - windows-2022
   - windows-2019
 toolchain:
+  - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
   - {compiler: gcc, version: 12}
-  - {compiler: gcc, version: 11}
-  - {compiler: gcc, version: 10}
-  - {compiler: gcc, version:  9}
   - {compiler: intel, version: '2025.0'}
   - {compiler: intel, version: '2024.1'}
   - {compiler: intel, version: '2024.0'}
@@ -90,10 +88,3 @@ exclude:
     toolchain: {compiler: nvidia-hpc}
   - os: windows-2019
     toolchain: {compiler: nvidia-hpc}
-  # gcc<=10 not available for ARM mac
-  - os: macos-14
-    toolchain: {compiler: gcc, version: 8}
-  - os: macos-14
-    toolchain: {compiler: gcc, version: 9}
-  - os: macos-14
-    toolchain: {compiler: gcc, version: 10}
