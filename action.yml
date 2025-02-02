@@ -94,11 +94,11 @@ runs:
             install_intel $platform false
             ;;
           nvidia-hpc)
-            version=${VERSION:-23.11}
+            version=${VERSION:-25.1}
             install_nvidiahpc $platform
             ;;
           lfortran)
-            version=${VERSION:-0.33.0}
+            version=${VERSION:-0.45.0}
             install_lfortran $platform
             ;;
           *)

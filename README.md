@@ -35,7 +35,8 @@ jobs:
           - {compiler: gcc, version: 13}
           - {compiler: intel, version: '2025.0'}
           - {compiler: intel-classic, version: '2021.10'}
-          - {compiler: nvidia-hpc, version: '23.11'}
+          - {compiler: nvidia-hpc, version: '25.1'}
+          - {compiler: lfortran, version: '0.45.0'}
         include:
           - os: ubuntu-latest
             toolchain: {compiler: gcc, version: 12}
