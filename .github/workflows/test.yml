@@ -114,9 +114,9 @@ jobs:
 
       - name: Upload compatibility report
         if: needs.options.outputs.mode == 'report'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: compat
+          name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
           path: compat/*.csv
   
   compat:
@@ -143,10 +143,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Download reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: compat
+          pattern: compat-*
           path: compat
+          merge-multiple: true
 
       - name: Concatenate reports
         run: |
@@ -160,7 +161,7 @@ jobs:
           cat compat.md
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: compat
           path: |
