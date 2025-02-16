@@ -86,8 +86,10 @@ ubuntu-22.04,nvidia-hpc,21.1,
 ubuntu-22.04,nvidia-hpc,21.11,&check;
 ubuntu-22.04,nvidia-hpc,21.7,
 ubuntu-22.04,nvidia-hpc,21.9,
+ubuntu-22.04,nvidia-hpc,22.1,
 ubuntu-22.04,nvidia-hpc,22.11,&check;
 ubuntu-22.04,nvidia-hpc,22.2,
+ubuntu-22.04,nvidia-hpc,22.3,
 ubuntu-22.04,nvidia-hpc,22.5,
 ubuntu-22.04,nvidia-hpc,22.7,
 ubuntu-22.04,nvidia-hpc,22.9,
@@ -129,7 +131,6 @@ ubuntu-24.04,intel,2022.2,&check;
 ubuntu-24.04,intel,2023.0,&check;
 ubuntu-24.04,intel,2023.1,&check;
 ubuntu-24.04,intel,2023.2,&check;
-ubuntu-24.04,intel,2024.0,&check;
 ubuntu-24.04,intel,2024.1,&check;
 ubuntu-24.04,intel,2025.0,&check;
 ubuntu-24.04,lfortran,0.41.0,&check;
