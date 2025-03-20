@@ -70,7 +70,7 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         cd $(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
-        source ./action.sh
+        source ./main.sh
 
         echo "FC=${FC}" >> $GITHUB_ENV
         echo "CC=${CC}" >> $GITHUB_ENV
