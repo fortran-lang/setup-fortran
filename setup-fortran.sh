@@ -45,14 +45,23 @@ install_gcc_brew()
 
 install_gcc_apt()
 {
-  # check if gcc preinstalled via apt
+  # Check whether the system gcc version is the version we are after.
   cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
   maj=$(echo $cur | cut -d'.' -f1)
+  needs_install=1
   if [ "$maj" == "$version" ]; then
-    echo "GCC $version already installed"
+    # Check whether that version is installed.
+    if apt list --installed gcc-${version} | grep -q "gcc-${version}/"; then
+      echo "GCC $version already installed"
+      needs_install=0
+    fi
   else
+    # Install the PPA for installing other versions of gcc.
     sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
     sudo apt-get update
+  fi
+
+  if [ "${needs_install}" == "1" ]; then
     sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
   fi
 
