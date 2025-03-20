@@ -69,42 +69,8 @@ runs:
         COMPILER: ${{ inputs.compiler }}
         VERSION: ${{ inputs.version }}
       run: |
-        action_path=$(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
-        source "$action_path/setup-fortran.sh"
-        
-        compiler=${COMPILER:-gcc}
-        platform=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-        if [[ "$RUNNER_OS" == "macOS" ]] && [[ "$compiler" == "intel" ]]; then
-          echo "Compiler 'intel' not supported on macOS, falling back to 'intel-classic'"
-          compiler="intel-classic"
-        fi
-
-        case $compiler in
-          gcc)
-            version=${VERSION:-13}
-            install_gcc $platform
-            ;;
-          intel-classic)
-            version=${VERSION:-2023.2.0}
-            install_intel $platform true
-            ;;
-          intel)
-            version=${VERSION:-2025.0}
-            install_intel $platform false
-            ;;
-          nvidia-hpc)
-            version=${VERSION:-25.1}
-            install_nvidiahpc $platform
-            ;;
-          lfortran)
-            version=${VERSION:-0.45.0}
-            install_lfortran $platform
-            ;;
-          *)
-            exit 1
-            ;;
-        esac
+        cd $(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
+        source ./action.sh
 
         echo "FC=${FC}" >> $GITHUB_ENV
         echo "CC=${CC}" >> $GITHUB_ENV
