@@ -350,11 +350,11 @@ install_intel_apt()
   # c/cpp compiler package names changed with 2024+
   case $version in
     2024* | 2025*)
-      sudo apt-get install \
+      sudo apt-get install -y \
         intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
       ;;
     *)
-      sudo apt-get install \
+      sudo apt-get install -y \
         intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
       ;;
   esac
