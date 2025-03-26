@@ -1,0 +1,58 @@
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+# https://docs.github.com/en/actions/use-cases-and-examples/publishing-packages/publishing-docker-images#publishing-images-to-github-packages
+name: 'Build docker image for use in GitHub Actions'
+description: 'Builds a docker image for use in GitHub Actions for a given compiler and a given compiler version.'
+
+inputs:
+  compiler-name:
+    description: 'The Fortran compiler to install.'
+    required: true
+  compiler-version:
+    description: 'The compiler version to install.'
+    required: true
+  docker-registry-name:
+    description: 'The docker registry to publish to.'
+    default: 'ghcr.io'
+  docker-registry-username:
+    description: 'The username to login to the docker registry with.'
+    required: true
+  docker-registry-password:
+    description: 'The password to login to the docker registry with.'
+    required: true
+  image-name:
+    description: 'The name of the docker image.'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: "Log in to the container registry"
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.docker-registry-name }}
+        username: ${{ inputs.docker-registry-username }}
+        password: ${{ inputs.docker-registry-password }}
+
+    - name: "Extract metadata (tags, labels) for docker"
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ inputs.docker-registry-name }}/${{ inputs.image-name }}
+        tags: |
+          type=raw,value=linux-${{ inputs.compiler-name }}-${{ inputs.compiler-version }}
+          type=sha
+          type=ref,enable=true,priority=600,prefix=,suffix=,event=branch
+          type=ref,enable=true,priority=600,prefix=,suffix=,event=tag
+          type=ref,enable=true,priority=600,prefix=pr-,suffix=,event=pr
+
+    - name: "Build and push docker image"
+      id: push
+      uses: docker/build-push-action@v6
+      with:
+        context: docker/github-actions/
+        build-args: |
+          COMPILER=${{ inputs.compiler-name }}
+          VERSION=${{ inputs.compiler-version }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}

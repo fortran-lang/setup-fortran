@@ -54,162 +54,193 @@ jobs:
       # debugging
       - name: Show matrix
         run: echo "${{ toJSON(fromJSON(steps.matrix.outputs.matrix)) }}"
-    
-  test:
-    name: Test
-    needs: options
-    runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
+
+
+  build-and-push-docker-image:
+    name: 'Build and push docker image'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.options.outputs.matrix) }}
+      matrix:
+        include:
+          - compiler-name: 'gcc'
+            compiler-version: '13'
     steps:
-      - name: Checkout repository
+      - name: "Checkout repository"
         uses: actions/checkout@v4
 
-      - name: Setup Fortran
-        id: setup-fortran
-        continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
-        uses: ./
+      - name: 'Build and push docker image'
+        uses: ./.github/actions/build-gha-docker-image
         with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
+          compiler-name: ${{ matrix.compiler-name }}
+          compiler-version: ${{ matrix.compiler-version }}
+          docker-registry-name: 'ghcr.io'
+          docker-registry-username: ${{ github.actor }}
+          docker-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image-name: ${{ github.repository }}
 
-      # - name: Debug with tmate
-      #   uses: mxschmitt/action-tmate@v3
-
-      - name: Test Fortran compiler
-        if: steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-fc
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-      
-      - name: Test C compiler
-        continue-on-error: true
-        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-cc
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-      
-      - name: Test C++ compiler
-        continue-on-error: true
-        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
-        uses: ./.github/actions/test-cxx
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
-          version: ${{ matrix.toolchain.version }}
-
-      - name: Create compatibility report
-        if: needs.options.outputs.mode == 'report'
-        shell: bash
-        run: |
-          mkdir -p compat
-          support=$([ "${{ steps.setup-fortran.outcome }}" == "success" ] && echo "&check;" || echo "")
-          prefix="${{ matrix.os }},${{ matrix.toolchain.compiler }},${{ matrix.toolchain.version }}"
-          report="compat/${prefix//,/_}.csv"
-          echo "$prefix,$support" >> "$report"
-          cat "$report"
-
-      - name: Upload compatibility report
-        if: needs.options.outputs.mode == 'report'
-        uses: actions/upload-artifact@v4
-        with:
-          name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
-          path: compat/*.csv
-  
-  compat:
-    name: Report compatibility
-    needs: 
-      - options
-      - test
-    if: needs.options.outputs.mode == 'report'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-
-      - name: Install packages
-        run: pip install -r requirements.txt
-
-      - name: Download reports
-        uses: actions/download-artifact@v4
-        with:
-          pattern: compat-*
-          path: compat
-          merge-multiple: true
-
-      - name: Concatenate reports
-        run: |
-          echo "runner,compiler,version,support" > .github/compat/long_compat.csv
-          cat compat/*.csv >> .github/compat/long_compat.csv
-
-      - name: Make wide reports
-        working-directory: .github/compat
-        run: |
-          python wide_compat_reports.py "long_compat.csv" "compat.csv"
-          cat compat.md
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: compat
-          path: |
-            .github/compat/long_compat.csv
-            .github/compat/compat.csv
-            .github/compat/compat.md
-
-      - name: Check for changes
-        working-directory: .github/compat
-        id: diff
-        run: |
-          if ! [ -f compat.csv ]; then
-            echo "diff=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          diff=$(git diff compat.csv)
-          if [[ $diff == "" ]]; then
-            echo "No changes found"
-            echo "diff=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changes found:"
-            echo "$diff"
-            echo "diff=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update README
-        if: ${{ steps.diff.outputs.diff == 'true' }}
-        run: python .github/compat/update_compat_table.py ".github/compat/compat.md" "README.md"
-
-      - name: Print README diff
-        if: ${{ steps.diff.outputs.diff == 'true' }}
-        run: git diff README.md
-
-      - name: Create pull request
-        if: ${{ steps.diff.outputs.diff == 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
-          now=$(date +'%Y-%m-%dT%H-%M-%S')
-          updated_branch="compat_$now"
-          default_branch="${{ github.event.repository.default_branch }}"
-          
-          git switch -c "$updated_branch"
-          git add .github/compat/*compat.csv README.md
-          git commit -m "Update compatibility matrix"
-          git push -u origin "$updated_branch"
-          gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file .github/compat/compat.md
+    
+#  test:
+#    name: Test
+#    needs: options
+#    runs-on: ${{ matrix.os }}
+#    continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
+#    strategy:
+#      fail-fast: false
+#      matrix: ${{ fromJSON(needs.options.outputs.matrix) }}
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#
+#      - name: Setup Fortran
+#        id: setup-fortran
+#        continue-on-error: ${{ needs.options.outputs.mode == 'report' }}
+#        uses: ./
+#        with:
+#          compiler: ${{ matrix.toolchain.compiler }}
+#          version: ${{ matrix.toolchain.version }}
+#
+#      # - name: Debug with tmate
+#      #   uses: mxschmitt/action-tmate@v3
+#
+#      - name: Test Fortran compiler
+#        if: steps.setup-fortran.outcome == 'success'
+#        uses: ./.github/actions/test-fc
+#        with:
+#          compiler: ${{ matrix.toolchain.compiler }}
+#          version: ${{ matrix.toolchain.version }}
+#      
+#      - name: Test C compiler
+#        continue-on-error: true
+#        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
+#        uses: ./.github/actions/test-cc
+#        with:
+#          compiler: ${{ matrix.toolchain.compiler }}
+#          version: ${{ matrix.toolchain.version }}
+#      
+#      - name: Test C++ compiler
+#        continue-on-error: true
+#        if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
+#        uses: ./.github/actions/test-cxx
+#        with:
+#          compiler: ${{ matrix.toolchain.compiler }}
+#          version: ${{ matrix.toolchain.version }}
+#
+#      - name: Create compatibility report
+#        if: needs.options.outputs.mode == 'report'
+#        shell: bash
+#        run: |
+#          mkdir -p compat
+#          support=$([ "${{ steps.setup-fortran.outcome }}" == "success" ] && echo "&check;" || echo "")
+#          prefix="${{ matrix.os }},${{ matrix.toolchain.compiler }},${{ matrix.toolchain.version }}"
+#          report="compat/${prefix//,/_}.csv"
+#          echo "$prefix,$support" >> "$report"
+#          cat "$report"
+#
+#      - name: Upload compatibility report
+#        if: needs.options.outputs.mode == 'report'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
+#          path: compat/*.csv
+#  
+#  compat:
+#    name: Report compatibility
+#    needs: 
+#      - options
+#      - test
+#    if: needs.options.outputs.mode == 'report'
+#    runs-on: ubuntu-latest
+#    permissions:
+#      contents: write
+#      pull-requests: write
+#    steps:
+#
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#
+#      - name: Setup Python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: 3.9
+#
+#      - name: Install packages
+#        run: pip install -r requirements.txt
+#
+#      - name: Download reports
+#        uses: actions/download-artifact@v4
+#        with:
+#          pattern: compat-*
+#          path: compat
+#          merge-multiple: true
+#
+#      - name: Concatenate reports
+#        run: |
+#          echo "runner,compiler,version,support" > .github/compat/long_compat.csv
+#          cat compat/*.csv >> .github/compat/long_compat.csv
+#
+#      - name: Make wide reports
+#        working-directory: .github/compat
+#        run: |
+#          python wide_compat_reports.py "long_compat.csv" "compat.csv"
+#          cat compat.md
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: compat
+#          path: |
+#            .github/compat/long_compat.csv
+#            .github/compat/compat.csv
+#            .github/compat/compat.md
+#
+#      - name: Check for changes
+#        working-directory: .github/compat
+#        id: diff
+#        run: |
+#          if ! [ -f compat.csv ]; then
+#            echo "diff=false" >> $GITHUB_OUTPUT
+#            exit 0
+#          fi
+#
+#          diff=$(git diff compat.csv)
+#          if [[ $diff == "" ]]; then
+#            echo "No changes found"
+#            echo "diff=false" >> $GITHUB_OUTPUT
+#          else
+#            echo "Changes found:"
+#            echo "$diff"
+#            echo "diff=true" >> $GITHUB_OUTPUT
+#          fi
+#
+#      - name: Update README
+#        if: ${{ steps.diff.outputs.diff == 'true' }}
+#        run: python .github/compat/update_compat_table.py ".github/compat/compat.md" "README.md"
+#
+#      - name: Print README diff
+#        if: ${{ steps.diff.outputs.diff == 'true' }}
+#        run: git diff README.md
+#
+#      - name: Create pull request
+#        if: ${{ steps.diff.outputs.diff == 'true' }}
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        run: |
+#          git config user.name "github-actions[bot]"
+#          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+#          
+#          now=$(date +'%Y-%m-%dT%H-%M-%S')
+#          updated_branch="compat_$now"
+#          default_branch="${{ github.event.repository.default_branch }}"
+#          
+#          git switch -c "$updated_branch"
+#          git add .github/compat/*compat.csv README.md
+#          git commit -m "Update compatibility matrix"
+#          git push -u origin "$updated_branch"
+#          gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file .github/compat/compat.md
