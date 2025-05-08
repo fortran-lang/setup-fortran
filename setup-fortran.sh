@@ -27,7 +27,11 @@ install_environment_modules_apt() {
 
 install_gcc_brew()
 {
-  brew install --force gcc@${version}
+  if brew list --versions gcc | grep -q "^gcc ${version}\."; then
+    echo "GCC $version already installed"
+  else
+    brew install --force gcc@${version}
+  fi
 
   # make an unversioned symlink
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
