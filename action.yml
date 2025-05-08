@@ -8,6 +8,10 @@ inputs:
   version:
     description: "Version of toolchain or compiler"
     required: false
+  update-environment:
+    description: "Whether to set environment variables"
+    required: false
+    default: true
 outputs:
   fc:
     description: "Path to Fortran compiler"
@@ -72,9 +76,11 @@ runs:
         cd $(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
         source ./main.sh
 
-        echo "FC=${FC}" >> $GITHUB_ENV
-        echo "CC=${CC}" >> $GITHUB_ENV
-        echo "CXX=${CXX}" >> $GITHUB_ENV
+        if [[ "${{ inputs.update-environment }}" == "true" ]]; then
+          echo "FC=${FC}" >> $GITHUB_ENV
+          echo "CC=${CC}" >> $GITHUB_ENV
+          echo "CXX=${CXX}" >> $GITHUB_ENV
+        fi
 
     # save oneAPI cache and activate environment
     - name: Save cache
@@ -111,15 +117,16 @@ runs:
           fi
         fi
 
-        # set env vars
-        echo FC=$FC>>$GITHUB_ENV
-        echo CC=$CC>>$GITHUB_ENV
-        echo CXX=$CXX>>$GITHUB_ENV
-
-        # set fpm env vars
-        echo FPM_FC=$FC>>$GITHUB_ENV
-        echo FPM_CC=$CC>>$GITHUB_ENV
-        echo FPM_CXX=$CXX>>$GITHUB_ENV
+        if [[ "${{ inputs.update-environment }}" == "true" ]]; then
+          # cmake
+          echo FC=$FC>>$GITHUB_ENV
+          echo CC=$CC>>$GITHUB_ENV
+          echo CXX=$CXX>>$GITHUB_ENV
+          # fpm
+          echo FPM_FC=$FC>>$GITHUB_ENV
+          echo FPM_CC=$CC>>$GITHUB_ENV
+          echo FPM_CXX=$CXX>>$GITHUB_ENV
+        fi
 
         # set action outputs
         echo fc=$FC>>$GITHUB_OUTPUT
