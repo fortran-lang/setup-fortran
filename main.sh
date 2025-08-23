@@ -33,6 +33,7 @@ case $compiler in
     install_lfortran $platform
     ;;
   *)
+    echo "Compiler '$compiler' not supported. Please check docs."
     exit 1
     ;;
 esac
