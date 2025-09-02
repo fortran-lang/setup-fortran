@@ -27,49 +27,61 @@ install_environment_modules_apt() {
 
 install_gcc_brew()
 {
-  brew install --force gcc@${version}
+  if [[ "$version" == "latest" ]]; then
+    brew install --force gcc
+    # detect installed version using homebrew
+    gcc_version=$(brew list --versions gcc | grep -o '[0-9]\+' | head -1)
+  else
+    brew install --force gcc@${version}
+    gcc_version=$version
+  fi
 
   # make an unversioned symlink
   os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
   if (( "$os_ver" > 13 )); then
     # default homebrew bin dir changed with macos 14
-    ln -fs /opt/homebrew/bin/gfortran-${version} /usr/local/bin/gfortran
-    ln -fs /opt/homebrew/bin/gcc-${version} /usr/local/bin/gcc
-    ln -fs /opt/homebrew/bin/g++-${version} /usr/local/bin/g++
+    bindir=/opt/homebrew/bin
   else
-    ln -fs /usr/local/bin/gfortran-${version} /usr/local/bin/gfortran
-    ln -fs /usr/local/bin/gcc-${version} /usr/local/bin/gcc
-    ln -fs /usr/local/bin/g++-${version} /usr/local/bin/g++
+    bindir=/usr/local/bin
   fi
+
+  ln -fs ${bindir}/gfortran-${gcc_version} /usr/local/bin/gfortran
+  ln -fs ${bindir}/gcc-${gcc_version} /usr/local/bin/gcc
+  ln -fs ${bindir}/g++-${gcc_version} /usr/local/bin/g++
 }
 
 install_gcc_apt()
 {
-  # Check whether the system gcc version is the version we are after.
-  cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
-  maj=$(echo $cur | cut -d'.' -f1)
-  needs_install=1
-  if [ "$maj" == "$version" ]; then
-    # Check whether that version is installed.
-    if apt list --installed gcc-${version} | grep -q "gcc-${version}/"; then
-      echo "GCC $version already installed"
-      needs_install=0
-    fi
-  else
-    # Install the PPA for installing other versions of gcc.
-    sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+  if [ "$version" == "latest" ]; then
     sudo apt-get update
-  fi
+    sudo apt-get install -y gcc gfortran g++
+  else
+    # Check whether the system gcc version is the version we are after.
+    cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
+    maj=$(echo $cur | cut -d'.' -f1)
+    needs_install=1
+    if [ "$maj" == "$version" ]; then
+      # Check whether that version is installed.
+      if apt list --installed gcc-${version} | grep -q "gcc-${version}/"; then
+        echo "GCC $version already installed"
+        needs_install=0
+      fi
+    else
+      # Install the PPA for installing other versions of gcc.
+      sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+      sudo apt-get update
+    fi
 
-  if [ "${needs_install}" == "1" ]; then
-    sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
-  fi
+    if [ "${needs_install}" == "1" ]; then
+      sudo apt-get install -y gcc-${version} gfortran-${version} g++-${version}
+    fi
 
-  sudo update-alternatives \
-    --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
-    --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
-    --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
-    --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
+    sudo update-alternatives \
+      --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
+      --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
+      --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
+      --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
+  fi
 }
 
 install_gcc_choco()
@@ -88,8 +100,12 @@ install_gcc_choco()
     mv /c/mingw64 "$RUNNER_TEMP/"
     # ...and install selected version
     case $version in
-      13)
-        choco install mingw --version 13.2.0 --force
+      latest|13)
+        if [ "$version" == "latest" ]; then
+          choco install mingw --force
+        else
+          choco install mingw --version 13.2.0 --force
+        fi
         # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
         # so hide Strawberry compilers and manually add mingw bin dir to PATH
         mkdir "$RUNNER_TEMP/strawberry"
@@ -114,7 +130,7 @@ install_gcc_choco()
         choco install mingw --version 8.5.0 --force
         ;;
       *)
-        echo "Unsupported version: $version (choose 8-13)"
+        echo "Unsupported version: $version (choose 8-13 or latest)"
         exit 1
         ;;
     esac
@@ -345,7 +361,9 @@ install_intel_apt()
 {
   local version=$1
   local classic=$2
-  intel_version_map_l $version $classic
+  if [ "$version" != "latest" ]; then
+    intel_version_map_l $version $classic
+  fi
 
   require_fetch
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
@@ -356,17 +374,23 @@ install_intel_apt()
     | sudo tee /etc/apt/sources.list.d/oneAPI.list
   sudo apt-get update
 
-  # c/cpp compiler package names changed with 2024+
-  case $version in
-    2024* | 2025*)
-      sudo apt-get install -y \
-        intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
-      ;;
-    *)
-      sudo apt-get install -y \
-        intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
-      ;;
-  esac
+  if [ "$version" == "latest" ]; then
+    sudo apt-get install -y \
+      intel-oneapi-compiler-fortran \
+      intel-oneapi-compiler-dpcpp-cpp
+  else
+    # c/cpp compiler package names changed with 2024+
+    case $version in
+      2024* | 2025*)
+        sudo apt-get install -y \
+          intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
+        ;;
+      *)
+        sudo apt-get install -y \
+          intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
+        ;;
+    esac
+  fi
 
   source /opt/intel/oneapi/setvars.sh
   export_intel_vars
@@ -623,7 +647,11 @@ install_lfortran_l()
   export CC="gcc"
   export CXX="g++"
   export CONDA=conda
-  $CONDA install -c conda-forge -n base -y lfortran=$version
+  if [ "$version" == "latest" ]; then
+    $CONDA install -c conda-forge -n base -y lfortran
+  else
+    $CONDA install -c conda-forge -n base -y lfortran=$version
+  fi
 }
 
 install_lfortran_w()
@@ -632,7 +660,11 @@ install_lfortran_w()
   export CC="cl"
   export CXX="cl"
   export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
-  $CONDA install -c conda-forge -n base -y lfortran=$version
+  if [ "$version" == "latest" ]; then
+    $CONDA install -c conda-forge -n base -y lfortran
+  else
+    $CONDA install -c conda-forge -n base -y lfortran=$version
+  fi
 }
 
 install_lfortran_m()
@@ -642,7 +674,11 @@ install_lfortran_m()
   export CXX="g++"
   export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
   export CONDA=micromamba
-  $CONDA install -c conda-forge -n base -y lfortran=$version
+  if [ "$version" == "latest" ]; then
+    $CONDA install -c conda-forge -n base -y lfortran
+  else
+    $CONDA install -c conda-forge -n base -y lfortran=$version
+  fi
 }
 
 install_lfortran()
