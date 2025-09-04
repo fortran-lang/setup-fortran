@@ -102,6 +102,7 @@ install_gcc_choco()
     case $version in
       latest)
         choco install mingw --force
+        ;;
       13)
         choco install mingw --version 13.2.0 --force
         # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
