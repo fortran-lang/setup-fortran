@@ -44,7 +44,7 @@ runs:
       uses: actions/cache/restore@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
 
     # Use micromamba for lfortran install on mac. Check if micromamba already
     # exists, only install it if needed. If we install it, clean it up after.
@@ -88,7 +88,7 @@ runs:
       uses: actions/cache/save@v3
       with:
         path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version }}-${{ steps.get-date.outputs.date }}
+        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
     - name: Activate oneAPI
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       shell: cmd

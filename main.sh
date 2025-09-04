@@ -13,7 +13,7 @@ source ./setup-fortran.sh
 
 case $compiler in
   gcc)
-    version=${VERSION:-13}
+    version=${VERSION:-latest}
     install_gcc $platform
     ;;
   intel-classic)
@@ -29,7 +29,7 @@ case $compiler in
     install_nvidiahpc $platform
     ;;
   lfortran)
-    version=${VERSION:-0.45.0}
+    version=${VERSION:-latest}
     install_lfortran $platform
     ;;
   *)
