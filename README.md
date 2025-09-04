@@ -70,6 +70,7 @@ jobs:
   - *lfortran* for `lfortran`
   - *nvidia-hpc* for `nvfortran`
 - *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
+- *update-environment*: Whether to set environment variables (`FC` etc, defaults true). 
 
 
 ## Outputs
