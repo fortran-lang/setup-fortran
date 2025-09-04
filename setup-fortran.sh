@@ -100,12 +100,10 @@ install_gcc_choco()
     mv /c/mingw64 "$RUNNER_TEMP/"
     # ...and install selected version
     case $version in
-      latest|13)
-        if [ "$version" == "latest" ]; then
-          choco install mingw --force
-        else
-          choco install mingw --version 13.2.0 --force
-        fi
+      latest)
+        choco install mingw --force
+      13)
+        choco install mingw --version 13.2.0 --force
         # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
         # so hide Strawberry compilers and manually add mingw bin dir to PATH
         mkdir "$RUNNER_TEMP/strawberry"
