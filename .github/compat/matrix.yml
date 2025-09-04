@@ -3,8 +3,8 @@ os:
   - ubuntu-22.04
   - macos-14
   - macos-13
+  - windows-2025
   - windows-2022
-  - windows-2019
 toolchain:
   - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
@@ -90,7 +90,7 @@ exclude:
   - os: macos-13
     toolchain: {compiler: nvidia-hpc}
   # nvidia-hpc not available for windows
-  - os: windows-2022
+  - os: windows-2025
     toolchain: {compiler: nvidia-hpc}
-  - os: windows-2019
+  - os: windows-2022
     toolchain: {compiler: nvidia-hpc}
