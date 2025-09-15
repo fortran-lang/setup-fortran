@@ -32,21 +32,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         toolchain:
-          - {compiler: gcc, version: 13}
+          - {compiler: gcc, version: 'latest'}
           - {compiler: intel, version: '2025.0'}
           - {compiler: intel-classic, version: '2021.10'}
           - {compiler: nvidia-hpc, version: '25.1'}
           - {compiler: lfortran, version: '0.45.0'}
-        include:
-          - os: ubuntu-latest
-            toolchain: {compiler: gcc, version: 12}
         exclude:
           - os: macos-latest
-            toolchain: {compiler: intel, version: '2023.2'}
+            toolchain: {compiler: intel}
           - os: macos-latest
-            toolchain: {compiler: nvidia-hpc, version: '23.11'}
+            toolchain: {compiler: nvidia-hpc}
           - os: windows-latest
-            toolchain: {compiler: nvidia-hpc, version: '23.11'}
+            toolchain: {compiler: nvidia-hpc}
 
     steps:
       - uses: fortran-lang/setup-fortran@v1
