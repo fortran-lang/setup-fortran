@@ -41,7 +41,7 @@ runs:
     - name: Restore cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
       id: cache
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
@@ -85,7 +85,7 @@ runs:
     # save oneAPI cache and activate environment
     - name: Save cache
       if: runner.os == 'Windows' && contains(inputs.compiler, 'intel') && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: ${{ env.ONEAPI_ROOT }}
         key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
