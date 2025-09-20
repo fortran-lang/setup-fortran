@@ -41,6 +41,8 @@ jobs:
           - os: macos-latest
             toolchain: {compiler: intel}
           - os: macos-latest
+            toolchain: {compiler: intel-classic}
+          - os: macos-latest
             toolchain: {compiler: nvidia-hpc}
           - os: windows-latest
             toolchain: {compiler: nvidia-hpc}
