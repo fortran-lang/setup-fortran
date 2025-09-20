@@ -58,7 +58,7 @@ runs:
         else
           echo "install=true" >> $GITHUB_OUTPUT
         fi
-    - uses: mamba-org/setup-micromamba@v1
+    - uses: mamba-org/setup-micromamba@v2.0.6
       if: runner.os == 'macOS' && contains(inputs.compiler, 'lfortran') && steps.check-umamba.outputs.install == 'true'
       with:
         init-shell: bash
@@ -140,4 +140,4 @@ runs:
 
     - name: Setup MSVC toolchain (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@v1.13.0
