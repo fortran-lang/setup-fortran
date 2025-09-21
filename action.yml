@@ -73,7 +73,7 @@ runs:
         COMPILER: ${{ inputs.compiler }}
         VERSION: ${{ inputs.version }}
       run: |
-        cd $(echo '/${{ github.action_path }}' | sed -e 's/\\/\//g' -e 's/://')
+        cd $(echo "$GITHUB_ACTION_PATH" | sed -e 's/\\/\//g' -e 's/://')
         source ./main.sh
 
         if [[ "${{ inputs.update-environment }}" == "true" ]]; then
