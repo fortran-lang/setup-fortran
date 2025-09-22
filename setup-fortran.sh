@@ -2,14 +2,18 @@
 
 set -ex
 
-if command -v sudo > /dev/null 2>&1; then
-  SUDO=sudo
-else
-  if [[ $EUID -ne 0 ]]; then
-    echo "This script requires 'sudo' to install packages. Please install 'sudo' or run as root."
-    exit 1
+sudo_wrapper() {
+  if command -v sudo > /dev/null 2>&1; then
+    SUDO="sudo"
+  else
+    if [[ $EUID -ne 0 ]]; then
+      echo "This script requires 'sudo' to install packages. Please install 'sudo' or run as root."
+      exit 1
+    fi
+    SUDO=""
   fi
-fi
+  $SUDO "$@"
+}
 
 require_fetch()
 {
@@ -27,7 +31,7 @@ require_fetch()
 # https://github.com/cea-hpc/modules
 install_environment_modules_apt() {
   echo "Installing environment-modules package..."
-  $SUDO apt-get install -y environment-modules
+  sudo_wrapper apt-get install -y environment-modules
   echo "Environment-modules installed."
   echo "Sourcing modules.sh script to set up environment modules..."
   source /etc/profile.d/modules.sh
@@ -62,8 +66,8 @@ install_gcc_brew()
 install_gcc_apt()
 {
   if [ "$version" == "latest" ]; then
-    $SUDO apt-get update
-    $SUDO apt-get install -y gcc gfortran g++
+    sudo_wrapper apt-get update
+    sudo_wrapper apt-get install -y gcc gfortran g++
   else
     # Check whether the system gcc version is the version we are after.
     cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
@@ -77,15 +81,15 @@ install_gcc_apt()
       fi
     else
       # Install the PPA for installing other versions of gcc.
-      $SUDO add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-      $SUDO apt-get update
+      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+      sudo_wrapper apt-get update
     fi
 
     if [ "${needs_install}" == "1" ]; then
-      $SUDO apt-get install -y gcc-${version} gfortran-${version} g++-${version}
+      sudo_wrapper apt-get install -y gcc-${version} gfortran-${version} g++-${version}
     fi
 
-    $SUDO update-alternatives \
+    sudo_wrapper update-alternatives \
       --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
       --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
       --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
@@ -376,25 +380,25 @@ install_intel_apt()
   require_fetch
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
   $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
-  $SUDO apt-key add $_KEY
+  sudo_wrapper apt-key add $_KEY
   rm $_KEY
   echo "deb https://apt.repos.intel.com/oneapi all main" \
-    | $SUDO tee /etc/apt/sources.list.d/oneAPI.list
-  $SUDO apt-get update
+    | sudo_wrapper tee /etc/apt/sources.list.d/oneAPI.list
+  sudo_wrapper apt-get update
 
   if [ "$version" == "latest" ]; then
-    $SUDO apt-get install -y \
+    sudo_wrapper apt-get install -y \
       intel-oneapi-compiler-fortran \
       intel-oneapi-compiler-dpcpp-cpp
   else
     # c/cpp compiler package names changed with 2024+
     case $version in
       2024* | 2025*)
-        $SUDO apt-get install -y \
+        sudo_wrapper apt-get install -y \
           intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
         ;;
       *)
-        $SUDO apt-get install -y \
+        sudo_wrapper apt-get install -y \
           intel-oneapi-compiler-{fortran,dpcpp-cpp-and-cpp-classic}-$version
         ;;
     esac
@@ -462,7 +466,7 @@ install_intel_dmg()
   require_fetch
   $fetch $MACOS_HPCKIT_URL > m_HPCKit.dmg
   hdiutil attach m_HPCKit.dmg
-  $SUDO /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
+  sudo_wrapper /Volumes/"$(basename "$MACOS_HPCKIT_URL" .dmg)"/bootstrapper.app/Contents/MacOS/bootstrapper -s \
     --action install \
     --eula=accept \
     --continue-with-optional-error=yes \
@@ -598,10 +602,10 @@ install_nvidiahpc_apt()
 
   # install NVIDIA HPC SDK
   echo "Installing NVIDIA HPC SDK $version..."
-  curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | $SUDO gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
-  echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | $SUDO tee /etc/apt/sources.list.d/nvhpc.list
-  $SUDO apt-get update -y
-  $SUDO apt-get install -y nvhpc-$cversion
+  curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo_wrapper gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+  echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo_wrapper tee /etc/apt/sources.list.d/nvhpc.list
+  sudo_wrapper apt-get update -y
+  sudo_wrapper apt-get install -y nvhpc-$cversion
   echo "NVIDIA HPC SDK $version installed."
 
   # load NVIDIA HPC SDK module
