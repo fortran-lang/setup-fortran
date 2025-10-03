@@ -9,6 +9,7 @@ toolchain:
   - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
   - {compiler: gcc, version: 12}
+  - {compiler: intel, version: '2025.2'}
   - {compiler: intel, version: '2025.0'}
   - {compiler: intel, version: '2024.1'}
   - {compiler: intel, version: '2024.0'}
