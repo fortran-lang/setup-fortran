@@ -74,6 +74,7 @@ ubuntu-22.04,intel,2023.2,&check;
 ubuntu-22.04,intel,2024.0,&check;
 ubuntu-22.04,intel,2024.1,&check;
 ubuntu-22.04,intel,2025.0,&check;
+ubuntu-22.04,intel,2025.2,&check;
 ubuntu-22.04,lfortran,0.41.0,&check;
 ubuntu-22.04,lfortran,0.42.0,&check;
 ubuntu-22.04,lfortran,0.43.0,&check;
@@ -84,6 +85,9 @@ ubuntu-22.04,nvidia-hpc,20.7,
 ubuntu-22.04,nvidia-hpc,20.9,
 ubuntu-22.04,nvidia-hpc,21.1,
 ubuntu-22.04,nvidia-hpc,21.11,&check;
+ubuntu-22.04,nvidia-hpc,21.2,
+ubuntu-22.04,nvidia-hpc,21.3,
+ubuntu-22.04,nvidia-hpc,21.5,
 ubuntu-22.04,nvidia-hpc,21.7,
 ubuntu-22.04,nvidia-hpc,21.9,
 ubuntu-22.04,nvidia-hpc,22.1,
@@ -134,6 +138,7 @@ ubuntu-24.04,intel,2023.2,&check;
 ubuntu-24.04,intel,2024.0,&check;
 ubuntu-24.04,intel,2024.1,&check;
 ubuntu-24.04,intel,2025.0,&check;
+ubuntu-24.04,intel,2025.2,&check;
 ubuntu-24.04,lfortran,0.41.0,&check;
 ubuntu-24.04,lfortran,0.42.0,&check;
 ubuntu-24.04,lfortran,0.43.0,&check;
@@ -197,6 +202,7 @@ windows-2022,intel,2023.2,&check;
 windows-2022,intel,2024.0,&check;
 windows-2022,intel,2024.1,&check;
 windows-2022,intel,2025.0,&check;
+windows-2022,intel,2025.2,&check;
 windows-2022,lfortran,0.41.0,&check;
 windows-2022,lfortran,0.42.0,&check;
 windows-2022,lfortran,0.43.0,&check;
@@ -233,6 +239,7 @@ windows-2025,intel,2023.2,&check;
 windows-2025,intel,2024.0,&check;
 windows-2025,intel,2024.1,&check;
 windows-2025,intel,2025.0,&check;
+windows-2025,intel,2025.2,&check;
 windows-2025,lfortran,0.41.0,&check;
 windows-2025,lfortran,0.42.0,&check;
 windows-2025,lfortran,0.43.0,&check;
