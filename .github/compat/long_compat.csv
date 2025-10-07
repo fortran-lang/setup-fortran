@@ -2,6 +2,7 @@ runner,compiler,version,support
 macos-13,gcc,12,&check;
 macos-13,gcc,13,&check;
 macos-13,gcc,14,&check;
+macos-13,gcc,15,&check;
 macos-13,intel-classic,2021.1.2,
 macos-13,intel-classic,2021.1,&check;
 macos-13,intel-classic,2021.10,&check;
@@ -24,6 +25,7 @@ macos-13,lfortran,0.45.0,&check;
 macos-14,gcc,12,&check;
 macos-14,gcc,13,&check;
 macos-14,gcc,14,&check;
+macos-14,gcc,15,&check;
 macos-14,intel-classic,2021.1.2,
 macos-14,intel-classic,2021.1,&check;
 macos-14,intel-classic,2021.10,&check;
@@ -173,7 +175,8 @@ ubuntu-24.04,nvidia-hpc,24.5,&check;
 ubuntu-24.04,nvidia-hpc,25.1,&check;
 windows-2022,gcc,12,&check;
 windows-2022,gcc,13,&check;
-windows-2022,gcc,14,
+windows-2022,gcc,14,&check;
+windows-2022,gcc,15,&check;
 windows-2022,intel-classic,2021.1.2,
 windows-2022,intel-classic,2021.1,
 windows-2022,intel-classic,2021.10,&check;
@@ -211,6 +214,7 @@ windows-2022,lfortran,0.45.0,&check;
 windows-2025,gcc,12,&check;
 windows-2025,gcc,13,&check;
 windows-2025,gcc,14,&check;
+windows-2025,gcc,15,&check;
 windows-2025,intel-classic,2021.1.2,
 windows-2025,intel-classic,2021.1,
 windows-2025,intel-classic,2021.10,&check;
