@@ -6,6 +6,7 @@ os:
   - windows-2025
   - windows-2022
 toolchain:
+  - {compiler: gcc, version: 15}
   - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
   - {compiler: gcc, version: 12}
@@ -95,3 +96,8 @@ exclude:
     toolchain: {compiler: nvidia-hpc}
   - os: windows-2022
     toolchain: {compiler: nvidia-hpc}
+  # gcc 15 only available for windows (via chocolatey), macos (brew)
+  - os: ubuntu-24.04
+    toolchain: {compiler: gcc, version: 15}
+  - os: ubuntu-22.04
+    toolchain: {compiler: gcc, version: 15}
