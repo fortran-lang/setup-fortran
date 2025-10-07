@@ -108,7 +108,7 @@ ubuntu-22.04,nvidia-hpc,23.9,&check;
 ubuntu-22.04,nvidia-hpc,24.1,&check;
 ubuntu-22.04,nvidia-hpc,24.3,&check;
 ubuntu-22.04,nvidia-hpc,24.5,&check;
-ubuntu-22.04,nvidia-hpc,25.1,
+ubuntu-22.04,nvidia-hpc,25.1,&check;
 ubuntu-24.04,gcc,12,&check;
 ubuntu-24.04,gcc,13,&check;
 ubuntu-24.04,gcc,14,&check;
