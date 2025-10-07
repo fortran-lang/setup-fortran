@@ -116,9 +116,29 @@ install_gcc_choco()
       latest)
         choco install mingw --force
         ;;
+      15)
+        choco install mingw --version 15.2.0 --force
+        # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # so hide Strawberry compilers and manually add mingw bin dir to PATH
+        mkdir "$RUNNER_TEMP/strawberry"
+        mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
+        mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
+        mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
+        ;;
+      14)
+        choco install mingw --version 14.2.0 --force
+        # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # so hide Strawberry compilers and manually add mingw bin dir to PATH
+        mkdir "$RUNNER_TEMP/strawberry"
+        mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
+        mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
+        mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
+        ;;
       13)
         choco install mingw --version 13.2.0 --force
-        # mingw 13 on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
         # so hide Strawberry compilers and manually add mingw bin dir to PATH
         mkdir "$RUNNER_TEMP/strawberry"
         mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
@@ -142,7 +162,7 @@ install_gcc_choco()
         choco install mingw --version 8.5.0 --force
         ;;
       *)
-        echo "Unsupported version: $version (choose 8-13 or latest)"
+        echo "Unsupported version: $version (choose 8-15, or latest)"
         exit 1
         ;;
     esac
