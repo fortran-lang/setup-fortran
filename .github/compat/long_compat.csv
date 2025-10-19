@@ -108,7 +108,7 @@ ubuntu-22.04,nvidia-hpc,23.9,&check;
 ubuntu-22.04,nvidia-hpc,24.1,&check;
 ubuntu-22.04,nvidia-hpc,24.3,&check;
 ubuntu-22.04,nvidia-hpc,24.5,&check;
-ubuntu-22.04,nvidia-hpc,25.1,&check;
+ubuntu-22.04,nvidia-hpc,25.1,
 ubuntu-24.04,gcc,12,&check;
 ubuntu-24.04,gcc,13,&check;
 ubuntu-24.04,gcc,14,&check;
@@ -188,7 +188,7 @@ windows-2022,intel-classic,2021.4,
 windows-2022,intel-classic,2021.5,
 windows-2022,intel-classic,2021.6,&check;
 windows-2022,intel-classic,2021.7.1,
-windows-2022,intel-classic,2021.7,&check;
+windows-2022,intel-classic,2021.7,
 windows-2022,intel-classic,2021.8,
 windows-2022,intel-classic,2021.9,&check;
 windows-2022,intel,2021.1.2,
