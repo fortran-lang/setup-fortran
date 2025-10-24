@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload compatibility report
         if: needs.options.outputs.mode == 'report'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
           path: compat/*.csv
@@ -161,7 +161,7 @@ jobs:
           cat compat.md
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: compat
           path: |
