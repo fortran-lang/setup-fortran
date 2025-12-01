@@ -31,7 +31,6 @@ toolchain:
   - {compiler: intel-classic, version: '2021.9'}
   - {compiler: intel-classic, version: '2021.8'}
   - {compiler: intel-classic, version: '2021.7.1'}
-  - {compiler: intel-classic, version: '2021.7'}
   - {compiler: intel-classic, version: '2021.6'}
   - {compiler: intel-classic, version: '2021.5'}
   - {compiler: intel-classic, version: '2021.4'}
@@ -39,11 +38,9 @@ toolchain:
   - {compiler: intel-classic, version: '2021.2'}
   - {compiler: intel-classic, version: '2021.1.2'}
   - {compiler: intel-classic, version: '2021.1'}
-  - {compiler: lfortran, version: '0.45.0'}
-  - {compiler: lfortran, version: '0.44.0'}
-  - {compiler: lfortran, version: '0.43.0'}
-  - {compiler: lfortran, version: '0.42.0'}
-  - {compiler: lfortran, version: '0.41.0'}
+  - {compiler: lfortran, version: '0.58.0'}
+  - {compiler: lfortran, version: '0.57.0'}
+  - {compiler: lfortran, version: '0.56.0'}
   - {compiler: nvidia-hpc, version: '25.1'}
   - {compiler: nvidia-hpc, version: '24.5'}
   - {compiler: nvidia-hpc, version: '24.3'}
