@@ -50,14 +50,8 @@ install_gcc_brew()
   fi
 
   # make an unversioned symlink
-  os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-  if (( "$os_ver" > 13 )); then
-    # default homebrew bin dir changed with macos 14
-    bindir=/opt/homebrew/bin
-  else
-    bindir=/usr/local/bin
-  fi
-
+  # detect actual homebrew location (differs between Intel and ARM)
+  bindir=$(brew --prefix)/bin
   ln -fs ${bindir}/gfortran-${gcc_version} /usr/local/bin/gfortran
   ln -fs ${bindir}/gcc-${gcc_version} /usr/local/bin/gcc
   ln -fs ${bindir}/g++-${gcc_version} /usr/local/bin/g++
