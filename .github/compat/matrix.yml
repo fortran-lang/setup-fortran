@@ -10,7 +10,6 @@ toolchain:
   - {compiler: gcc, version: 15}
   - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
-  - {compiler: gcc, version: 12}
   - {compiler: intel, version: '2025.2'}
   - {compiler: intel, version: '2025.0'}
   - {compiler: intel, version: '2024.1'}
@@ -41,7 +40,6 @@ toolchain:
   - {compiler: intel-classic, version: '2021.1'}
   - {compiler: lfortran, version: '0.58.0'}
   - {compiler: lfortran, version: '0.57.0'}
-  - {compiler: lfortran, version: '0.56.0'}
   - {compiler: nvidia-hpc, version: '25.1'}
   - {compiler: nvidia-hpc, version: '24.5'}
   - {compiler: nvidia-hpc, version: '24.3'}
