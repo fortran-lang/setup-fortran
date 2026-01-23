@@ -94,12 +94,11 @@ def generate_bash_script(latest_versions):
         var_name = compiler.upper().replace('-', '_')
 
         lines.append(f"# Latest supported {compiler} versions by runner")
-        lines.append(f"declare -A LATEST_{var_name}_VERSION=(")
+        lines.append(f"declare -A LATEST_{var_name}_VERSION")
 
         for os_name, version in sorted(os_versions.items()):
-            lines.append(f'  ["{os_name}"]="{version}"')
+            lines.append(f'LATEST_{var_name}_VERSION["{os_name}"]="{version}"')
 
-        lines.append(")")
         lines.append("")
 
     return "\n".join(lines)
