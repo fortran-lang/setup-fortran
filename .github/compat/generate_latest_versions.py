@@ -81,7 +81,12 @@ def find_latest_versions(matrix_data):
 
 
 def generate_bash_script(latest_versions):
-    """Generate bash script content with latest version info in associative arrays."""
+    """Generate bash script with simple VAR=value lookup table.
+
+    Uses simple variable assignments for bash 3.2+ compatibility.
+    Variable names follow pattern: LATEST_<compiler>_<os>
+    where both compiler and os have . and - replaced with _
+    """
     lines = [
         "#!/usr/bin/env bash",
         "# Auto-generated from .github/compat/matrix.yml",
@@ -90,14 +95,16 @@ def generate_bash_script(latest_versions):
     ]
 
     for compiler, os_versions in sorted(latest_versions.items()):
-        # Convert compiler name to valid bash variable name
-        var_name = compiler.upper().replace('-', '_')
+        # Sanitize compiler name for variable naming
+        compiler_safe = compiler.replace('-', '_').replace('.', '_')
 
         lines.append(f"# Latest supported {compiler} versions by runner")
-        lines.append(f"declare -A LATEST_{var_name}_VERSION")
 
         for os_name, version in sorted(os_versions.items()):
-            lines.append(f'LATEST_{var_name}_VERSION["{os_name}"]="{version}"')
+            # Sanitize OS name for variable naming
+            os_safe = os_name.replace('-', '_').replace('.', '_')
+            var_name = f"LATEST_{compiler_safe}_{os_safe}"
+            lines.append(f'{var_name}="{version}"')
 
         lines.append("")
 

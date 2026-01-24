@@ -63,18 +63,15 @@ resolve_latest_version()
 
   local runner_os=$(detect_runner_os "$platform")
 
-  # Convert compiler name to variable name format
-  local var_name=$(echo "$compiler" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-  local array_name="LATEST_${var_name}_VERSION"
+  # Sanitize compiler and OS names for variable lookup (replace - and . with _)
+  local compiler_safe=$(echo "$compiler" | tr '.-' '__')
+  local os_safe=$(echo "$runner_os" | tr '.-' '__')
 
-  # Use indirect reference to access the associative array
-  local -n version_map="$array_name" 2>/dev/null || {
-    echo "Error: Unknown compiler '$compiler'" >&2
-    return 1
-  }
+  # Build variable name
+  local var_name="LATEST_${compiler_safe}_${os_safe}"
 
-  # Look up the version for this runner OS
-  local version="${version_map[$runner_os]}"
+  # Use indirect variable expansion to get the version
+  local version="${!var_name}"
 
   if [ -z "$version" ]; then
     echo "Error: No latest version defined for $compiler on $runner_os" >&2
