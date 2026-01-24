@@ -145,12 +145,6 @@ jobs:
           compiler: ${{ matrix.compiler }}
           version: latest
 
-      - name: Test compiler installed
-        uses: ./.github/actions/test-fc
-        with:
-          compiler: ${{ matrix.compiler }}
-          version: latest
-
       - name: Verify installed version matches expected
         shell: bash
         run: |
@@ -185,6 +179,18 @@ jobs:
             echo "✗ Version mismatch: expected $expected_version, got $actual_version"
             exit 1
           fi
+
+      - name: Test compiler works (compile hello world)
+        shell: bash
+        run: |
+          cat > hello.f90 <<EOF
+          program hello
+            print *, "Hello from Fortran!"
+          end program hello
+          EOF
+
+          ${{ env.FC }} hello.f90 -o hello
+          ./hello
 
   compat:
     name: Report compatibility
