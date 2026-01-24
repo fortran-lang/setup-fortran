@@ -118,7 +118,80 @@ jobs:
         with:
           name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
           path: compat/*.csv
-  
+
+  test-latest:
+    name: Test version latest resolution
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            compiler: gcc
+          - os: windows-2025
+            compiler: gcc
+          - os: macos-15
+            compiler: gcc
+          - os: ubuntu-24.04
+            compiler: lfortran
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Fortran with version latest
+        id: setup-fortran
+        uses: ./
+        with:
+          compiler: ${{ matrix.compiler }}
+          version: latest
+
+      - name: Verify installed version matches expected
+        shell: bash
+        run: |
+          source ./setup-fortran.sh
+
+          # Detect platform (same as main.sh)
+          platform=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+          # Get expected version from latest-versions.sh
+          expected_version=$(resolve_latest_version "${{ matrix.compiler }}" "$platform")
+          echo "Expected version: $expected_version"
+
+          # Get actual installed version
+          case "${{ matrix.compiler }}" in
+            gcc)
+              actual_version=$(gfortran --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1)
+              ;;
+            lfortran)
+              actual_version=$(lfortran --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+              ;;
+            *)
+              echo "Unknown compiler: ${{ matrix.compiler }}"
+              exit 1
+              ;;
+          esac
+          echo "Actual version: $actual_version"
+
+          # Compare versions
+          if [[ "$actual_version" == "$expected_version" ]]; then
+            echo "✓ Version matches expected"
+          else
+            echo "✗ Version mismatch: expected $expected_version, got $actual_version"
+            exit 1
+          fi
+
+      - name: Test compiler works (compile hello world)
+        shell: bash
+        run: |
+          cat > hello.f90 <<EOF
+          program hello
+            print *, "Hello from Fortran!"
+          end program hello
+          EOF
+
+          ${{ env.FC }} hello.f90 -o hello
+          ./hello
+
   compat:
     name: Report compatibility
     needs: 
@@ -192,9 +265,17 @@ jobs:
         if: ${{ steps.diff.outputs.diff == 'true' }}
         run: python .github/compat/update_compat_table.py ".github/compat/compat.md" "README.md"
 
+      - name: Generate latest versions lookup table
+        if: ${{ steps.diff.outputs.diff == 'true' }}
+        run: python .github/compat/update_latest_versions.py ".github/compat/matrix.yml" ".github/compat/latest-versions.sh"
+
       - name: Print README diff
         if: ${{ steps.diff.outputs.diff == 'true' }}
         run: git diff README.md
+
+      - name: Print latest-versions.sh diff
+        if: ${{ steps.diff.outputs.diff == 'true' }}
+        run: git diff .github/compat/latest-versions.sh
 
       - name: Create pull request
         if: ${{ steps.diff.outputs.diff == 'true' }}
@@ -209,7 +290,7 @@ jobs:
           default_branch="${{ github.event.repository.default_branch }}"
           
           git switch -c "$updated_branch"
-          git add .github/compat/*compat.csv README.md
+          git add .github/compat/ README.md
           git commit -m "Update compatibility matrix"
           git push -u origin "$updated_branch"
           gh pr create -B "$default_branch" -H "$updated_branch" --title "Update compatibility matrix" --body-file .github/compat/compat.md

@@ -15,6 +15,99 @@ sudo_wrapper() {
   $SUDO "$@"
 }
 
+# Source the auto-generated latest versions mapping
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/.github/compat/latest-versions.sh"
+
+# Detect the current runner OS
+detect_runner_os()
+{
+  # Try ImageOS environment variable first (GitHub Actions)
+  if [ -n "$ImageOS" ]; then
+    # Normalize ImageOS to match compatibility matrix naming
+    case "$ImageOS" in
+      macos15)
+        echo "macos-15"
+        ;;
+      macos14)
+        echo "macos-14"
+        ;;
+      macos15-intel)
+        echo "macos-15-intel"
+        ;;
+      ubuntu24)
+        echo "ubuntu-24.04"
+        ;;
+      ubuntu22)
+        echo "ubuntu-22.04"
+        ;;
+      win22)
+        echo "windows-2022"
+        ;;
+      win25)
+        echo "windows-2025"
+        ;;
+      *)
+        # If not recognized, return as-is
+        echo "$ImageOS"
+        ;;
+    esac
+    return
+  fi
+
+  # Fallback: detect from system
+  local platform=$1
+  case $platform in
+    linux*)
+      if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [[ "$ID" == "ubuntu" ]]; then
+          echo "ubuntu-$VERSION_ID"
+          return
+        fi
+      fi
+      echo "linux"
+      ;;
+    darwin*)
+      local os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
+      echo "macos-${os_ver}"
+      ;;
+    mingw*|msys*|cygwin*)
+      # Try to detect Windows version - default to a generic windows
+      echo "windows"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+# Resolve 'latest' to the actual latest supported version for the current runner
+resolve_latest_version()
+{
+  local compiler=$1
+  local platform=$2
+
+  local runner_os=$(detect_runner_os "$platform")
+
+  # Sanitize compiler and OS names for variable lookup (replace - and . with _)
+  local compiler_safe=$(echo "$compiler" | tr '.-' '__')
+  local os_safe=$(echo "$runner_os" | tr '.-' '__')
+
+  # Build variable name
+  local var_name="LATEST_${compiler_safe}_${os_safe}"
+
+  # Use indirect variable expansion to get the version
+  local version="${!var_name}"
+
+  if [ -z "$version" ]; then
+    echo "Error: No latest version defined for $compiler on $runner_os" >&2
+    return 1
+  fi
+
+  echo "$version"
+}
+
 require_fetch()
 {
   if command -v curl > /dev/null 2>&1; then
@@ -40,14 +133,13 @@ install_environment_modules_apt() {
 
 install_gcc_brew()
 {
+  local resolved_version=$version
   if [[ "$version" == "latest" ]]; then
-    brew install --force gcc
-    # detect installed version using homebrew
-    gcc_version=$(brew list --versions gcc | grep -o '[0-9]\+' | head -1)
-  else
-    brew install --force gcc@${version}
-    gcc_version=$version
+    resolved_version=$(resolve_latest_version "gcc" "darwin")
   fi
+
+  brew install --force gcc@${resolved_version}
+  gcc_version=$resolved_version
 
   # make an unversioned symlink
   # detect actual homebrew location (differs between Intel and ARM)
@@ -59,40 +151,45 @@ install_gcc_brew()
 
 install_gcc_apt()
 {
+  local resolved_version=$version
   if [ "$version" == "latest" ]; then
-    sudo_wrapper apt-get update
-    sudo_wrapper apt-get install -y gcc gfortran g++
-  else
-    # Check whether the system gcc version is the version we are after.
-    cur=$(apt show gcc | grep "Version" | cut -d':' -f3 | cut -d'-' -f1)
-    maj=$(echo $cur | cut -d'.' -f1)
-    needs_install=1
-    if [ "$maj" == "$version" ]; then
-      # Check whether that version is installed.
-      if apt list --installed gcc-${version} | grep -q "gcc-${version}/"; then
-        echo "GCC $version already installed"
-        needs_install=0
-      fi
-    else
-      # Install the PPA for installing other versions of gcc.
-      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-      sudo_wrapper apt-get update
-    fi
-
-    if [ "${needs_install}" == "1" ]; then
-      sudo_wrapper apt-get install -y gcc-${version} gfortran-${version} g++-${version}
-    fi
-
-    sudo_wrapper update-alternatives \
-      --install /usr/bin/gcc gcc /usr/bin/gcc-${version} 100 \
-      --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${version} \
-      --slave /usr/bin/gcov gcov /usr/bin/gcov-${version} \
-      --slave /usr/bin/g++ g++ /usr/bin/g++-${version}
+    resolved_version=$(resolve_latest_version "gcc" "linux")
   fi
+
+  # Check whether the system gcc version is the version we are after.
+  cur=$(apt show gcc 2>/dev/null | grep "Version" | cut -d':' -f3 | cut -d'-' -f1 || echo "")
+  maj=$(echo $cur | cut -d'.' -f1)
+  needs_install=1
+  if [ "$maj" == "$resolved_version" ]; then
+    # Check whether that version is installed.
+    if apt list --installed gcc-${resolved_version} 2>/dev/null | grep -q "gcc-${resolved_version}/"; then
+      echo "GCC $resolved_version already installed"
+      needs_install=0
+    fi
+  else
+    # Install the PPA for installing other versions of gcc.
+    sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+    sudo_wrapper apt-get update
+  fi
+
+  if [ "${needs_install}" == "1" ]; then
+    sudo_wrapper apt-get install -y gcc-${resolved_version} gfortran-${resolved_version} g++-${resolved_version}
+  fi
+
+  sudo_wrapper update-alternatives \
+    --install /usr/bin/gcc gcc /usr/bin/gcc-${resolved_version} 100 \
+    --slave /usr/bin/gfortran gfortran /usr/bin/gfortran-${resolved_version} \
+    --slave /usr/bin/gcov gcov /usr/bin/gcov-${resolved_version} \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-${resolved_version}
 }
 
 install_gcc_choco()
 {
+  local resolved_version=$version
+  if [[ "$version" == "latest" ]]; then
+    resolved_version=$(resolve_latest_version "gcc" "mingw")
+  fi
+
   # check if mingw preinstalled via choco, falling back to check directly for gfortran
   cur=$(choco list -e mingw -r | cut -d'|' -f2)
   if [[ "$cur" == "" ]] && [[ "$(which gfortran)" != "" ]]; then
@@ -100,16 +197,13 @@ install_gcc_choco()
   fi
   maj=$(echo $cur | cut -d'.' -f1)
   # if already installed, nothing to do
-  if [ "$maj" == "$version" ]; then
-    echo "GCC $version already installed"
+  if [ "$maj" == "$resolved_version" ]; then
+    echo "GCC $resolved_version already installed"
   else
     # otherwise hide preinstalled mingw compilers
     mv /c/mingw64 "$RUNNER_TEMP/"
     # ...and install selected version
-    case $version in
-      latest)
-        choco install mingw --force
-        ;;
+    case $resolved_version in
       15)
         choco install mingw --version 15.2.0 --force
         # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
@@ -683,11 +777,7 @@ install_lfortran_l()
   export CC="gcc"
   export CXX="g++"
   export CONDA=conda
-  if [ "$version" == "latest" ]; then
-    $CONDA install -c conda-forge -n base -y lfortran
-  else
-    $CONDA install -c conda-forge -n base -y lfortran=$version
-  fi
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
 install_lfortran_w()
@@ -696,11 +786,7 @@ install_lfortran_w()
   export CC="cl"
   export CXX="cl"
   export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
-  if [ "$version" == "latest" ]; then
-    $CONDA install -c conda-forge -n base -y lfortran
-  else
-    $CONDA install -c conda-forge -n base -y lfortran=$version
-  fi
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
 install_lfortran_m()
@@ -710,31 +796,33 @@ install_lfortran_m()
   export CXX="g++"
   export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
   export CONDA=micromamba
-  if [ "$version" == "latest" ]; then
-    $CONDA install -c conda-forge -n base -y lfortran
-  else
-    $CONDA install -c conda-forge -n base -y lfortran=$version
-  fi
+  $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
 install_lfortran()
 {
   local platform=$1
+  local resolved_version=$version
+
+  if [ "$version" == "latest" ]; then
+    resolved_version=$(resolve_latest_version "lfortran" "$platform")
+  fi
+
   case $platform in
     linux*)
-      install_lfortran_l $version
+      install_lfortran_l $resolved_version
       ;;
     darwin*)
-      install_lfortran_m $version
+      install_lfortran_m $resolved_version
       ;;
     mingw*)
-      install_lfortran_w $version
+      install_lfortran_w $resolved_version
       ;;
     msys*)
-      install_lfortran_w $version
+      install_lfortran_w $resolved_version
       ;;
     cygwin*)
-      install_lfortran_w $version
+      install_lfortran_w $resolved_version
       ;;
     *)
       echo "Unsupported platform: $platform"
