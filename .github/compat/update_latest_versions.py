@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate latest-versions.sh from matrix.yml.
-This creates a bash script with associative arrays mapping
-runner OS to the latest supported version for each compiler.
+Read matrix.yml and write a lookup
+table of the latest versions to a
+.env file to source at run time.
 """
 
 import sys
@@ -10,9 +10,9 @@ from pathlib import Path
 import yaml
 
 
-def parse_matrix(matrix_path):
+def parse_matrix(path):
     """Parse matrix.yml and return OS list, toolchains, and exclusions."""
-    with open(matrix_path, 'r') as f:
+    with open(path, 'r') as f:
         data = yaml.safe_load(f)
 
     return {
@@ -38,18 +38,18 @@ def is_excluded(os_name, compiler, version, exclusions):
     return False
 
 
-def version_sort_key(version_str):
+def version_sort_key(version: str):
     """Convert version string to sortable tuple of integers."""
     # Handle versions like "13", "14", "2023.2", "0.57.0", etc.
-    parts = str(version_str).replace("'", "").split('.')
+    parts = str(version).replace("'", "").split('.')
     return tuple(int(p) if p.isdigit() else 0 for p in parts)
 
 
-def find_latest_versions(matrix_data):
+def get_latest(matrix: dict):
     """Find the latest supported version for each compiler/OS combination."""
-    os_list = matrix_data['os']
-    toolchains = matrix_data['toolchain']
-    exclusions = matrix_data['exclude']
+    os_list = matrix['os']
+    toolchains = matrix['toolchain']
+    exclusions = matrix['exclude']
 
     # Group toolchains by compiler
     compilers = {}
@@ -61,59 +61,45 @@ def find_latest_versions(matrix_data):
         compilers[compiler].append(version)
 
     # For each compiler, find latest version per OS
-    result = {}
+    latest_versions = {}
     for compiler, versions in compilers.items():
-        result[compiler] = {}
-
+        latest_versions[compiler] = {}
         for os_name in os_list:
             # Find all non-excluded versions for this OS
-            available_versions = [
+            available = [
                 v for v in versions
                 if not is_excluded(os_name, compiler, v, exclusions)
             ]
-
-            if available_versions:
+            if available:
                 # Sort and take the highest version
-                latest = max(available_versions, key=version_sort_key)
-                result[compiler][os_name] = str(latest)
+                latest = max(available, key=version_sort_key)
+                latest_versions[compiler][os_name] = str(latest)
 
-    return result
+    return latest_versions
 
 
-def generate_bash_script(latest_versions):
-    """Generate bash script with simple VAR=value lookup table.
-
-    Uses simple variable assignments for bash 3.2+ compatibility.
+def to_lines(latest_versions) -> list[str]:
+    """
     Variable names follow pattern: LATEST_<compiler>_<os>
     where both compiler and os have . and - replaced with _
     """
-    lines = [
-        "#!/usr/bin/env bash",
-        "# Auto-generated from .github/compat/matrix.yml",
-        "# DO NOT EDIT MANUALLY - Run .github/compat/generate_latest_versions.py to regenerate",
-        "",
-    ]
-
+    
+    lines = []
     for compiler, os_versions in sorted(latest_versions.items()):
-        # Sanitize compiler name for variable naming
         compiler_safe = compiler.replace('-', '_').replace('.', '_')
-
         lines.append(f"# Latest supported {compiler} versions by runner")
-
         for os_name, version in sorted(os_versions.items()):
-            # Sanitize OS name for variable naming
             os_safe = os_name.replace('-', '_').replace('.', '_')
             var_name = f"LATEST_{compiler_safe}_{os_safe}"
             lines.append(f'{var_name}="{version}"')
-
         lines.append("")
 
-    return "\n".join(lines)
+    return lines
 
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: generate_latest_versions.py <matrix.yml> <output.sh>")
+        print("Usage: update_latest_versions.py <matrix.yml> <output.env>")
         sys.exit(1)
 
     matrix_path = Path(sys.argv[1])
@@ -124,13 +110,18 @@ def main():
         sys.exit(1)
 
     matrix_data = parse_matrix(matrix_path)
-    latest_versions = find_latest_versions(matrix_data)
-    bash_content = generate_bash_script(latest_versions)
+    latest_versions = get_latest(matrix_data)
+    variable_lines = to_lines(latest_versions)
 
     with open(output_path, 'w') as f:
-        f.write(bash_content)
+        prefix_lines = [
+            "# Auto-generated from .github/compat/matrix.yml",
+            "# DO NOT EDIT MANUALLY - Run .github/compat/update_latest_versions.py to regenerate",
+            "",
+        ]
+        f.write("\n".join(prefix_lines + variable_lines))
 
-    print(f"Generated {output_path}")
+    print(f"Wrote {output_path}")
 
 
 if __name__ == "__main__":

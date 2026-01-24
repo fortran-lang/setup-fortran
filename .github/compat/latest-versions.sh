@@ -1,6 +1,5 @@
-#!/usr/bin/env bash
 # Auto-generated from .github/compat/matrix.yml
-# DO NOT EDIT MANUALLY - Run .github/compat/generate_latest_versions.py to regenerate
+# DO NOT EDIT MANUALLY - Run .github/compat/update_latest_versions.py to regenerate
 
 # Latest supported gcc versions by runner
 LATEST_gcc_macos_14="15"
