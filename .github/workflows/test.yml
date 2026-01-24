@@ -128,11 +128,11 @@ jobs:
         include:
           - os: ubuntu-24.04
             compiler: gcc
-          - os: windows-latest
+          - os: windows-2025
             compiler: gcc
-          - os: macos-latest
+          - os: macos-15
             compiler: gcc
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             compiler: lfortran
     steps:
       - name: Checkout repository

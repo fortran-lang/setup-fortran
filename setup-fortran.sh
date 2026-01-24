@@ -24,7 +24,34 @@ detect_runner_os()
 {
   # Try ImageOS environment variable first (GitHub Actions)
   if [ -n "$ImageOS" ]; then
-    echo "$ImageOS"
+    # Normalize ImageOS to match compatibility matrix naming
+    case "$ImageOS" in
+      macos15)
+        echo "macos-15"
+        ;;
+      macos14)
+        echo "macos-14"
+        ;;
+      macos15-intel)
+        echo "macos-15-intel"
+        ;;
+      ubuntu24)
+        echo "ubuntu-24.04"
+        ;;
+      ubuntu22)
+        echo "ubuntu-22.04"
+        ;;
+      win22)
+        echo "windows-2022"
+        ;;
+      win25)
+        echo "windows-2025"
+        ;;
+      *)
+        # If not recognized, return as-is
+        echo "$ImageOS"
+        ;;
+    esac
     return
   fi
 
