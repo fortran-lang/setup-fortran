@@ -163,7 +163,7 @@ jobs:
               actual_version=$(gfortran --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1)
               ;;
             lfortran)
-              actual_version=$(lfortran --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+              actual_version=$(lfortran --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
               ;;
             *)
               echo "Unknown compiler: ${{ matrix.compiler }}"
