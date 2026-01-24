@@ -118,7 +118,74 @@ jobs:
         with:
           name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
           path: compat/*.csv
-  
+
+  test-latest:
+    name: Test version latest resolution
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            compiler: gcc
+          - os: windows-latest
+            compiler: gcc
+          - os: macos-latest
+            compiler: gcc
+          - os: ubuntu-latest
+            compiler: lfortran
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Fortran with version latest
+        id: setup-fortran
+        uses: ./
+        with:
+          compiler: ${{ matrix.compiler }}
+          version: latest
+
+      - name: Test compiler installed
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.compiler }}
+          version: latest
+
+      - name: Verify installed version matches expected
+        shell: bash
+        run: |
+          source ./setup-fortran.sh
+
+          # Detect platform (same as main.sh)
+          platform=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+          # Get expected version from latest-versions.sh
+          expected_version=$(resolve_latest_version "${{ matrix.compiler }}" "$platform")
+          echo "Expected version: $expected_version"
+
+          # Get actual installed version
+          case "${{ matrix.compiler }}" in
+            gcc)
+              actual_version=$(gfortran --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1)
+              ;;
+            lfortran)
+              actual_version=$(lfortran --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+              ;;
+            *)
+              echo "Unknown compiler: ${{ matrix.compiler }}"
+              exit 1
+              ;;
+          esac
+          echo "Actual version: $actual_version"
+
+          # Compare versions
+          if [[ "$actual_version" == "$expected_version" ]]; then
+            echo "✓ Version matches expected"
+          else
+            echo "✗ Version mismatch: expected $expected_version, got $actual_version"
+            exit 1
+          fi
+
   compat:
     name: Report compatibility
     needs: 
