@@ -267,7 +267,7 @@ jobs:
 
       - name: Generate latest versions lookup table
         if: ${{ steps.diff.outputs.diff == 'true' }}
-        run: python .github/compat/update_latest_versions.py ".github/compat/matrix.yml" ".github/compat/latest-versions.sh"
+        run: python .github/compat/update_latest_versions.py ".github/compat/compat.csv" ".github/compat/latest-versions.sh"
 
       - name: Print README diff
         if: ${{ steps.diff.outputs.diff == 'true' }}

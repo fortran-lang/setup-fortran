@@ -1,41 +1,13 @@
 #!/usr/bin/env python3
 """
-Read matrix.yml and write a lookup
-table of the latest versions to a
-.env file to source at run time.
+Read compat.csv and write a lookup table
+of the latest working versions to a .sh
+file to source at run time.
 """
 
+import csv
 import sys
 from pathlib import Path
-import yaml
-
-
-def parse_matrix(path):
-    """Parse matrix.yml and return OS list, toolchains, and exclusions."""
-    with open(path, 'r') as f:
-        data = yaml.safe_load(f)
-
-    return {
-        'os': data.get('os', []),
-        'toolchain': data.get('toolchain', []),
-        'exclude': data.get('exclude', [])
-    }
-
-
-def is_excluded(os_name, compiler, version, exclusions):
-    """Check if a specific OS/compiler/version combination is excluded."""
-    for exclusion in exclusions:
-        exclude_os = exclusion.get('os')
-        exclude_toolchain = exclusion.get('toolchain', {})
-        exclude_compiler = exclude_toolchain.get('compiler')
-        exclude_version = str(exclude_toolchain.get('version', ''))
-
-        if exclude_os == os_name and exclude_compiler == compiler:
-            # If exclusion doesn't specify version, it excludes all versions
-            if not exclude_version or exclude_version == str(version):
-                return True
-
-    return False
 
 
 def version_sort_key(version: str):
@@ -45,35 +17,62 @@ def version_sort_key(version: str):
     return tuple(int(p) if p.isdigit() else 0 for p in parts)
 
 
-def get_latest(matrix: dict):
-    """Find the latest supported version for each compiler/OS combination."""
-    os_list = matrix['os']
-    toolchains = matrix['toolchain']
-    exclusions = matrix['exclude']
+def parse_compat_csv(csv_path):
+    """
+    Parse compat.csv and return latest working version for each OS/compiler combo.
 
-    # Group toolchains by compiler
-    compilers = {}
-    for toolchain in toolchains:
-        compiler = toolchain['compiler']
-        version = toolchain['version']
-        if compiler not in compilers:
-            compilers[compiler] = []
-        compilers[compiler].append(version)
+    CSV format:
+    Row 1: compiler,gcc,gcc,gcc,intel,intel,...
+    Row 2: version,13,14,15,2021.1,2021.2,...
+    Row 3: runner,,,,,,...
+    Row 4+: os-name,&check;,,&check;,...
 
-    # For each compiler, find latest version per OS
+    Returns: dict[compiler][os] = latest_version
+    """
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        rows = list(reader)
+
+    if len(rows) < 4:
+        raise ValueError(f"CSV must have at least 4 rows, got {len(rows)}")
+
+    # Parse header rows
+    compiler_row = rows[0]
+    version_row = rows[1]
+    # Skip row 2 (runner header)
+
+    # Build list of (compiler, version, column_index)
+    columns = []
+    for i in range(1, len(compiler_row)):  # Skip first column (label)
+        compiler = compiler_row[i]
+        version = version_row[i]
+        if compiler and version:  # Skip empty columns
+            columns.append((compiler, version, i))
+
+    # Parse OS rows and find latest version for each OS/compiler
     latest_versions = {}
-    for compiler, versions in compilers.items():
-        latest_versions[compiler] = {}
-        for os_name in os_list:
-            # Find all non-excluded versions for this OS
-            available = [
-                v for v in versions
-                if not is_excluded(os_name, compiler, v, exclusions)
-            ]
-            if available:
-                # Sort and take the highest version
-                latest = max(available, key=version_sort_key)
-                latest_versions[compiler][os_name] = str(latest)
+
+    for row_idx in range(3, len(rows)):  # Start after runner header
+        row = rows[row_idx]
+        if not row or not row[0]:  # Skip empty rows
+            continue
+
+        os_name = row[0]
+
+        # Check each column for this OS
+        for compiler, version, col_idx in columns:
+            if col_idx < len(row) and row[col_idx] == '&check;':
+                # This OS/compiler/version combo works
+                if compiler not in latest_versions:
+                    latest_versions[compiler] = {}
+
+                # Update if this is the first or highest version for this OS/compiler
+                if os_name not in latest_versions[compiler]:
+                    latest_versions[compiler][os_name] = version
+                else:
+                    current = latest_versions[compiler][os_name]
+                    if version_sort_key(version) > version_sort_key(current):
+                        latest_versions[compiler][os_name] = version
 
     return latest_versions
 
@@ -83,7 +82,7 @@ def to_lines(latest_versions) -> list[str]:
     Variable names follow pattern: LATEST_<compiler>_<os>
     where both compiler and os have . and - replaced with _
     """
-    
+
     lines = []
     for compiler, os_versions in sorted(latest_versions.items()):
         compiler_safe = compiler.replace('-', '_').replace('.', '_')
@@ -99,23 +98,22 @@ def to_lines(latest_versions) -> list[str]:
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: update_latest_versions.py <matrix.yml> <output.env>")
+        print("Usage: update_latest_versions.py <compat.csv> <output.sh>")
         sys.exit(1)
 
-    matrix_path = Path(sys.argv[1])
+    csv_path = Path(sys.argv[1])
     output_path = Path(sys.argv[2])
 
-    if not matrix_path.is_file():
-        print(f"Error: {matrix_path} not found")
+    if not csv_path.is_file():
+        print(f"Error: {csv_path} not found")
         sys.exit(1)
 
-    matrix_data = parse_matrix(matrix_path)
-    latest_versions = get_latest(matrix_data)
+    latest_versions = parse_compat_csv(csv_path)
     variable_lines = to_lines(latest_versions)
 
     with open(output_path, 'w') as f:
         prefix_lines = [
-            "# Auto-generated from .github/compat/matrix.yml",
+            f"# Auto-generated from {csv_path.name}",
             "# DO NOT EDIT MANUALLY - Run .github/compat/update_latest_versions.py to regenerate",
             "",
         ]
