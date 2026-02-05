@@ -28,6 +28,10 @@ case $compiler in
     version=${VERSION:-25.1}
     install_nvidiahpc $platform
     ;;
+  aocc)
+    version=${VERSION:-latest}
+    install_aocc $platform
+    ;;
   lfortran)
     version=${VERSION:-latest}
     install_lfortran $platform

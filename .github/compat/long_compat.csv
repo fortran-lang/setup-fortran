@@ -182,6 +182,7 @@ ubuntu-24.04,nvidia-hpc,24.1,
 ubuntu-24.04,nvidia-hpc,24.3,
 ubuntu-24.04,nvidia-hpc,24.5,&check;
 ubuntu-24.04,nvidia-hpc,25.1,&check;
+ubuntu-24.04,aocc,5.1.0,&check;
 windows-2022,gcc,13,&check;
 windows-2022,gcc,14,&check;
 windows-2022,gcc,15,&check;

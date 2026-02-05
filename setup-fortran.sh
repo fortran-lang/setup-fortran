@@ -294,6 +294,109 @@ install_gcc()
   export CXX="g++"
 }
 
+detect_aocc_root()
+{
+  if [ -n "$AOCC_ROOT" ] && [ -d "$AOCC_ROOT" ]; then
+    echo "$AOCC_ROOT"
+    return
+  fi
+
+  if [ -d /opt/AMD ]; then
+    local candidate
+    candidate=$(ls -d /opt/AMD/aocc-compiler-* 2>/dev/null | sort -V | tail -n 1 || true)
+    if [ -n "$candidate" ] && [ -d "$candidate" ]; then
+      echo "$candidate"
+      return
+    fi
+  fi
+
+  echo ""
+}
+
+install_aocc_linux()
+{
+  local root
+  root=$(detect_aocc_root)
+
+  # Resolve requested AOCC version
+  local resolved_version=$version
+  if [ "$resolved_version" = "latest" ]; then
+    resolved_version=$(resolve_latest_version "aocc" "linux")
+  fi
+
+  local aocc_deb
+  local aocc_url
+  local aocc_sha256
+
+  case "$resolved_version" in
+    5.1.0)
+      aocc_deb="aocc-compiler-5.1.0_1_amd64.deb"
+      aocc_url="https://www.amd.com/fr/developer/aocc/eula/aocc-5-1-eula.html?filename=${aocc_deb}"
+      aocc_sha256="42f9ed0713a8fe269d5a5b40b1992a5380ff59b4441e58d38eb9f27df5bfe6df"
+      ;;
+    *)
+      echo "Unsupported AOCC version: $resolved_version"
+      exit 1
+      ;;
+  esac
+
+  if [ -z "$root" ]; then
+    require_fetch
+
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+    cd "$tmp_dir" || exit 42
+
+    echo "Downloading AOCC ${resolved_version} from AMD..."
+    $fetch "$aocc_url" > "$aocc_deb"
+
+    echo "${aocc_sha256}  ${aocc_deb}" | sha256sum -c -
+
+    # Install dependencies and the AOCC .deb
+    sudo_wrapper apt-get install -y libncurses5 libncursesw5 || true
+    sudo_wrapper dpkg -i "$aocc_deb" || sudo_wrapper apt-get -f install -y
+
+    cd - >/dev/null 2>&1 || true
+    rm -rf "$tmp_dir"
+
+    root=$(detect_aocc_root)
+    if [ -z "$root" ]; then
+      echo "AOCC installation completed but installation directory could not be detected." >&2
+      exit 1
+    fi
+  fi
+
+  # AOCC provides setenv_AOCC.sh to configure the environment
+  source "$root/setenv_AOCC.sh"
+
+  # Ensure standard compiler environment variables are set
+  export FC="flang"
+  export CC="clang"
+  export CXX="clang++"
+
+  # Export AOCC-related environment to subsequent steps
+  if [ -n "$GITHUB_ENV" ]; then
+    env | grep -i 'aocc\|AMD' >> "$GITHUB_ENV" || true
+  fi
+
+  echo "The AOCC flang installed is:"
+  flang --version
+}
+
+install_aocc()
+{
+  local platform=$1
+  case $platform in
+    linux*)
+      install_aocc_linux
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+}
+
 export_intel_vars()
 {
   cat >> $GITHUB_ENV <<EOF
