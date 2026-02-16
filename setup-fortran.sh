@@ -352,9 +352,8 @@ install_aocc_linux()
 
     echo "${aocc_sha256}  ${aocc_deb}" | sha256sum -c -
 
-    # Install dependencies and the AOCC .deb
-    sudo_wrapper apt-get install -y libncurses5 libncursesw5 || true
-    sudo_wrapper dpkg -i "$aocc_deb" || sudo_wrapper apt-get -f install -y
+    # Install the AOCC .deb
+    sudo_wrapper apt-get install -y "./${aocc_deb}"
 
     cd - >/dev/null 2>&1 || true
     rm -rf "$tmp_dir"

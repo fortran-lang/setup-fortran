@@ -29,6 +29,9 @@ runs:
           fcv=$(${{ env.FC }} --version 2>&1 | awk '/nvfortran/ {print $2}' | cut -d'-' -f1)
         elif ([[ "${{ inputs.compiler }}" == "lfortran" ]]); then
           fcv=$(${{ env.FC }} --version | head -n 1 | grep -woE '[0123456789.]+')
+        elif ([[ "${{ inputs.compiler }}" == "aocc" ]]); then
+          # AOCC flang reports LLVM/clang version first; extract AOCC version (e.g. AOCC_4.0.0 or AOCC 5.1.0)
+          fcv=$(${{ env.FC }} --version 2>&1 | grep -oE 'AOCC[_ ][0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
         elif ([[ "${{ inputs.compiler }}" != "nvidia-hpc" ]]); then
           fcv=$(${{ env.FC }} --version | head -n 1)
           fcv=$(echo "$fcv" | grep -woE '[0123456789.]+' | head -n 1)
