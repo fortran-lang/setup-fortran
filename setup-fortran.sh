@@ -331,7 +331,7 @@ install_aocc_linux()
   case "$resolved_version" in
     5.1.0)
       aocc_deb="aocc-compiler-5.1.0_1_amd64.deb"
-      aocc_url="https://www.amd.com/fr/developer/aocc/eula/aocc-5-1-eula.html?filename=${aocc_deb}"
+      aocc_url="https://download.amd.com/developer/eula/aocc/aocc-5-1/${aocc_deb}"
       aocc_sha256="42f9ed0713a8fe269d5a5b40b1992a5380ff59b4441e58d38eb9f27df5bfe6df"
       ;;
     *)
