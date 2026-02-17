@@ -69,7 +69,8 @@ macos-15,intel-classic,2021.9,&check;
 macos-15,lfortran,0.57.0,&check;
 macos-15,lfortran,0.58.0,&check;
 ubuntu-22.04,gcc,13,&check;
-ubuntu-22.04,gcc,14,
+ubuntu-22.04,gcc,14,&check;
+ubuntu-22.04,gcc,15,&check;
 ubuntu-22.04,intel-classic,2021.1.2,&check;
 ubuntu-22.04,intel-classic,2021.1,&check;
 ubuntu-22.04,intel-classic,2021.10,&check;
@@ -125,6 +126,7 @@ ubuntu-22.04,nvidia-hpc,24.5,&check;
 ubuntu-22.04,nvidia-hpc,25.1,&check;
 ubuntu-24.04,gcc,13,&check;
 ubuntu-24.04,gcc,14,&check;
+ubuntu-24.04,gcc,15,&check;
 ubuntu-24.04,intel-classic,2021.1.2,&check;
 ubuntu-24.04,intel-classic,2021.1,&check;
 ubuntu-24.04,intel-classic,2021.10,&check;
