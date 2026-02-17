@@ -128,6 +128,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             compiler: gcc
+          - os: ubuntu-22.04
+            compiler: gcc
           - os: windows-2025
             compiler: gcc
           - os: macos-15

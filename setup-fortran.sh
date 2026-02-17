@@ -131,6 +131,25 @@ install_environment_modules_apt() {
   echo "Environment modules set up completed."
 }
 
+setup_brew_linux()
+{
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+}
+
+install_gcc_brew_linux()
+{
+  local resolved_version=$1
+  setup_brew_linux
+  brew install --force gcc@${resolved_version}
+  bindir=$(brew --prefix)/bin
+  sudo_wrapper update-alternatives \
+    --install /usr/bin/gcc gcc ${bindir}/gcc-${resolved_version} 100 \
+    --slave /usr/bin/gfortran gfortran ${bindir}/gfortran-${resolved_version} \
+    --slave /usr/bin/gcov gcov ${bindir}/gcov-${resolved_version} \
+    --slave /usr/bin/g++ g++ ${bindir}/g++-${resolved_version}
+}
+
 install_gcc_brew()
 {
   local resolved_version=$version
@@ -151,10 +170,7 @@ install_gcc_brew()
 
 install_gcc_apt()
 {
-  local resolved_version=$version
-  if [ "$version" == "latest" ]; then
-    resolved_version=$(resolve_latest_version "gcc" "linux")
-  fi
+  local resolved_version=$1
 
   # Check whether the system gcc version is the version we are after.
   cur=$(apt show gcc 2>/dev/null | grep "Version" | cut -d':' -f3 | cut -d'-' -f1 || echo "")
@@ -166,10 +182,6 @@ install_gcc_apt()
       echo "GCC $resolved_version already installed"
       needs_install=0
     fi
-  else
-    # Install the PPA for installing other versions of gcc.
-    sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-    sudo_wrapper apt-get update
   fi
 
   if [ "${needs_install}" == "1" ]; then
@@ -269,7 +281,19 @@ install_gcc()
   local platform=$1
   case $platform in
     linux*)
-      install_gcc_apt
+      local resolved_version=$version
+      if [ "$version" == "latest" ]; then
+        resolved_version=$(resolve_latest_version "gcc" "linux")
+      fi
+      # Add PPA for additional GCC versions, then probe apt availability.
+      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+      sudo_wrapper apt-get update -q
+      if apt-cache show gcc-${resolved_version} &>/dev/null; then
+        install_gcc_apt "$resolved_version"
+      else
+        install_gcc_brew_linux "$resolved_version"
+      fi
       ;;
     darwin*)
       install_gcc_brew
