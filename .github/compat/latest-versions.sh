@@ -1,6 +1,9 @@
 # Auto-generated from compat.csv
 # DO NOT EDIT MANUALLY - Run .github/compat/update_latest_versions.py to regenerate
 
+# Latest supported aocc versions by runner
+LATEST_aocc_ubuntu_24_04="5.1.0"
+
 # Latest supported gcc versions by runner
 LATEST_gcc_macos_14="15"
 LATEST_gcc_macos_15="15"
