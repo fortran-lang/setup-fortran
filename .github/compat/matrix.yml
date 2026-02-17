@@ -67,6 +67,7 @@ toolchain:
   - {compiler: nvidia-hpc, version: '20.11'}
   - {compiler: nvidia-hpc, version: '20.9'}
   - {compiler: nvidia-hpc, version: '20.7'}
+  - {compiler: aocc, version: '5.1.0'}
 exclude:
   # intel-classic >= 2021.10.0 not available for mac
   - os: macos-15-intel
@@ -97,3 +98,16 @@ exclude:
     toolchain: {compiler: gcc, version: 15}
   - os: ubuntu-22.04
     toolchain: {compiler: gcc, version: 15}
+  # aocc supported only on Ubuntu 24.04
+  - os: ubuntu-22.04
+    toolchain: {compiler: aocc}
+  - os: macos-15-intel
+    toolchain: {compiler: aocc}
+  - os: macos-15
+    toolchain: {compiler: aocc}
+  - os: macos-14
+    toolchain: {compiler: aocc}
+  - os: windows-2025
+    toolchain: {compiler: aocc}
+  - os: windows-2022
+    toolchain: {compiler: aocc}
