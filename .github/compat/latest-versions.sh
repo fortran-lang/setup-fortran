@@ -39,5 +39,5 @@ LATEST_lfortran_windows_2022="0.58.0"
 LATEST_lfortran_windows_2025="0.58.0"
 
 # Latest supported nvidia-hpc versions by runner
-LATEST_nvidia_hpc_ubuntu_22_04="25.1"
-LATEST_nvidia_hpc_ubuntu_24_04="25.1"
+LATEST_nvidia_hpc_ubuntu_22_04="26.1"
+LATEST_nvidia_hpc_ubuntu_24_04="26.1"
