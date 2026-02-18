@@ -93,11 +93,6 @@ exclude:
     toolchain: {compiler: nvidia-hpc}
   - os: windows-2022
     toolchain: {compiler: nvidia-hpc}
-  # gcc 15 only available for windows (via chocolatey), macos (brew)
-  - os: ubuntu-24.04
-    toolchain: {compiler: gcc, version: 15}
-  - os: ubuntu-22.04
-    toolchain: {compiler: gcc, version: 15}
   # aocc supported only on Ubuntu 24.04
   - os: ubuntu-22.04
     toolchain: {compiler: aocc}
