@@ -25,7 +25,7 @@ case $compiler in
     install_intel $platform false
     ;;
   nvidia-hpc)
-    version=${VERSION:-25.1}
+    version=${VERSION:-latest}
     install_nvidiahpc $platform
     ;;
   aocc)

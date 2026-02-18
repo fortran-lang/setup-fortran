@@ -841,15 +841,19 @@ install_nvidiahpc_apt()
   # install environment-modules
   install_environment_modules_apt
 
-  # to convert version format from X.Y to X-Y
-  local cversion=$(echo "$version" | tr '.' '-')
-
   # install NVIDIA HPC SDK
   echo "Installing NVIDIA HPC SDK $version..."
   curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo_wrapper gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
   echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo_wrapper tee /etc/apt/sources.list.d/nvhpc.list
   sudo_wrapper apt-get update -y
-  sudo_wrapper apt-get install -y nvhpc-$cversion
+  if [ "$version" == "latest" ]; then
+    sudo_wrapper apt-get install -y nvhpc
+    version=$(ls /opt/nvidia/hpc_sdk/Linux_$(uname -m)/ | grep -E '^[0-9]+\.[0-9]+$' | sort -V | tail -1)
+  else
+    # to convert version format from X.Y to X-Y
+    local cversion=$(echo "$version" | tr '.' '-')
+    sudo_wrapper apt-get install -y nvhpc-$cversion
+  fi
   echo "NVIDIA HPC SDK $version installed."
 
   # load NVIDIA HPC SDK module
