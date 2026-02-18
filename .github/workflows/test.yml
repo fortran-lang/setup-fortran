@@ -138,8 +138,6 @@ jobs:
             compiler: lfortran
           - os: ubuntu-24.04
             compiler: intel
-          - os: ubuntu-24.04
-            compiler: intel-classic
           - os: ubuntu-22.04
             compiler: nvidia-hpc
           - os: ubuntu-24.04
