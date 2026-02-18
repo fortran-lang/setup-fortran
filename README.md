@@ -34,7 +34,7 @@ jobs:
           - {compiler: gcc, version: 'latest'}
           - {compiler: intel, version: '2025.0'}
           - {compiler: intel-classic, version: '2021.10'}
-          - {compiler: nvidia-hpc, version: '25.1'}
+          - {compiler: nvidia-hpc, version: 'latest'}
           - {compiler: lfortran, version: '0.45.0'}
           - {compiler: aocc, version: '5.1.0'}
         exclude:
