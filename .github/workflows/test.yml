@@ -136,6 +136,16 @@ jobs:
             compiler: gcc
           - os: ubuntu-24.04
             compiler: lfortran
+          - os: ubuntu-24.04
+            compiler: intel
+          - os: ubuntu-24.04
+            compiler: intel-classic
+          - os: ubuntu-22.04
+            compiler: nvidia-hpc
+          - os: ubuntu-24.04
+            compiler: nvidia-hpc
+          - os: ubuntu-24.04
+            compiler: aocc
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -155,10 +165,6 @@ jobs:
           # Detect platform (same as main.sh)
           platform=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-          # Get expected version from latest-versions.sh
-          expected_version=$(resolve_latest_version "${{ matrix.compiler }}" "$platform")
-          echo "Expected version: $expected_version"
-
           # Get actual installed version
           case "${{ matrix.compiler }}" in
             gcc)
@@ -167,6 +173,15 @@ jobs:
             lfortran)
               actual_version=$(lfortran --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
               ;;
+            aocc)
+              actual_version=$($FC --version 2>&1 | grep -oE 'AOCC[_ ][0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+              ;;
+            intel|intel-classic)
+              actual_version=$($FC --version | head -n1 | grep -woE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+              ;;
+            nvidia-hpc)
+              actual_version=$(nvfortran --version 2>&1 | awk '/nvfortran/ {print $2}' | cut -d'-' -f1)
+              ;;
             *)
               echo "Unknown compiler: ${{ matrix.compiler }}"
               exit 1
@@ -174,13 +189,29 @@ jobs:
           esac
           echo "Actual version: $actual_version"
 
-          # Compare versions
-          if [[ "$actual_version" == "$expected_version" ]]; then
-            echo "✓ Version matches expected"
-          else
-            echo "✗ Version mismatch: expected $expected_version, got $actual_version"
-            exit 1
-          fi
+          # For compilers that resolve 'latest' to a pinned version via latest-versions.sh,
+          # verify the installed version matches. For compilers that install an unversioned
+          # package (intel, intel-classic, nvidia-hpc), just confirm the compiler is functional.
+          case "${{ matrix.compiler }}" in
+            gcc|lfortran|aocc)
+              expected_version=$(resolve_latest_version "${{ matrix.compiler }}" "$platform")
+              echo "Expected version: $expected_version"
+              if [[ "$actual_version" == "$expected_version" ]]; then
+                echo "Version matches expected"
+              else
+                echo "Version mismatch: expected $expected_version, got $actual_version"
+                exit 1
+              fi
+              ;;
+            *)
+              if [[ -n "$actual_version" ]]; then
+                echo "Compiler is functional (version: $actual_version)"
+              else
+                echo "Could not determine installed version"
+                exit 1
+              fi
+              ;;
+          esac
 
       - name: Test compiler works (compile hello world)
         shell: bash
