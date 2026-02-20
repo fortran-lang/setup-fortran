@@ -48,6 +48,17 @@ runs:
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw' output: $output"; exit 1)
         rm hw
 
+    - name: Test compile with debug flags (bash)
+      working-directory: test
+      shell: bash
+      run: |
+        # Compile with flags that trigger advanced assembler features
+        # These flags would have caught the gcc-15 assembler issue (issue #197)
+        ${{ env.FC }} -g -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow -o hw_debug hw.f90
+        output=$(./hw_debug 2>&1)
+        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw_debug' output: $output"; exit 1)
+        rm hw_debug
+
     - name: Test compile Fortran (pwsh)
       working-directory: test
       # todo: debug lfortran discovery issues (same for powershell and cmd below)
