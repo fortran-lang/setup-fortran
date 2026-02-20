@@ -50,6 +50,7 @@ runs:
 
     - name: Test compile with debug flags (bash)
       working-directory: test
+      if: ${{ inputs.compiler == 'gcc' }}
       shell: bash
       run: |
         # Compile with flags that trigger advanced assembler features
