@@ -143,6 +143,7 @@ ubuntu-24.04,intel,2022.2,&check;
 ubuntu-24.04,intel,2023.0,&check;
 ubuntu-24.04,intel,2023.1,&check;
 ubuntu-24.04,intel,2023.2,&check;
+ubuntu-24.04,intel,2024.0,&check;
 ubuntu-24.04,intel,2024.1,&check;
 ubuntu-24.04,intel,2025.0,&check;
 ubuntu-24.04,intel,2025.2,&check;
@@ -151,6 +152,7 @@ ubuntu-24.04,lfortran,0.58.0,&check;
 ubuntu-24.04,nvidia-hpc,23.1,
 ubuntu-24.04,nvidia-hpc,23.11,
 ubuntu-24.04,nvidia-hpc,23.3,
+ubuntu-24.04,nvidia-hpc,23.5,
 ubuntu-24.04,nvidia-hpc,23.7,
 ubuntu-24.04,nvidia-hpc,23.9,
 ubuntu-24.04,nvidia-hpc,24.1,
