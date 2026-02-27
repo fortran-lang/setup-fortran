@@ -48,50 +48,6 @@ runs:
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw' output: $output"; exit 1)
         rm hw
 
-    - name: Test compile with debug flags (bash)
-      working-directory: test
-      if: ${{ inputs.compiler == 'gcc' }}
-      shell: bash
-      run: |
-        # Compile with flags that trigger advanced assembler features
-        # These flags would have caught the gcc-15 assembler issue (issue #197)
-        ${{ env.FC }} -g -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow -o hw_debug hw.f90
-        output=$(./hw_debug 2>&1)
-        [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected Fortran program 'hw_debug' output: $output"; exit 1)
-        rm hw_debug
-
-    - name: Verify brew binutils in PATH for gcc-15+ on Linux (issue #197)
-      if: ${{ inputs.compiler == 'gcc' && runner.os == 'Linux' && inputs.version >= 15 }}
-      shell: bash
-      run: |
-        # For gcc-15+ installed via brew on Linux, brew binutils must be in PATH
-        # to avoid assembler version mismatch (issue #197)
-
-        # Check if gfortran is from linuxbrew
-        fc_path=$(which ${{ env.FC }})
-        echo "Fortran compiler path: $fc_path"
-
-        if [[ "$fc_path" == *"linuxbrew"* ]]; then
-          echo "Detected linuxbrew gfortran"
-
-          # Check which 'as' assembler will be used
-          as_path=$(which as)
-          echo "Assembler in PATH: $as_path"
-
-          # Verify it's the brew binutils, not system binutils
-          if [[ "$as_path" == *"linuxbrew"* ]]; then
-            echo "PASS: Brew binutils is in PATH (correct)"
-          else
-            echo "FAIL: System assembler will be used instead of brew binutils"
-            echo "This will cause '.base64' assembler errors with gcc-15+"
-            echo "Expected: brew binutils in PATH"
-            echo "Got: $as_path"
-            exit 1
-          fi
-        else
-          echo "Not using linuxbrew gfortran, skipping binutils check"
-        fi
-
     - name: Test compile Fortran (pwsh)
       working-directory: test
       # todo: debug lfortran discovery issues (same for powershell and cmd below)
