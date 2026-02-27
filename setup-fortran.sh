@@ -189,8 +189,6 @@ install_gcc_apt()
   fi
 
   if [ "${needs_install}" == "1" ]; then
-    sudo_wrapper apt-get install -y gcc-${resolved_version}-base
-    sudo_wrapper apt-get install -y libcc1-0 libgfortran5 libstdc++6
     sudo_wrapper apt-get install -y gcc-${resolved_version} gfortran-${resolved_version} g++-${resolved_version}
   fi
 
@@ -291,14 +289,30 @@ install_gcc()
       if [ "$version" == "latest" ]; then
         resolved_version=$(resolve_latest_version "gcc" "linux")
       fi
-      # Add PPA for additional GCC versions, then probe apt availability.
-      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
-      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-      sudo_wrapper apt-get update -q
-      if apt-cache show gcc-${resolved_version} &>/dev/null; then
-        install_gcc_apt "$resolved_version"
-      else
+
+      # Detect Ubuntu version
+      local ubuntu_version=""
+      if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [[ "$ID" == "ubuntu" ]]; then
+          ubuntu_version="$VERSION_ID"
+        fi
+      fi
+
+      # gcc-13 has dependency conflicts on ubuntu-22.04 runner images.
+      # Use brew instead for this version.
+      if [[ "$ubuntu_version" == "22.04" ]] && [[ "$resolved_version" == "13" ]]; then
         install_gcc_brew_linux "$resolved_version"
+      else
+        # Add PPA for additional GCC versions, then probe apt availability.
+        # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+        sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+        sudo_wrapper apt-get update -q
+        if apt-cache show gcc-${resolved_version} &>/dev/null; then
+          install_gcc_apt "$resolved_version"
+        else
+          install_gcc_brew_linux "$resolved_version"
+        fi
       fi
       ;;
     darwin*)
