@@ -190,6 +190,7 @@ install_gcc_apt()
 
   if [ "${needs_install}" == "1" ]; then
     sudo_wrapper apt-get install -y gcc-${resolved_version}-base
+    sudo_wrapper apt-get install -y libcc1-0 libgfortran5 libstdc++6
     sudo_wrapper apt-get install -y gcc-${resolved_version} gfortran-${resolved_version} g++-${resolved_version}
   fi
 
