@@ -142,6 +142,10 @@ install_gcc_brew_linux()
   local resolved_version=$1
   setup_brew_linux
   brew install --force gcc@${resolved_version}
+  # Add brew binutils to PATH (gcc-15+ requires newer assembler)
+  brew install --force binutils
+  binutils_dir=$(brew --prefix binutils)/bin
+  echo "$binutils_dir" >> $GITHUB_PATH
   bindir=$(brew --prefix)/bin
   sudo_wrapper update-alternatives \
     --install /usr/bin/gcc gcc ${bindir}/gcc-${resolved_version} 100 \
@@ -285,14 +289,30 @@ install_gcc()
       if [ "$version" == "latest" ]; then
         resolved_version=$(resolve_latest_version "gcc" "linux")
       fi
-      # Add PPA for additional GCC versions, then probe apt availability.
-      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
-      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-      sudo_wrapper apt-get update -q
-      if apt-cache show gcc-${resolved_version} &>/dev/null; then
-        install_gcc_apt "$resolved_version"
-      else
+
+      # Detect Ubuntu version
+      local ubuntu_version=""
+      if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [[ "$ID" == "ubuntu" ]]; then
+          ubuntu_version="$VERSION_ID"
+        fi
+      fi
+
+      # gcc-13 has dependency conflicts on ubuntu-22.04 runner images.
+      # Use brew instead for this version.
+      if [[ "$ubuntu_version" == "22.04" ]] && [[ "$resolved_version" == "13" ]]; then
         install_gcc_brew_linux "$resolved_version"
+      else
+        # Add PPA for additional GCC versions, then probe apt availability.
+        # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+        sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+        sudo_wrapper apt-get update -q
+        if apt-cache show gcc-${resolved_version} &>/dev/null; then
+          install_gcc_apt "$resolved_version"
+        else
+          install_gcc_brew_linux "$resolved_version"
+        fi
       fi
       ;;
     darwin*)
