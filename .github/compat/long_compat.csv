@@ -110,7 +110,7 @@ ubuntu-22.04,nvidia-hpc,24.1,&check;
 ubuntu-22.04,nvidia-hpc,24.3,&check;
 ubuntu-22.04,nvidia-hpc,24.5,&check;
 ubuntu-22.04,nvidia-hpc,25.1,&check;
-ubuntu-22.04,nvidia-hpc,25.3,&check;
+ubuntu-22.04,nvidia-hpc,25.3,
 ubuntu-22.04,nvidia-hpc,25.5,&check;
 ubuntu-22.04,nvidia-hpc,25.7,&check;
 ubuntu-22.04,nvidia-hpc,25.9,&check;
