@@ -132,6 +132,8 @@ jobs:
             compiler: gcc
           - os: windows-2025
             compiler: gcc
+          - os: macos-26
+            compiler: gcc
           - os: macos-15
             compiler: gcc
           - os: ubuntu-24.04
