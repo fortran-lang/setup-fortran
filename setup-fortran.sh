@@ -26,6 +26,12 @@ detect_runner_os()
   if [ -n "$ImageOS" ]; then
     # Normalize ImageOS to match compatibility matrix naming
     case "$ImageOS" in
+      macos26)
+        echo "macos-26"
+        ;;
+      macos26-intel)
+        echo "macos-26-intel"
+        ;;
       macos15)
         echo "macos-15"
         ;;
