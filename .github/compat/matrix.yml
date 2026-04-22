@@ -81,27 +81,61 @@ exclude:
   - os: windows-2022
     toolchain: {compiler: aocc}
 include:
-  # macos-14 and macos-15 (ARM): gcc full range, intel-classic bookends, lfortran full range
+  # macos-14 (ARM): gcc, intel-classic full range, lfortran
   - {os: macos-14, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-14, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-14, toolchain: {compiler: gcc, version: 13}}
-  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.1'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.12'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.11'}}
   - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.10'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.9'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.8'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.6'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.5'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.4'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.3'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.2'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
+  - {os: macos-14, toolchain: {compiler: intel-classic, version: '2021.1'}}
   - {os: macos-14, toolchain: {compiler: lfortran, version: '0.58.0'}}
   - {os: macos-14, toolchain: {compiler: lfortran, version: '0.57.0'}}
+  # macos-15 (ARM): gcc, intel-classic full range, lfortran
   - {os: macos-15, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-15, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-15, toolchain: {compiler: gcc, version: 13}}
-  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.1'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.12'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.11'}}
   - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.10'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.9'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.8'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.6'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.5'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.4'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.3'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.2'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
+  - {os: macos-15, toolchain: {compiler: intel-classic, version: '2021.1'}}
   - {os: macos-15, toolchain: {compiler: lfortran, version: '0.58.0'}}
   - {os: macos-15, toolchain: {compiler: lfortran, version: '0.57.0'}}
-  # macos-15-intel: gcc full range, intel-classic bookends, intel known-working versions, lfortran full range
+  # macos-15-intel: gcc, intel-classic full range, intel full range, lfortran
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 13}}
-  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.1'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.12'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.11'}}
   - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.10'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.9'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.8'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.6'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.5'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.4'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.3'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.2'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.1'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2025.2'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2025.0'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2024.1'}}
