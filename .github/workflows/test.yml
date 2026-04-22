@@ -1,7 +1,17 @@
 name: Test
-# Workflow has two modes: assert and report
+# Workflow has two modes: assert and report.
 # Push and pull request run in assert mode.
 # Schedule and dispatch run in report mode.
+#
+# In report mode, the test matrix is split across two jobs to stay under
+# GitHub's 256-job-per-matrix limit:
+#   - 'test':         cross-product of current runners x full toolchain list
+#   - 'test-include': explicit combinations from matrix.yml's include section
+#                     (currently legacy macOS runners, but general-purpose:
+#                     any runner/toolchain combo that doesn't fit cleanly in
+#                     the cross-product belongs here)
+# Adding runners or toolchains to the include section requires no workflow
+# changes — test-include picks them up automatically.
 on:
   push:
     paths-ignore:
@@ -24,6 +34,7 @@ jobs:
     outputs:
       mode: ${{ steps.mode.outputs.mode }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      include_matrix: ${{ steps.matrix.outputs.include_matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,16 +55,23 @@ jobs:
         run: |
           mode=${{ steps.mode.outputs.mode }}
           if [[ "$mode" == "report" ]]; then
-            yq -o json matrix.yml > matrix.json
+            yq -o json 'del(.include)' matrix.yml > matrix.json
+            yq -o json '.include' matrix.yml | jq '{include: .}' > include_matrix.json
           else
             python matrix_json_from_csv.py "long_compat.csv" "matrix.json"
+            echo '{"include":[]}' > include_matrix.json
           fi
           matrix=$(cat matrix.json | jq -r tostring)
+          include_matrix=$(cat include_matrix.json | jq -r tostring)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "include_matrix=$include_matrix" >> "$GITHUB_OUTPUT"
 
       # debugging
       - name: Show matrix
         run: echo "${{ toJSON(fromJSON(steps.matrix.outputs.matrix)) }}"
+
+      - name: Show include matrix
+        run: echo "${{ toJSON(fromJSON(steps.matrix.outputs.include_matrix)) }}"
     
   test:
     name: Test
@@ -114,6 +132,66 @@ jobs:
 
       - name: Upload compatibility report
         if: needs.options.outputs.mode == 'report'
+        uses: actions/upload-artifact@v7
+        with:
+          name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
+          path: compat/*.csv
+
+  test-include:
+    name: Test (include matrix)
+    needs: options
+    if: needs.options.outputs.mode == 'report'
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.options.outputs.include_matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Fortran
+        id: setup-fortran
+        continue-on-error: true
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Test Fortran compiler
+        if: steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Test C compiler
+        continue-on-error: true
+        if: steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Test C++ compiler
+        continue-on-error: true
+        if: steps.setup-fortran.outcome == 'success'
+        uses: ./.github/actions/test-cxx
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Create compatibility report
+        shell: bash
+        run: |
+          mkdir -p compat
+          support=$([ "${{ steps.setup-fortran.outcome }}" == "success" ] && echo "&check;" || echo "")
+          prefix="${{ matrix.os }},${{ matrix.toolchain.compiler }},${{ matrix.toolchain.version }}"
+          report="compat/${prefix//,/_}.csv"
+          echo "$prefix,$support" >> "$report"
+          cat "$report"
+
+      - name: Upload compatibility report
         uses: actions/upload-artifact@v7
         with:
           name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
@@ -227,9 +305,10 @@ jobs:
 
   compat:
     name: Report compatibility
-    needs: 
+    needs:
       - options
       - test
+      - test-include
     if: needs.options.outputs.mode == 'report'
     runs-on: ubuntu-latest
     permissions:
