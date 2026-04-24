@@ -16,7 +16,6 @@ LATEST_gcc_windows_2022="15"
 LATEST_gcc_windows_2025="15"
 
 # Latest supported intel versions by runner
-LATEST_intel_macos_15_intel="2021.2"
 LATEST_intel_macos_26_intel="2021.2"
 LATEST_intel_ubuntu_22_04="2025.2"
 LATEST_intel_ubuntu_24_04="2025.2"
@@ -24,11 +23,9 @@ LATEST_intel_windows_2022="2025.2"
 LATEST_intel_windows_2025="2025.2"
 
 # Latest supported intel-classic versions by runner
-LATEST_intel_classic_macos_14="2021.10"
-LATEST_intel_classic_macos_15="2021.10"
-LATEST_intel_classic_macos_15_intel="2021.10"
+LATEST_intel_classic_macos_15_intel="2021.8"
 LATEST_intel_classic_macos_26="2021.10"
-LATEST_intel_classic_macos_26_intel="2021.10"
+LATEST_intel_classic_macos_26_intel="2021.9"
 LATEST_intel_classic_ubuntu_22_04="2021.12"
 LATEST_intel_classic_ubuntu_24_04="2021.12"
 LATEST_intel_classic_windows_2022="2021.12"
