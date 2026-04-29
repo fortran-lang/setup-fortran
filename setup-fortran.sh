@@ -19,6 +19,21 @@ sudo_wrapper() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/.github/compat/latest-versions.sh"
 
+# Fail if compiler+platform would only be available via emulation.
+# Add/remove new entries here as needed.
+check_emulation()
+{
+  local compiler=$1
+  local platform=$2
+
+  case "$compiler:$platform" in
+    gcc:mingw*arm64*|gcc:mingw*aarch64*|gcc:msys*arm64*|gcc:cygwin*arm64*)
+      echo "Error: Native GCC is not available on ARM64 Windows."
+      exit 1
+      ;;
+  esac
+}
+
 # Detect the current runner OS
 detect_runner_os()
 {
@@ -52,6 +67,9 @@ detect_runner_os()
         ;;
       win25)
         echo "windows-2025"
+        ;;
+      win11-arm64)
+        echo "windows-11-arm"
         ;;
       *)
         # If not recognized, return as-is
@@ -207,6 +225,7 @@ install_gcc_apt()
 
 install_gcc_choco()
 {
+  local platform=${1:-}
   local resolved_version=$version
   if [[ "$version" == "latest" ]]; then
     resolved_version=$(resolve_latest_version "gcc" "mingw")
@@ -325,13 +344,13 @@ install_gcc()
       install_gcc_brew
       ;;
     mingw*)
-      install_gcc_choco
+      install_gcc_choco "$platform"
       ;;
     msys*)
-      install_gcc_choco
+      install_gcc_choco "$platform"
       ;;
     cygwin*)
-      install_gcc_choco
+      install_gcc_choco "$platform"
       ;;
     *)
       echo "Unsupported platform: $platform"
