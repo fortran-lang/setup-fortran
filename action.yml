@@ -138,6 +138,14 @@ runs:
       shell: bash
       run: mv /usr/bin/link $RUNNER_TEMP/link
 
+    - name: Get architecture (Windows)
+      id: msvc-arch
+      if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
+      shell: bash
+      run: echo "arch=${RUNNER_ARCH,,}" >> $GITHUB_OUTPUT
+
     - name: Setup MSVC toolchain (Windows)
       if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
       uses: ilammy/msvc-dev-cmd@v1.13.0
+      with:
+        arch: ${{ steps.msvc-arch.outputs.arch }}
