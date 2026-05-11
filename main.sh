@@ -11,6 +11,8 @@ fi
 
 source ./setup-fortran.sh
 
+check_emulation "$compiler" "$platform"
+
 case $compiler in
   gcc)
     version=${VERSION:-latest}
