@@ -224,13 +224,12 @@ windows-2022,gcc,15,&check;
 windows-2022,intel-classic,2021.1.2,
 windows-2022,intel-classic,2021.1,
 windows-2022,intel-classic,2021.10,&check;
-windows-2022,intel-classic,2021.11,&check;
+windows-2022,intel-classic,2021.11,
 windows-2022,intel-classic,2021.12,&check;
 windows-2022,intel-classic,2021.2,
 windows-2022,intel-classic,2021.3,
 windows-2022,intel-classic,2021.4,
 windows-2022,intel-classic,2021.5,
-windows-2022,intel-classic,2021.6,&check;
 windows-2022,intel-classic,2021.7.1,
 windows-2022,intel-classic,2021.8,
 windows-2022,intel-classic,2021.9,&check;
