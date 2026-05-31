@@ -230,7 +230,7 @@ windows-2022,intel-classic,2021.2,
 windows-2022,intel-classic,2021.3,
 windows-2022,intel-classic,2021.4,
 windows-2022,intel-classic,2021.5,
-windows-2022,intel-classic,2021.6,&check;
+windows-2022,intel-classic,2021.6,
 windows-2022,intel-classic,2021.7.1,
 windows-2022,intel-classic,2021.8,
 windows-2022,intel-classic,2021.9,&check;
@@ -278,7 +278,6 @@ windows-2025,intel,2022.2,&check;
 windows-2025,intel,2023.0,
 windows-2025,intel,2023.1,&check;
 windows-2025,intel,2023.2,&check;
-windows-2025,intel,2024.0,&check;
 windows-2025,intel,2024.1,&check;
 windows-2025,intel,2025.0,&check;
 windows-2025,intel,2025.2,&check;
