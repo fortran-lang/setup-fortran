@@ -167,9 +167,11 @@ install_gcc_brew_linux()
   setup_brew_linux
   brew install --force gcc@${resolved_version}
   # Add brew binutils to PATH (gcc-15+ requires newer assembler)
-  brew install --force binutils
-  binutils_dir=$(brew --prefix binutils)/bin
-  echo "$binutils_dir" >> $GITHUB_PATH
+  if [[ "$resolved_version" -ge 15 ]]; then
+    brew install --force binutils
+    binutils_dir=$(brew --prefix binutils)/bin
+    echo "$binutils_dir" >> $GITHUB_PATH
+  fi
   bindir=$(brew --prefix)/bin
   sudo_wrapper update-alternatives \
     --install /usr/bin/gcc gcc ${bindir}/gcc-${resolved_version} 100 \
