@@ -96,13 +96,29 @@ jobs:
       # - name: Debug with tmate
       #   uses: mxschmitt/action-tmate@v3
 
+      - name: Verify GNU compilers are not shadowed by Apple Clang (macOS, gcc)
+        if: runner.os == 'macOS' && matrix.toolchain.compiler == 'gcc' && steps.setup-fortran.outcome == 'success'
+        shell: bash
+        run: |
+          echo "FC=$FC  ->  $($FC --version | head -n 1)"
+          echo "CC=$CC  ->  $($CC --version | head -n 1)"
+          if $CC --version 2>&1 | head -n 1 | grep -qi 'clang\|Apple'; then
+            echo "Error: \$CC ($CC) resolves to Apple Clang, not GNU GCC"
+            exit 1
+          fi
+          if $FC --version 2>&1 | head -n 1 | grep -qi 'clang\|Apple'; then
+            echo "Error: \$FC ($FC) resolves to Apple Clang, not GNU gfortran"
+            exit 1
+          fi
+          echo "OK: FC and CC both resolve to GNU compilers"
+
       - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
         uses: ./.github/actions/test-fc
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-      
+
       - name: Test C compiler
         continue-on-error: true
         if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
