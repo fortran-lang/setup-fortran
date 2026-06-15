@@ -96,12 +96,13 @@ jobs:
       # - name: Debug with tmate
       #   uses: mxschmitt/action-tmate@v3
 
-      - name: Verify GNU compilers are not shadowed by Apple Clang (macOS, gcc)
+      - name: Verify GNU compilers are consistent (macOS, gcc)
         if: runner.os == 'macOS' && matrix.toolchain.compiler == 'gcc' && steps.setup-fortran.outcome == 'success'
         shell: bash
         run: |
           echo "FC=$FC  ->  $($FC --version | head -n 1)"
           echo "CC=$CC  ->  $($CC --version | head -n 1)"
+          echo "CXX=$CXX  ->  $($CXX --version | head -n 1)"
           if $CC --version 2>&1 | head -n 1 | grep -qi 'clang\|Apple'; then
             echo "Error: \$CC ($CC) resolves to Apple Clang, not GNU GCC"
             exit 1
@@ -110,7 +111,19 @@ jobs:
             echo "Error: \$FC ($FC) resolves to Apple Clang, not GNU gfortran"
             exit 1
           fi
-          echo "OK: FC and CC both resolve to GNU compilers"
+          if $CXX --version 2>&1 | head -n 1 | grep -qi 'clang\|Apple'; then
+            echo "Error: \$CXX ($CXX) resolves to Apple Clang, not GNU g++"
+            exit 1
+          fi
+          fc_major=$($FC --version | head -n 1 | grep -oE '[0-9]+' | head -n 1)
+          cc_major=$($CC --version | head -n 1 | grep -oE '[0-9]+' | head -n 1)
+          cxx_major=$($CXX --version | head -n 1 | grep -oE '[0-9]+' | head -n 1)
+          echo "GCC major versions: FC=$fc_major CC=$cc_major CXX=$cxx_major"
+          if [[ "$fc_major" != "$cc_major" || "$fc_major" != "$cxx_major" ]]; then
+            echo "Error: FC/CC/CXX are from different GCC major versions ($fc_major/$cc_major/$cxx_major)"
+            exit 1
+          fi
+          echo "OK: FC, CC, and CXX all resolve to GNU GCC $fc_major"
 
       - name: Test Fortran compiler
         if: steps.setup-fortran.outcome == 'success'
