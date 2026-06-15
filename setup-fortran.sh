@@ -65,7 +65,7 @@ detect_runner_os()
       win22)
         echo "windows-2022"
         ;;
-      win25)
+      win25|win25-vs2026)
         echo "windows-2025"
         ;;
       win11-arm64)
