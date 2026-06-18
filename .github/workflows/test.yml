@@ -37,7 +37,7 @@ jobs:
       include_matrix: ${{ steps.matrix.outputs.include_matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set mode
         id: mode
@@ -83,7 +83,7 @@ jobs:
       matrix: ${{ fromJSON(needs.options.outputs.matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Fortran
         id: setup-fortran
@@ -148,7 +148,7 @@ jobs:
       matrix: ${{ fromJSON(needs.options.outputs.include_matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Fortran
         id: setup-fortran
@@ -226,7 +226,7 @@ jobs:
             compiler: aocc
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Fortran with version latest
         id: setup-fortran
@@ -317,7 +317,7 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v6
