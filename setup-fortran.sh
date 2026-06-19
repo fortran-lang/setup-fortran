@@ -327,20 +327,14 @@ install_gcc()
         fi
       fi
 
-      # gcc-13 has dependency conflicts on ubuntu-22.04 runner images.
-      # Use brew instead for this version.
-      if [[ "$ubuntu_version" == "22.04" ]] && [[ "$resolved_version" == "13" ]]; then
-        install_gcc_brew_linux "$resolved_version"
+      # Add PPA for additional GCC versions, then probe apt availability.
+      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+      sudo_wrapper apt-get update -q
+      if apt-cache show gcc-${resolved_version} &>/dev/null; then
+        install_gcc_apt "$resolved_version"
       else
-        # Add PPA for additional GCC versions, then probe apt availability.
-        # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
-        sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-        sudo_wrapper apt-get update -q
-        if apt-cache show gcc-${resolved_version} &>/dev/null; then
-          install_gcc_apt "$resolved_version"
-        else
-          install_gcc_brew_linux "$resolved_version"
-        fi
+        install_gcc_brew_linux "$resolved_version"
       fi
       linux_gcc_version="$resolved_version"
       ;;
