@@ -310,6 +310,7 @@ install_gcc_choco()
 install_gcc()
 {
   local platform=$1
+  local linux_gcc_version=""
   case $platform in
     linux*)
       local resolved_version=$version
@@ -341,6 +342,7 @@ install_gcc()
           install_gcc_brew_linux "$resolved_version"
         fi
       fi
+      linux_gcc_version="$resolved_version"
       ;;
     darwin*)
       install_gcc_brew
@@ -360,9 +362,18 @@ install_gcc()
       ;;
   esac
 
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
+  # Use versioned executables on Linux: brew may install a newer gcc as a build
+  # dependency and link it as the unversioned 'gfortran' in the brew bin dir,
+  # which is prepended to PATH and would shadow the requested version.
+  if [[ -n "$linux_gcc_version" ]]; then
+    export FC="gfortran-${linux_gcc_version}"
+    export CC="gcc-${linux_gcc_version}"
+    export CXX="g++-${linux_gcc_version}"
+  else
+    export FC="gfortran"
+    export CC="gcc"
+    export CXX="g++"
+  fi
 }
 
 detect_aocc_root()
