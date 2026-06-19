@@ -310,6 +310,7 @@ install_gcc_choco()
 install_gcc()
 {
   local platform=$1
+  local linux_gcc_version=""
   case $platform in
     linux*)
       local resolved_version=$version
@@ -326,21 +327,16 @@ install_gcc()
         fi
       fi
 
-      # gcc-13 has dependency conflicts on ubuntu-22.04 runner images.
-      # Use brew instead for this version.
-      if [[ "$ubuntu_version" == "22.04" ]] && [[ "$resolved_version" == "13" ]]; then
-        install_gcc_brew_linux "$resolved_version"
+      # Add PPA for additional GCC versions, then probe apt availability.
+      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+      sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+      sudo_wrapper apt-get update -q
+      if apt-cache show gcc-${resolved_version} &>/dev/null; then
+        install_gcc_apt "$resolved_version"
       else
-        # Add PPA for additional GCC versions, then probe apt availability.
-        # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
-        sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
-        sudo_wrapper apt-get update -q
-        if apt-cache show gcc-${resolved_version} &>/dev/null; then
-          install_gcc_apt "$resolved_version"
-        else
-          install_gcc_brew_linux "$resolved_version"
-        fi
+        install_gcc_brew_linux "$resolved_version"
       fi
+      linux_gcc_version="$resolved_version"
       ;;
     darwin*)
       install_gcc_brew
@@ -360,9 +356,18 @@ install_gcc()
       ;;
   esac
 
-  export FC="gfortran"
-  export CC="gcc"
-  export CXX="g++"
+  # Use versioned executables on Linux: brew may install a newer gcc as a build
+  # dependency and link it as the unversioned 'gfortran' in the brew bin dir,
+  # which is prepended to PATH and would shadow the requested version.
+  if [[ -n "$linux_gcc_version" ]]; then
+    export FC="gfortran-${linux_gcc_version}"
+    export CC="gcc-${linux_gcc_version}"
+    export CXX="g++-${linux_gcc_version}"
+  else
+    export FC="gfortran"
+    export CC="gcc"
+    export CXX="g++"
+  fi
 }
 
 detect_aocc_root()
