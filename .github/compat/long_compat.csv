@@ -249,8 +249,8 @@ windows-2022,intel,2024.0,&check;
 windows-2022,intel,2024.1,&check;
 windows-2022,intel,2025.0,&check;
 windows-2022,intel,2025.2,&check;
-windows-2022,lfortran,0.57.0,&check;
-windows-2022,lfortran,0.58.0,&check;
+windows-2022,lfortran,0.57.0,
+windows-2022,lfortran,0.58.0,
 windows-2025-vs2026,gcc,13,&check;
 windows-2025-vs2026,gcc,14,&check;
 windows-2025-vs2026,gcc,15,&check;
@@ -269,8 +269,8 @@ windows-2025-vs2026,intel,2021.4,
 windows-2025-vs2026,intel,2022.0,
 windows-2025-vs2026,intel,2022.2.1,
 windows-2025-vs2026,intel,2023.0,
-windows-2025-vs2026,lfortran,0.57.0,&check;
-windows-2025-vs2026,lfortran,0.58.0,&check;
+windows-2025-vs2026,lfortran,0.57.0,
+windows-2025-vs2026,lfortran,0.58.0,
 windows-2025,gcc,13,&check;
 windows-2025,gcc,14,&check;
 windows-2025,gcc,15,&check;
@@ -289,5 +289,5 @@ windows-2025,intel,2021.4,
 windows-2025,intel,2022.0,
 windows-2025,intel,2022.2.1,
 windows-2025,intel,2023.0,
-windows-2025,lfortran,0.57.0,&check;
-windows-2025,lfortran,0.58.0,&check;
+windows-2025,lfortran,0.57.0,
+windows-2025,lfortran,0.58.0,
