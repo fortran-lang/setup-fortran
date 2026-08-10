@@ -958,7 +958,8 @@ install_lfortran_l()
   local version=$1
   export CC="gcc"
   export CXX="g++"
-  export CONDA=conda
+  export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
+  export CONDA=micromamba
   $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
@@ -967,7 +968,8 @@ install_lfortran_w()
   local version=$1
   export CC="cl"
   export CXX="cl"
-  export CONDA=$CONDA\\Scripts\\conda  # https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md#environment-variables
+  export CONDA_ROOT_PREFIX=$MAMBA_ROOT_PREFIX
+  export CONDA=micromamba
   $CONDA install -c conda-forge -n base -y lfortran=$version
 }
 
