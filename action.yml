@@ -62,7 +62,7 @@ runs:
         else
           echo "install=true" >> $GITHUB_OUTPUT
         fi
-    - uses: mamba-org/setup-micromamba@v3.1.0
+    - uses: mamba-org/setup-micromamba@v3.2.1
       if: contains(inputs.compiler, 'lfortran') && steps.check-umamba.outputs.install == 'true'
       with:
         init-shell: bash
