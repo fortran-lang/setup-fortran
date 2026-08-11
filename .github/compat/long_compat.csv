@@ -48,6 +48,9 @@ macos-15-intel,intel,2024.0,
 macos-15-intel,intel,2024.1,
 macos-15-intel,intel,2025.0,
 macos-15-intel,intel,2025.2,
+macos-15-intel,intel,2025.3,
+macos-15-intel,intel,2026.0,
+macos-15-intel,intel,2026.1,
 macos-15-intel,lfortran,0.57.0,&check;
 macos-15-intel,lfortran,0.58.0,&check;
 macos-15,gcc,13,&check;
@@ -99,6 +102,9 @@ macos-26-intel,intel,2024.0,
 macos-26-intel,intel,2024.1,
 macos-26-intel,intel,2025.0,
 macos-26-intel,intel,2025.2,
+macos-26-intel,intel,2025.3,
+macos-26-intel,intel,2026.0,
+macos-26-intel,intel,2026.1,
 macos-26-intel,lfortran,0.57.0,&check;
 macos-26-intel,lfortran,0.58.0,&check;
 macos-26,gcc,13,&check;
@@ -150,6 +156,9 @@ ubuntu-22.04,intel,2024.0,&check;
 ubuntu-22.04,intel,2024.1,&check;
 ubuntu-22.04,intel,2025.0,&check;
 ubuntu-22.04,intel,2025.2,&check;
+ubuntu-22.04,intel,2025.3,&check;
+ubuntu-22.04,intel,2026.0,&check;
+ubuntu-22.04,intel,2026.1,&check;
 ubuntu-22.04,lfortran,0.57.0,&check;
 ubuntu-22.04,lfortran,0.58.0,&check;
 ubuntu-22.04,nvidia-hpc,23.11,&check;
@@ -198,6 +207,9 @@ ubuntu-24.04,intel,2024.0,&check;
 ubuntu-24.04,intel,2024.1,&check;
 ubuntu-24.04,intel,2025.0,&check;
 ubuntu-24.04,intel,2025.2,&check;
+ubuntu-24.04,intel,2025.3,&check;
+ubuntu-24.04,intel,2026.0,&check;
+ubuntu-24.04,intel,2026.1,&check;
 ubuntu-24.04,lfortran,0.57.0,&check;
 ubuntu-24.04,lfortran,0.58.0,&check;
 ubuntu-24.04,nvidia-hpc,23.1,
@@ -249,6 +261,9 @@ windows-2022,intel,2024.0,&check;
 windows-2022,intel,2024.1,&check;
 windows-2022,intel,2025.0,&check;
 windows-2022,intel,2025.2,&check;
+windows-2022,intel,2025.3,&check;
+windows-2022,intel,2026.0,&check;
+windows-2022,intel,2026.1,&check;
 windows-2022,lfortran,0.57.0,&check;
 windows-2022,lfortran,0.58.0,&check;
 windows-2025-vs2026,gcc,13,&check;
@@ -269,6 +284,9 @@ windows-2025-vs2026,intel,2021.4,
 windows-2025-vs2026,intel,2022.0,
 windows-2025-vs2026,intel,2022.2.1,
 windows-2025-vs2026,intel,2023.0,
+windows-2025-vs2026,intel,2025.3,&check;
+windows-2025-vs2026,intel,2026.0,&check;
+windows-2025-vs2026,intel,2026.1,&check;
 windows-2025-vs2026,lfortran,0.57.0,&check;
 windows-2025-vs2026,lfortran,0.58.0,&check;
 windows-2025,gcc,13,&check;
@@ -289,5 +307,8 @@ windows-2025,intel,2021.4,
 windows-2025,intel,2022.0,
 windows-2025,intel,2022.2.1,
 windows-2025,intel,2023.0,
+windows-2025,intel,2025.3,&check;
+windows-2025,intel,2026.0,&check;
+windows-2025,intel,2026.1,&check;
 windows-2025,lfortran,0.57.0,&check;
 windows-2025,lfortran,0.58.0,&check;
