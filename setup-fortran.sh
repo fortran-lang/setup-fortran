@@ -556,6 +556,15 @@ intel_version_map_l()
       2025.2 | 2025.2.1)
         version=2025.2
         ;;
+      2025.3 | 2025.3.2)
+        version=2025.3
+        ;;
+      2026.0)
+        version=2026.0
+        ;;
+      2026.1 | 2026.1.1)
+        version=2026.1
+        ;;
       2021.1)
         version=2021.1.1
         ;;
@@ -633,6 +642,15 @@ intel_version_map_w()
     esac
   else
     case $actual_version in
+      2026.1 | 2026.1.1)
+        version=2026.1.1
+        ;;
+      2026.0)
+        version=2026.0.0
+        ;;
+      2025.3 | 2025.3.2)
+        version=2025.3.2
+        ;;
       2025.2 | 2025.2.1)
         version=2025.2.1
         ;;
@@ -685,7 +703,7 @@ install_intel_apt()
   else
     # c/cpp compiler package names changed with 2024+
     case $version in
-      2024* | 2025*)
+      2024* | 2025* | 2026*)
         sudo_wrapper apt-get install -y \
           intel-oneapi-compiler-{fortran,dpcpp-cpp}-$version
         ;;
@@ -777,6 +795,18 @@ install_intel_win()
   intel_version_map_w $version $classic
 
   case $version in
+    2026.1.1)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a43777b7-be5a-4fb6-97f9-bf4ae49eeb33/intel-fortran-compiler-2026.1.1.20_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
+    2026.0.0)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/9af38d13-867b-45af-a950-0b42d9bac1ae/intel-fortran-compiler-2026.0.0.566_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
+    2025.3.2)
+      WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/039121f2-d488-4bc1-a5bb-97528e3a4b86/intel-fortran-compiler-2025.3.2.26_offline.exe
+      WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common
+      ;;
     2025.2.1)
       WINDOWS_HPCKIT_URL=https://registrationcenter-download.intel.com/akdlm/IRC_NAS/e63ac2b4-8a9a-4768-979a-399a8b6299de/intel-oneapi-hpc-toolkit-2025.2.1.46_offline.exe
       WINDOWS_HPCKIT_COMPONENTS=intel.oneapi.win.ifort-compiler:intel.oneapi.win.cpp-dpcpp-common

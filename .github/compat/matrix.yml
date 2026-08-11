@@ -11,6 +11,9 @@ toolchain:
   - {compiler: gcc, version: 15}
   - {compiler: gcc, version: 14}
   - {compiler: gcc, version: 13}
+  - {compiler: intel, version: '2026.1'}
+  - {compiler: intel, version: '2026.0'}
+  - {compiler: intel, version: '2025.3'}
   - {compiler: intel, version: '2025.2'}
   - {compiler: intel, version: '2025.0'}
   - {compiler: intel, version: '2024.1'}
@@ -154,6 +157,9 @@ include:
   - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.2'}}
   - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
   - {os: macos-15-intel, toolchain: {compiler: intel-classic, version: '2021.1'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel, version: '2026.1'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel, version: '2026.0'}}
+  - {os: macos-15-intel, toolchain: {compiler: intel, version: '2025.3'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2025.2'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2025.0'}}
   - {os: macos-15-intel, toolchain: {compiler: intel, version: '2024.1'}}
