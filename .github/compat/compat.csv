@@ -3,7 +3,7 @@ version,5.1.0,13,14,15,2021.1,2021.1.2,2021.2,2021.4,2022.0,2022.1,2022.2,2022.2
 runner,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 macos-14,,&check;,&check;,&check;,,,,,,,,,,,,,,,,,,,&check;,,&check;,&check;,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
 macos-15,,&check;,&check;,&check;,,,,,,,,,,,,,,,,,,,&check;,,&check;,&check;,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
-macos-15-intel,,&check;,&check;,&check;,&check;,,&check;,,,,,,,,,,,,,,,,&check;,,&check;,&check;,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
+macos-15-intel,,&check;,&check;,&check;,&check;,,&check;,,,,,,,,,,,,,,,,&check;,,&check;,,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
 macos-26,,&check;,&check;,&check;,,,,,,,,,,,,,,,,,,,&check;,,&check;,&check;,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
 macos-26-intel,,&check;,&check;,&check;,&check;,,&check;,,,,,,,,,,,,,,,,&check;,,&check;,&check;,,&check;,&check;,,&check;,&check;,&check;,,,&check;,&check;,,,,,,,,,,,,,,
 ubuntu-22.04,,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;,&check;
