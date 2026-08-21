@@ -9,6 +9,14 @@ Set up Fortran compiler toolchains for GitHub Actions.
 Supports GNU, Intel, LLVM, NVIDIA, AMD, Arm, and LFortran compilers across
 Linux, macOS, and Windows.
 
+## Migration Guide
+
+Migrating from `v1` requires only a few changes:
+
+- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
+- `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
+- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
+
 ## Usage
 
 ```yaml
@@ -322,14 +330,6 @@ jobs:
 | `FPM_CXX` | Command or path to the C++ compiler for fpm              |
 | `F77`     | Command or path to the Fortran compiler (alias for `FC`) |
 | `F90`     | Command or path to the Fortran compiler (alias for `FC`) |
-
-## Migration Guide
-
-Migrating from `v1` requires only a few changes:
-
-- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
-- `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
-- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
 
 ## Development
 
