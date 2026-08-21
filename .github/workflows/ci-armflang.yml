@@ -1,0 +1,63 @@
+name: armflang
+
+on:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }}
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04-arm, ubuntu-22.04-arm]
+        toolchain:
+          - { compiler: armflang, version: "22.1" }
+          - { compiler: armflang, version: "21.1" }
+          - { compiler: armflang, version: "20.1" }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install ArmFlang ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        with:
+          compiler: armflang
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Verify installation
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
+        run: npm run verify-installation
+
+      - name: Run integration tests
+        run: npm run integration-test

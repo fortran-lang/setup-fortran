@@ -1,0 +1,92 @@
+name: Verify Windows Shell Invocation
+description: |
+  Verifies that FC, CC, CXX, F77, and F90 environment variables are correctly
+  set and that all compiler executables are callable from PowerShell and CMD.
+  Uses --version with a /? fallback for MSVC-style compilers (e.g. icl).
+inputs:
+  fc:
+    description: Full path to the Fortran compiler ($FC)
+    required: true
+  cc:
+    description: Full path to the C companion compiler ($CC)
+    required: true
+  cxx:
+    description: Full path to the C++ companion compiler ($CXX)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Verify compiler invocation under pwsh (Windows only)
+      shell: pwsh
+      env:
+        OUTPUT_FC: ${{ inputs.fc }}
+        OUTPUT_CC: ${{ inputs.cc }}
+        OUTPUT_CXX: ${{ inputs.cxx }}
+      run: |
+        $fc = $Env:OUTPUT_FC
+        $cc = $Env:OUTPUT_CC
+        $cxx = $Env:OUTPUT_CXX
+        Write-Host "FC: $fc"
+        Write-Host "CC: $cc"
+        Write-Host "CXX: $cxx"
+
+        # Verify F77 and F90 legacy aliases are set and match FC
+        $f77 = $Env:F77
+        $f90 = $Env:F90
+        Write-Host "F77: $f77"
+        Write-Host "F90: $f90"
+        if ($f77 -ne $fc) {
+          Write-Error "F77='$f77' does not match FC='$fc'"
+          exit 1
+        }
+        if ($f90 -ne $fc) {
+          Write-Error "F90='$f90' does not match FC='$fc'"
+          exit 1
+        }
+
+        # Verify executables are callable under PowerShell.
+        # Try --version; fall back to /? for MSVC-style compilers (e.g. icl,
+        # ifort, cl), which reject --version on Windows.
+        & "$fc" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$fc" /? 2>$null }
+        & "$cc" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$cc" /? 2>$null }
+        & "$cxx" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$cxx" /? 2>$null }
+        & "$f77" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$f77" /? 2>$null }
+        & "$f90" --version 2>$null
+        if ($LASTEXITCODE -ne 0) { & "$f90" /? 2>$null }
+
+    - name: Verify compiler invocation under cmd (Windows only)
+      shell: cmd
+      env:
+        OUTPUT_FC: ${{ inputs.fc }}
+        OUTPUT_CC: ${{ inputs.cc }}
+        OUTPUT_CXX: ${{ inputs.cxx }}
+      run: |
+        echo FC: %OUTPUT_FC%
+        echo CC: %OUTPUT_CC%
+        echo CXX: %OUTPUT_CXX%
+        echo F77: %F77%
+        echo F90: %F90%
+        if not "%F77%" == "%OUTPUT_FC%" (
+          echo "::error::F77='%F77%' does not match FC='%OUTPUT_FC%'"
+          exit /b 1
+        )
+        if not "%F90%" == "%OUTPUT_FC%" (
+          echo "::error::F90='%F90%' does not match FC='%OUTPUT_FC%'"
+          exit /b 1
+        )
+        REM Try --version; fall back to /? for MSVC-style compilers (e.g. icl,
+        REM ifort, cl), which reject --version on Windows.
+        "%OUTPUT_FC%" --version 2>nul
+        if errorlevel 1 "%OUTPUT_FC%" /? 2>nul
+        "%OUTPUT_CC%" --version 2>nul
+        if errorlevel 1 "%OUTPUT_CC%" /? 2>nul
+        "%OUTPUT_CXX%" --version 2>nul
+        if errorlevel 1 "%OUTPUT_CXX%" /? 2>nul
+        "%F77%" --version 2>nul
+        if errorlevel 1 "%F77%" /? 2>nul
+        "%F90%" --version 2>nul
+        if errorlevel 1 "%F90%" /? 2>nul

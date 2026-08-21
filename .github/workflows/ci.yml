@@ -1,0 +1,309 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 0 * * 5"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  validation:
+    uses: ./.github/workflows/validation.yml
+
+  aocc:
+    needs: [validation]
+    uses: ./.github/workflows/ci-aocc.yml
+
+  armflang:
+    needs: [validation]
+    uses: ./.github/workflows/ci-armflang.yml
+
+  gfortran:
+    needs: [validation]
+    uses: ./.github/workflows/ci-gfortran.yml
+
+  flang:
+    needs: [validation]
+    uses: ./.github/workflows/ci-flang.yml
+
+  ifort:
+    needs: [validation]
+    uses: ./.github/workflows/ci-ifort.yml
+
+  ifx:
+    needs: [validation]
+    uses: ./.github/workflows/ci-ifx.yml
+
+  lfortran:
+    needs: [validation]
+    uses: ./.github/workflows/ci-lfortran.yml
+
+  nvfortran:
+    needs: [validation]
+    uses: ./.github/workflows/ci-nvfortran.yml
+
+  two-invocations:
+    name: sequential installations in one job
+    needs: [validation]
+    runs-on: ubuntu-24.04
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install GFortran 14
+        id: first
+        uses: ./
+        with:
+          compiler: gfortran
+          version: "14"
+        timeout-minutes: 30
+
+      - name: Verify first installation env vars (baseline)
+        env:
+          FIRST_VERSION: ${{ steps.first.outputs.version }}
+          FIRST_FC: ${{ steps.first.outputs.fc }}
+          FIRST_CC: ${{ steps.first.outputs.cc }}
+          FIRST_CXX: ${{ steps.first.outputs.cxx }}
+        run: |
+          echo "First installation: version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX  F77=$F77  F90=$F90"
+
+          # Env vars must be set and match the step outputs
+          if [ "$FC" != "$FIRST_FC" ]; then
+            echo "::error::FC env var (\$FC='$FC') does not match first output ('$FIRST_FC')"
+            exit 1
+          fi
+          if [ "$CC" != "$FIRST_CC" ]; then
+            echo "::error::CC env var (\$CC='$CC') does not match first output ('$FIRST_CC')"
+            exit 1
+          fi
+          if [ "$CXX" != "$FIRST_CXX" ]; then
+            echo "::error::CXX env var (\$CXX='$CXX') does not match first output ('$FIRST_CXX')"
+            exit 1
+          fi
+          # F77 and F90 aliases should also match FC
+          if [ "$F77" != "$FIRST_FC" ]; then
+            echo "::error::F77 env var (\$F77) does not match first FC ('$FIRST_FC')"
+            exit 1
+          fi
+          if [ "$F90" != "$FIRST_FC" ]; then
+            echo "::error::F90 env var (\$F90) does not match first FC ('$FIRST_FC')"
+            exit 1
+          fi
+          echo "First installation env vars: OK (FC, CC, CXX, F77, F90)"
+
+          # PATH ordering: first compiler's bin dir must be present
+          first_bin=$(dirname "$(dirname "$FIRST_FC")")
+          path_first=$(echo "$PATH" | tr ':' '\n' | grep -n "^${first_bin}" | head -1 | cut -d: -f1)
+          if [ -z "$path_first" ]; then
+            echo "::error::First compiler bin dir ($first_bin) not found on PATH"
+            exit 1
+          fi
+          echo "First installation PATH: OK (bin at position $path_first)"
+
+          # Actual runtime: $FC --version must report the first version
+          actual_version=$($FC --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          first_major=$(echo "$FIRST_VERSION" | grep -oE '^[0-9]+')
+          if [ -z "$actual_version" ]; then
+            echo "::error::Could not extract version from \$FC --version output"
+            exit 1
+          fi
+          if ! echo "$actual_version" | grep -q "^${first_major}\."; then
+            echo "::error::Runtime \$FC reports version '$actual_version' but expected '${first_major}.*' (first installation)"
+            exit 1
+          fi
+          echo "First installation runtime: OK (reports version $actual_version)"
+
+      - name: Install GFortran 15 (different version)
+        id: second
+        uses: ./
+        with:
+          compiler: gfortran
+          version: "15"
+        timeout-minutes: 30
+
+      - name: Verify second installation took precedence
+        env:
+          FIRST_VERSION: ${{ steps.first.outputs.version }}
+          SECOND_VERSION: ${{ steps.second.outputs.version }}
+          FIRST_FC: ${{ steps.first.outputs.fc }}
+          SECOND_FC: ${{ steps.second.outputs.fc }}
+          FIRST_CC: ${{ steps.first.outputs.cc }}
+          SECOND_CC: ${{ steps.second.outputs.cc }}
+          FIRST_CXX: ${{ steps.first.outputs.cxx }}
+          SECOND_CXX: ${{ steps.second.outputs.cxx }}
+        run: |
+          echo "First installation:  version=$FIRST_VERSION  FC=$FIRST_FC  CC=$FIRST_CC  CXX=$FIRST_CXX  F77=$F77  F90=$F90"
+          echo "Second installation: version=$SECOND_VERSION  FC=$SECOND_FC  CC=$SECOND_CC  CXX=$SECOND_CXX  F77=$F77  F90=$F90"
+
+          if [ "$FIRST_VERSION" = "$SECOND_VERSION" ]; then
+            echo "::error::Two different versions resolved to the same version."
+            exit 1
+          fi
+
+          # 1. Env-var overwrite: $FC, $CC, $CXX, $F77, $F90 must point to the SECOND installation
+          if [ "$FC" != "$SECOND_FC" ]; then
+            echo "::error::FC env var (\$FC='$FC') does not match second output ('$SECOND_FC')"
+            exit 1
+          fi
+          if [ "$CC" != "$SECOND_CC" ]; then
+            echo "::error::CC env var (\$CC='$CC') does not match second output ('$SECOND_CC')"
+            exit 1
+          fi
+          if [ "$CXX" != "$SECOND_CXX" ]; then
+            echo "::error::CXX env var (\$CXX='$CXX') does not match second output ('$SECOND_CXX')"
+            exit 1
+          fi
+          # F77 and F90 aliases should also point to the second installation
+          if [ "$F77" != "$SECOND_FC" ]; then
+            echo "::error::F77 env var (\$F77) does not match second FC ('$SECOND_FC')"
+            exit 1
+          fi
+          if [ "$F90" != "$SECOND_FC" ]; then
+            echo "::error::F90 env var (\$F90) does not match second FC ('$SECOND_FC')"
+            exit 1
+          fi
+          # Also verify they are NOT still pointing to the first installation
+          if [ "$FC" = "$FIRST_FC" ] || [ "$CC" = "$FIRST_CC" ] || [ "$CXX" = "$FIRST_CXX" ] || [ "$F77" = "$FIRST_FC" ] || [ "$F90" = "$FIRST_FC" ]; then
+            echo "::error::One or more env vars still point to the FIRST installation"
+            exit 1
+          fi
+          echo "Env-var overwrite: OK (FC, CC, CXX, F77, F90 all replaced)"
+
+          # 2. PATH ordering: second compiler's bin dir must precede first's
+          first_bin=$(dirname "$(dirname "$FIRST_FC")")
+          second_bin=$(dirname "$(dirname "$SECOND_FC")")
+          path_first=$(echo "$PATH" | tr ':' '\n' | grep -n "^${first_bin}" | head -1 | cut -d: -f1)
+          path_second=$(echo "$PATH" | tr ':' '\n' | grep -n "^${second_bin}" | head -1 | cut -d: -f1)
+          if [ -z "$path_second" ]; then
+            echo "::error::Second compiler bin dir not found on PATH"
+            exit 1
+          fi
+          if [ -n "$path_first" ] && [ "$path_first" -lt "$path_second" ]; then
+            echo "::error::First compiler bin ($first_bin) precedes second ($second_bin) on PATH"
+            exit 1
+          fi
+          echo "PATH ordering: OK (second compiler precedes first)"
+
+          # 3. Actual runtime: $FC --version must report the second version
+          actual_version=$($FC --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "Actual $FC --version reports full version: $actual_version"
+          second_major=$(echo "$SECOND_VERSION" | grep -oE '^[0-9]+')
+          if [ -z "$actual_version" ]; then
+            echo "::error::Could not extract version from \$FC --version output"
+            exit 1
+          fi
+          if ! echo "$actual_version" | grep -q "^${second_major}\."; then
+            echo "::error::Runtime $FC reports version '$actual_version' but expected '${second_major}.*' (second installation)"
+            exit 1
+          fi
+          echo "Runtime compiler: OK (reports second installation version)"
+
+          echo "Sequential installation test passed: second installation took precedence."
+
+      - name: Run integration tests for final state
+        run: npm run integration-test
+
+  canary-report:
+    name: Weekly Canary Report
+    needs:
+      [
+        validation,
+        aocc,
+        armflang,
+        gfortran,
+        flang,
+        ifort,
+        ifx,
+        lfortran,
+        nvfortran,
+        two-invocations,
+      ]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Create issue for failed integration jobs
+        uses: actions/github-script@v9
+        env:
+          AOCC: ${{ needs.aocc.result }}
+          ARMFLANG: ${{ needs.armflang.result }}
+          GFORTRAN: ${{ needs.gfortran.result }}
+          FLANG: ${{ needs.flang.result }}
+          IFORT: ${{ needs.ifort.result }}
+          IFX: ${{ needs.ifx.result }}
+          LFORTRAN: ${{ needs.lfortran.result }}
+          NVFORTRAN: ${{ needs.nvfortran.result }}
+          TWO_INVOCATIONS: ${{ needs.two-invocations.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const jobs = {
+              'AOCC': process.env.AOCC,
+              'ARM Flang': process.env.ARMFLANG,
+              'GFortran': process.env.GFORTRAN,
+              'Flang': process.env.FLANG,
+              'Ifort (Classic)': process.env.IFORT,
+              'Ifx': process.env.IFX,
+              'LFortran': process.env.LFORTRAN,
+              'NVFORTRAN': process.env.NVFORTRAN,
+              'Sequential installations': process.env.TWO_INVOCATIONS,
+            };
+            const failed = Object.entries(jobs)
+              .filter(([, result]) => result === 'failure')
+              .map(([name]) => `- ${name}`);
+            if (failed.length === 0) {
+              console.log('All canary jobs passed.');
+              return;
+            }
+            const runUrl = process.env.RUN_URL;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly Canary: ${failed.length} integration job(s) failed`,
+              body: [
+                '## Weekly Canary Failure Report',
+                '',
+                'The weekly CI canary run detected failures in the following integration jobs:',
+                '',
+                ...failed,
+                '',
+                'These failures typically indicate upstream breakage — installer URLs, package repositories, Homebrew formulae, hosted runner images, or `latest` resolution may have changed without a code modification.',
+                '',
+                `[View the workflow run](${runUrl}) for details on the failed jobs.`,
+              ].join('\n'),
+            });

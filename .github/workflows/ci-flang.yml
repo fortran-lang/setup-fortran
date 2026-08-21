@@ -1,0 +1,134 @@
+name: flang
+
+on:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+      matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        toolchain:
+          - { compiler: flang, version: "22" }
+          - { compiler: flang, version: "21" }
+          - { compiler: flang, version: "20" }
+          - { compiler: flang, version: "19" }
+          - { compiler: flang, version: "18" }
+          - { compiler: flang, version: "17" }
+        include:
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "16" }
+          - image: macos-26
+            toolchain: { compiler: flang } # only latest version available from brew
+          - image: macos-26-intel
+            toolchain: { compiler: flang } # only latest version available from brew
+          - image: macos-15
+            toolchain: { compiler: flang } # only latest version available from brew
+          - image: macos-15-intel
+            toolchain: { compiler: flang } # only latest version available from brew
+          - image: macos-14
+            toolchain: { compiler: flang } # only latest version available from brew
+          - image: macos-26
+            toolchain: { compiler: flang, version: "21" }
+          - image: macos-26
+            toolchain: { compiler: flang, version: "21.1.6" } # test that patch versions are accepted and resolved correctly
+          - image: macos-26
+            toolchain: { compiler: flang, version: "20" }
+          - image: macos-26
+            toolchain: { compiler: flang, version: "19" }
+          - image: macos-15
+            toolchain: { compiler: flang, version: "21" }
+          - image: macos-15
+            toolchain: { compiler: flang, version: "20" }
+          - image: macos-15
+            toolchain: { compiler: flang, version: "19" }
+          - image: macos-26-intel
+            toolchain: { compiler: flang, version: "19" }
+          - image: macos-15-intel
+            toolchain: { compiler: flang, version: "19" }
+          - image: windows-2025
+            toolchain: { compiler: flang, version: "22" }
+          - image: windows-2025
+            toolchain: { compiler: flang, version: "22.1.0" } # test that patch versions are accepted and resolved correctly
+          - image: windows-2022
+            toolchain: { compiler: flang, version: "22" }
+          - image: windows-11-arm
+            toolchain: { compiler: flang, version: "22" }
+          - image: windows-11-arm
+            toolchain: { compiler: flang, version: "21" }
+          - image: windows-11-arm
+            toolchain: { compiler: flang, version: "20" }
+          - image: windows-2025
+            toolchain: { compiler: flang, msystem: ucrt64 } # only latest version available from Pacman
+          - image: windows-2022
+            toolchain: { compiler: flang, msystem: ucrt64 } # only latest version available from Pacman
+          - image: windows-2025
+            toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
+          - image: windows-2022
+            toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+          msystem: ${{ matrix.toolchain.msystem }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify installation
+        shell: bash
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
+        run: |
+          npm run verify-installation
+          echo "Fortran Compiler Setup:"
+          echo "  Version: ${{ steps.setup.outputs.version }}"
+          echo "  FC:      ${{ steps.setup.outputs.fc }}"
+          echo "  CC:      ${{ steps.setup.outputs.cc }}"
+          echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
+
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
+      - name: Run Integration Tests
+        run: npm run integration-test
