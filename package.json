@@ -17,6 +17,9 @@
   },
   "type": "commonjs",
   "main": "index.js",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map",
     "build:integration-test": "ncc build src/run_fortran_tests.ts -o dist-tests --source-map",

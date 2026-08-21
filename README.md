@@ -333,6 +333,10 @@ Migrating from `v1` requires only a few changes:
 
 ## Development
 
+Requires Node.js 24 or newer (`.nvmrc` pins the version CI uses).
+
+Install dependencies with `npm ci`.
+
 Run `npm run all` to format and lint the source, run unit tests, bundle the
 action into `dist`, and run the smoke tests.
 
