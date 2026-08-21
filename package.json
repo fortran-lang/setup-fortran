@@ -1,20 +1,19 @@
 {
   "name": "setup-fortran",
-  "version": "1.10.0",
+  "version": "2.0.0",
   "description": "Set up Fortran compilers on GitHub Actions runners",
-  "homepage": "https://github.com/minhqdao/setup-fortran#readme",
+  "homepage": "https://github.com/fortran-lang/setup-fortran#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/minhqdao/setup-fortran.git"
+    "url": "git+https://github.com/fortran-lang/setup-fortran.git"
   },
   "bugs": {
-    "url": "https://github.com/minhqdao/setup-fortran/issues"
+    "url": "https://github.com/fortran-lang/setup-fortran/issues"
   },
   "license": "Apache-2.0",
   "author": {
-    "name": "Minh Dao",
-    "email": "hello@minhdao.de",
-    "url": "https://minhdao.de"
+    "name": "Fortran Community",
+    "url": "https://fortran-lang.org"
   },
   "type": "commonjs",
   "main": "index.js",

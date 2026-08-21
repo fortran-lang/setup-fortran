@@ -1,6 +1,6 @@
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-setup--fortran-blueviolet?logo=github)](https://github.com/marketplace/actions/setup-fortran-compilers)
-[![GitHub release](https://img.shields.io/github/v/release/minhqdao/setup-fortran?color=orange)](https://github.com/minhqdao/setup-fortran/releases)
-[![CI](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/minhqdao/setup-fortran/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/fortran-lang/setup-fortran?color=orange)](https://github.com/fortran-lang/setup-fortran/releases)
+[![CI](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 # setup-fortran
@@ -12,7 +12,7 @@ Linux, macOS, and Windows.
 ## Usage
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: fortran-lang/setup-fortran@v2
   with:
     compiler: <compiler>
     version: <version>
@@ -248,7 +248,7 @@ Use of the canonical names is recommended.
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: minhqdao/setup-fortran@v1
+  - uses: fortran-lang/setup-fortran@v2
   - run: ${{ env.FC }} hello.f90
 ```
 
@@ -258,7 +258,7 @@ supported version for the platform.
 ### Specific Version
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: fortran-lang/setup-fortran@v2
   with:
     compiler: lfortran
     version: "0.64.0"
@@ -285,7 +285,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: minhqdao/setup-fortran@v1
+      - uses: fortran-lang/setup-fortran@v2
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
@@ -295,7 +295,7 @@ jobs:
 ### Windows with MSYS2
 
 ```yaml
-- uses: minhqdao/setup-fortran@v1
+- uses: fortran-lang/setup-fortran@v2
   with:
     compiler: lfortran
     msystem: ucrt64
@@ -325,7 +325,7 @@ jobs:
 
 ## Migration Guide
 
-Migrating from `fortran-lang/setup-fortran` to `minhqdao/setup-fortran` requires only a few changes:
+Migrating from `v1` requires only a few changes:
 
 - The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 - `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
@@ -341,7 +341,7 @@ executes the bundled code from this directory.
 
 ## Reporting Issues
 
-Report bugs and feature requests in the [issue tracker](https://github.com/minhqdao/setup-fortran/issues).
+Report bugs and feature requests in the [issue tracker](https://github.com/fortran-lang/setup-fortran/issues).
 
 ## License
 

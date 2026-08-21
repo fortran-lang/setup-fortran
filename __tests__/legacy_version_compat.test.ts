@@ -7,12 +7,12 @@ jest.mock("@actions/core");
 // Incumbent parity guard.
 //
 // Every green cell that fortran-lang/setup-fortran verified in its generated
-// compatibility matrix (`setup-fortran/.github/compat/compat.csv`) must still
-// be accepted by the replacement's resolvers after the selector is migrated to
-// the canonical compiler name. The version tables below intentionally mirror
-// the installed SUPPORTED_VERSIONS arrays in src/installers/*; they are kept
-// in this dedicated test so dropping a legacy spelling produces a visible test
-// failure instead of a quiet behaviour change.
+// compatibility matrix (previously `setup-fortran/.github/compat/compat.csv`)
+// must still be accepted by the replacement's resolvers after the selector is
+// migrated to the canonical compiler name. The version tables below
+// intentionally mirror the installed SUPPORTED_VERSIONS arrays in
+// src/installers/*; they are kept in this dedicated test so dropping a legacy
+// spelling produces a visible test failure instead of a quiet behaviour change.
 //
 // Two incumbent cells are deliberate, documented deviations and live in
 // `UNSUPPORTED_INCUMBENT_CELLS` instead of the acceptance table:
