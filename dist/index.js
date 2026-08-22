@@ -106665,6 +106665,15 @@ async function darwin_installDarwin(inputs) {
     info(`Installing ifort ${version} on macOS (${inputs.arch})...`);
     if (inputs.arch === Arch.ARM64) {
         await ensureRosetta();
+        // The companion clang builds arm64 objects by default on these runners;
+        // they must be x86_64 to link with ifort under Rosetta.
+        for (const name of ["CFLAGS", "CXXFLAGS", "LDFLAGS"]) {
+            const value = [process.env[name], "-arch x86_64"]
+                .filter(Boolean)
+                .join(" ");
+            exportVariable(name, value);
+            process.env[name] = value;
+        }
     }
     const cacheKey = `ifort-darwin-validated-v1-${inputs.arch}-${version}`;
     const cachePaths = [darwin_ONEAPI_ROOT];

@@ -185,6 +185,7 @@ async function run(): Promise<void> {
       const objPath = path.join(buildDir, `${name}${objExt}`);
       const outputPath = path.join(buildDir, isWindows ? `${name}.exe` : name);
       const fflags = (process.env.FFLAGS ?? "").split(" ").filter(Boolean);
+      const cflags = (process.env.CFLAGS ?? "").split(" ").filter(Boolean);
 
       core.startGroup(`Test: ${name}`);
 
@@ -192,7 +193,7 @@ async function run(): Promise<void> {
       if (isMsvc) {
         await exec.exec(cc, ["/c", `/Fo:${objPath}`, cPath]);
       } else {
-        await exec.exec(cc, ["-c", "-o", objPath, cPath]);
+        await exec.exec(cc, ["-c", ...cflags, "-o", objPath, cPath]);
       }
 
       // Link Fortran + C object into final executable

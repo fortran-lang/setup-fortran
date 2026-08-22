@@ -39,6 +39,10 @@ describe("installDarwin (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // installDarwin appends -arch flags to these and mutates process.env
+    for (const name of ["CFLAGS", "CXXFLAGS", "LDFLAGS"]) {
+      delete process.env[name];
+    }
     mockedFs.existsSync.mockReturnValue(true);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
       if (commandLine === "ifort" && args?.[0] === "--version") {
@@ -158,6 +162,36 @@ describe("installDarwin (ifort)", () => {
     expect(mockedExec).not.toHaveBeenCalledWith(
       "sudo",
       expect.arrayContaining(["--install-rosetta"]),
+    );
+  });
+
+  it("exports x86_64 C/C++ flags on ARM64 so companions match ifort", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+
+    await installDarwin({ ...baseInputs, arch: Arch.ARM64 });
+
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CFLAGS",
+      "-arch x86_64",
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "CXXFLAGS",
+      "-arch x86_64",
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "LDFLAGS",
+      "-arch x86_64",
+    );
+  });
+
+  it("leaves C flags untouched on x64", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+
+    await installDarwin(baseInputs);
+
+    expect(mockedExportVariable).not.toHaveBeenCalledWith(
+      "CFLAGS",
+      expect.anything(),
     );
   });
 

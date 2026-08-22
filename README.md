@@ -144,7 +144,8 @@ Use of the canonical names is recommended.
 
 > Intel ships `ifort` for macOS as x86_64 binaries. On ARM64 runners they run
 > under Rosetta 2, which the action verifies (and installs if missing) before
-> installation.
+> installation. To keep companion C/C++ objects linkable there, the action
+> exports `CFLAGS`, `CXXFLAGS`, and `LDFLAGS` with `-arch x86_64`.
 
 ---
 
