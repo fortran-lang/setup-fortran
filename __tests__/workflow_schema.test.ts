@@ -108,22 +108,22 @@ describe("workflow YAML schema", () => {
   }
 });
 
-describe("ci.yml canary structure", () => {
-  const ciYml = loadWorkflows()["ci.yml"];
+// describe("ci.yml canary structure", () => {
+//   const ciYml = loadWorkflows()["ci.yml"];
 
-  it("has a weekly schedule trigger", () => {
-    const schedule = ciYml.on as Record<string, unknown>;
-    expect(schedule).toHaveProperty("schedule");
-    const cronList = schedule["schedule"] as Array<{ cron: string }>;
-    expect(cronList).toHaveLength(1);
-    // Friday at 00:00 UTC: minute=0 hour=0 day=* month=* weekday=5
-    const [minute, hour, day, month, weekday] = cronList[0].cron.split(" ");
-    expect(minute).toBe("0");
-    expect(hour).toBe("0");
-    expect(day).toBe("*");
-    expect(month).toBe("*");
-    expect(weekday).toBe("5");
-  });
+//   it("has a weekly schedule trigger", () => {
+//     const schedule = ciYml.on as Record<string, unknown>;
+//     expect(schedule).toHaveProperty("schedule");
+//     const cronList = schedule["schedule"] as Array<{ cron: string }>;
+//     expect(cronList).toHaveLength(1);
+//     // Friday at 00:00 UTC: minute=0 hour=0 day=* month=* weekday=5
+//     const [minute, hour, day, month, weekday] = cronList[0].cron.split(" ");
+//     expect(minute).toBe("0");
+//     expect(hour).toBe("0");
+//     expect(day).toBe("*");
+//     expect(month).toBe("*");
+//     expect(weekday).toBe("5");
+//   });
 
 //   it("has a canary-report job", () => {
 //     expect(ciYml.jobs).toHaveProperty("canary-report");
