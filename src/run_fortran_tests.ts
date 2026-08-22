@@ -104,17 +104,22 @@ function getCxxLinkFlags(
           skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
         };
       }
-      if (platform === OS.MacOS && compiler === Compiler.Flang) {
-        // The bundled clang++ compiles against the toolchain's own ABI-tagged
-        // libc++, so the link must resolve libc++ inside the toolchain rather
-        // than the older system copy; the rpath keeps the runtime working.
-        const libDir = path.join(
-          path.dirname(path.dirname(process.env.FC ?? "")),
-          "lib",
-        );
-        return { flags: [`-L${libDir}`, "-lc++", `-Wl,-rpath,${libDir}`] };
+      if (
+        compiler === Compiler.Flang &&
+        platform === OS.MacOS &&
+        process.env.FLANG_VERSION !== LATEST
+      ) {
+        // The llvm.org tarballs ship libc++ headers that emit ODR ABI tags
+        // their own dylib does not define, and their dylib set cannot be
+        // linked through the Fortran driver with the new Apple linker
+        // (reexport flattening breaks libc++abi initializer registration).
+        // The brew install (LATEST) links fine.
+        return {
+          flags: [],
+          skip: "llvm.org flang toolchains ship a C++ runtime that cannot be linked through the Fortran driver on macOS",
+        };
       }
-      // System clang++ companion (lfortran) matches the system libc++.
+      // System clang++ companions match the system libc++ the drivers link.
       return { flags: [platform === OS.MacOS ? "-lc++" : "-lstdc++"] };
     case Compiler.IFort:
     case Compiler.IFX:
@@ -131,10 +136,24 @@ function getCxxLinkFlags(
         };
       }
       return { flags: ["-cxxlib"] };
-    case Compiler.NVFortran:
-      // nvfortran has no C++ stdlib switch; -lstdc++ is passed through to the
-      // linker and matches what the nvc++ companion links against on Linux.
+    case Compiler.NVFortran: {
+      // -lstdc++ is passed through to the linker and matches what the nvc++
+      // companion links against. nvc++ before 23.11 still used the EDG front
+      // end, which cannot parse the _FloatN declarations in modern glibc
+      // headers (e.g. ubuntu-24.04).
+      const version = /\/(\d{2})\.(\d{1,2})\//.exec(process.env.FC ?? "");
+      if (version) {
+        const major = parseInt(version[1], 10);
+        const minor = parseInt(version[2], 10);
+        if (major < 23 || (major === 23 && minor < 11)) {
+          return {
+            flags: [],
+            skip: "the nvc++ companion before 23.11 cannot parse modern glibc headers",
+          };
+        }
+      }
       return { flags: ["-lstdc++"] };
+    }
     default:
       return {
         flags: [],
