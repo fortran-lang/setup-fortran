@@ -64,6 +64,13 @@ function getCppFlags(compiler: Compiler, isWindows: boolean): string[] {
   return [];
 }
 
+// Major version suffix of the companion C++ compiler basename ("g++-11" -> 11,
+// "g++" -> unknown). Unknown versions never cause a skip.
+function companionMajor(cxxEnv: string | undefined): number {
+  const match = /(\d+)$/.exec(path.basename(cxxEnv ?? ""));
+  return match ? parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+}
+
 // Link flags for the Fortran driver when linking C++ objects: the C++ standard
 // library must be pulled in explicitly, and the correct one depends on the
 // companion C++ compiler (GNU g++ links libstdc++, clang++ companions link
@@ -73,6 +80,16 @@ function getCxxLinkFlags(
   compiler: Compiler,
   platform: OS,
 ): { flags: string[]; skip?: string } {
+  if (
+    compiler === Compiler.GFortran &&
+    platform === OS.MacOS &&
+    companionMajor(process.env.CXX) < 13
+  ) {
+    return {
+      flags: [],
+      skip: `the ${path.basename(process.env.CXX ?? "")} companion cannot parse current macOS SDK headers`,
+    };
+  }
   switch (compiler) {
     case Compiler.GFortran:
     case Compiler.AOCC:
@@ -87,7 +104,17 @@ function getCxxLinkFlags(
           skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
         };
       }
-      // clang++ companions: libc++ on macOS, libstdc++ on Linux.
+      if (platform === OS.MacOS && compiler === Compiler.Flang) {
+        // The bundled clang++ compiles against the toolchain's own ABI-tagged
+        // libc++, so the link must resolve libc++ inside the toolchain rather
+        // than the older system copy; the rpath keeps the runtime working.
+        const libDir = path.join(
+          path.dirname(path.dirname(process.env.FC ?? "")),
+          "lib",
+        );
+        return { flags: [`-L${libDir}`, "-lc++", `-Wl,-rpath,${libDir}`] };
+      }
+      // System clang++ companion (lfortran) matches the system libc++.
       return { flags: [platform === OS.MacOS ? "-lc++" : "-lstdc++"] };
     case Compiler.IFort:
     case Compiler.IFX:
@@ -105,7 +132,9 @@ function getCxxLinkFlags(
       }
       return { flags: ["-cxxlib"] };
     case Compiler.NVFortran:
-      return { flags: ["-cxxstdlib"] };
+      // nvfortran has no C++ stdlib switch; -lstdc++ is passed through to the
+      // linker and matches what the nvc++ companion links against on Linux.
+      return { flags: ["-lstdc++"] };
     default:
       return {
         flags: [],
