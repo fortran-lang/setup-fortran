@@ -71,6 +71,27 @@ function companionMajor(cxxEnv: string | undefined): number {
   return match ? parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
 }
 
+// Parses the glibc version from `ldd --version` (e.g. "2.39"); returns
+// undefined on non-glibc systems or when the output is unparseable.
+async function detectGlibcVersion(): Promise<number | undefined> {
+  let output = "";
+  const code = await exec.exec("ldd", ["--version"], {
+    ignoreReturnCode: true,
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+      stderr: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  if (code !== 0) return undefined;
+  const match = /(\d+\.\d+)/.exec(output);
+  return match ? parseFloat(match[1]) : undefined;
+}
+
 // Link flags for the Fortran driver when linking C++ objects: the C++ standard
 // library must be pulled in explicitly, and the correct one depends on the
 // companion C++ compiler (GNU g++ links libstdc++, clang++ companions link
@@ -79,6 +100,7 @@ function companionMajor(cxxEnv: string | undefined): number {
 function getCxxLinkFlags(
   compiler: Compiler,
   platform: OS,
+  glibcVersion?: number,
 ): { flags: string[]; skip?: string } {
   if (
     compiler === Compiler.GFortran &&
@@ -139,18 +161,19 @@ function getCxxLinkFlags(
     case Compiler.NVFortran: {
       // -lstdc++ is passed through to the linker and matches what the nvc++
       // companion links against. nvc++ before 23.11 still used the EDG front
-      // end, which cannot parse the _FloatN declarations in modern glibc
-      // headers (e.g. ubuntu-24.04).
+      // end, which cannot parse the _FloatN declarations in glibc >= 2.36
+      // headers (verified: fails on glibc 2.39 / ubuntu-24.04, passes on
+      // glibc 2.35 / ubuntu-22.04). Older glibc keeps the test.
       const version = /\/(\d{2})\.(\d{1,2})\//.exec(process.env.FC ?? "");
-      if (version) {
-        const major = parseInt(version[1], 10);
-        const minor = parseInt(version[2], 10);
-        if (major < 23 || (major === 23 && minor < 11)) {
-          return {
-            flags: [],
-            skip: "the nvc++ companion before 23.11 cannot parse modern glibc headers",
-          };
-        }
+      const companionIsLegacy =
+        version !== null &&
+        (parseInt(version[1], 10) < 23 ||
+          (parseInt(version[1], 10) === 23 && parseInt(version[2], 10) < 11));
+      if (companionIsLegacy && (glibcVersion ?? 0) >= 2.36) {
+        return {
+          flags: [],
+          skip: `the nvc++ companion before 23.11 cannot parse glibc ${String(glibcVersion)} headers`,
+        };
       }
       return { flags: ["-lstdc++"] };
     }
@@ -364,9 +387,12 @@ async function run(): Promise<void> {
     await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
     await execMixedCTest("mixed_cc_test", ["mixed_cc_test.f90"], "cc_test.c");
 
+    const glibcVersion =
+      platform === OS.Linux ? await detectGlibcVersion() : undefined;
     const { flags: cxxLinkFlags, skip: skipCxxLink } = getCxxLinkFlags(
       compiler,
       platform,
+      glibcVersion,
     );
     if (skipCxxLink) {
       skipTest("mixed_cxx_test", skipCxxLink);

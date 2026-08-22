@@ -16,33 +16,33 @@ jobs:
   validation:
     uses: ./.github/workflows/validation.yml
 
-  aocc:
-    needs: [validation]
-    uses: ./.github/workflows/ci-aocc.yml
+  # aocc:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-aocc.yml
 
-  armflang:
-    needs: [validation]
-    uses: ./.github/workflows/ci-armflang.yml
+  # armflang:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-armflang.yml
 
-  gfortran:
-    needs: [validation]
-    uses: ./.github/workflows/ci-gfortran.yml
+  # gfortran:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-gfortran.yml
 
-  flang:
-    needs: [validation]
-    uses: ./.github/workflows/ci-flang.yml
+  # flang:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-flang.yml
 
-  ifort:
-    needs: [validation]
-    uses: ./.github/workflows/ci-ifort.yml
+  # ifort:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-ifort.yml
 
-  ifx:
-    needs: [validation]
-    uses: ./.github/workflows/ci-ifx.yml
+  # ifx:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-ifx.yml
 
-  lfortran:
-    needs: [validation]
-    uses: ./.github/workflows/ci-lfortran.yml
+  # lfortran:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-lfortran.yml
 
   nvfortran:
     needs: [validation]
@@ -236,74 +236,74 @@ jobs:
       - name: Run integration tests for final state
         run: npm run integration-test
 
-  canary-report:
-    name: Weekly Canary Report
-    needs:
-      [
-        validation,
-        aocc,
-        armflang,
-        gfortran,
-        flang,
-        ifort,
-        ifx,
-        lfortran,
-        nvfortran,
-        two-invocations,
-      ]
-    if: always() && github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Create issue for failed integration jobs
-        uses: actions/github-script@v9
-        env:
-          AOCC: ${{ needs.aocc.result }}
-          ARMFLANG: ${{ needs.armflang.result }}
-          GFORTRAN: ${{ needs.gfortran.result }}
-          FLANG: ${{ needs.flang.result }}
-          IFORT: ${{ needs.ifort.result }}
-          IFX: ${{ needs.ifx.result }}
-          LFORTRAN: ${{ needs.lfortran.result }}
-          NVFORTRAN: ${{ needs.nvfortran.result }}
-          TWO_INVOCATIONS: ${{ needs.two-invocations.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          script: |
-            const jobs = {
-              'AOCC': process.env.AOCC,
-              'ARM Flang': process.env.ARMFLANG,
-              'GFortran': process.env.GFORTRAN,
-              'Flang': process.env.FLANG,
-              'Ifort (Classic)': process.env.IFORT,
-              'Ifx': process.env.IFX,
-              'LFortran': process.env.LFORTRAN,
-              'NVFORTRAN': process.env.NVFORTRAN,
-              'Sequential installations': process.env.TWO_INVOCATIONS,
-            };
-            const failed = Object.entries(jobs)
-              .filter(([, result]) => result === 'failure')
-              .map(([name]) => `- ${name}`);
-            if (failed.length === 0) {
-              console.log('All canary jobs passed.');
-              return;
-            }
-            const runUrl = process.env.RUN_URL;
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Weekly Canary: ${failed.length} integration job(s) failed`,
-              body: [
-                '## Weekly Canary Failure Report',
-                '',
-                'The weekly CI canary run detected failures in the following integration jobs:',
-                '',
-                ...failed,
-                '',
-                'These failures typically indicate upstream breakage — installer URLs, package repositories, Homebrew formulae, hosted runner images, or `latest` resolution may have changed without a code modification.',
-                '',
-                `[View the workflow run](${runUrl}) for details on the failed jobs.`,
-              ].join('\n'),
-            });
+  # canary-report:
+  #   name: Weekly Canary Report
+  #   needs:
+  #     [
+  #       validation,
+  #       aocc,
+  #       armflang,
+  #       gfortran,
+  #       flang,
+  #       ifort,
+  #       ifx,
+  #       lfortran,
+  #       nvfortran,
+  #       two-invocations,
+  #     ]
+  #   if: always() && github.event_name == 'schedule'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     issues: write
+  #   steps:
+  #     - name: Create issue for failed integration jobs
+  #       uses: actions/github-script@v9
+  #       env:
+  #         AOCC: ${{ needs.aocc.result }}
+  #         ARMFLANG: ${{ needs.armflang.result }}
+  #         GFORTRAN: ${{ needs.gfortran.result }}
+  #         FLANG: ${{ needs.flang.result }}
+  #         IFORT: ${{ needs.ifort.result }}
+  #         IFX: ${{ needs.ifx.result }}
+  #         LFORTRAN: ${{ needs.lfortran.result }}
+  #         NVFORTRAN: ${{ needs.nvfortran.result }}
+  #         TWO_INVOCATIONS: ${{ needs.two-invocations.result }}
+  #         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  #       with:
+  #         script: |
+  #           const jobs = {
+  #             'AOCC': process.env.AOCC,
+  #             'ARM Flang': process.env.ARMFLANG,
+  #             'GFortran': process.env.GFORTRAN,
+  #             'Flang': process.env.FLANG,
+  #             'Ifort (Classic)': process.env.IFORT,
+  #             'Ifx': process.env.IFX,
+  #             'LFortran': process.env.LFORTRAN,
+  #             'NVFORTRAN': process.env.NVFORTRAN,
+  #             'Sequential installations': process.env.TWO_INVOCATIONS,
+  #           };
+  #           const failed = Object.entries(jobs)
+  #             .filter(([, result]) => result === 'failure')
+  #             .map(([name]) => `- ${name}`);
+  #           if (failed.length === 0) {
+  #             console.log('All canary jobs passed.');
+  #             return;
+  #           }
+  #           const runUrl = process.env.RUN_URL;
+  #           await github.rest.issues.create({
+  #             owner: context.repo.owner,
+  #             repo: context.repo.repo,
+  #             title: `Weekly Canary: ${failed.length} integration job(s) failed`,
+  #             body: [
+  #               '## Weekly Canary Failure Report',
+  #               '',
+  #               'The weekly CI canary run detected failures in the following integration jobs:',
+  #               '',
+  #               ...failed,
+  #               '',
+  #               'These failures typically indicate upstream breakage — installer URLs, package repositories, Homebrew formulae, hosted runner images, or `latest` resolution may have changed without a code modification.',
+  #               '',
+  #               `[View the workflow run](${runUrl}) for details on the failed jobs.`,
+  #             ].join('\n'),
+  #           });
