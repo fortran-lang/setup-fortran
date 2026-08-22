@@ -92,6 +92,49 @@ async function detectGlibcVersion(): Promise<number | undefined> {
   return match ? parseFloat(match[1]) : undefined;
 }
 
+// Major.minor version of the nvc++ companion (e.g. "23.9"), parsed from
+// `nvc++ --version`; undefined when the probe fails. The nvfortran
+// installer exports only the bare "nvc++" name, so the version cannot be
+// derived from the environment and has to be queried from the compiler.
+// NVIDIA releases are calendar-based ("21.11"), so the version is kept as
+// a major/minor pair rather than a float, where 21.9 would compare above
+// 21.11.
+interface NvcxxVersion {
+  major: number;
+  minor: number;
+}
+
+async function detectNvcxxVersion(): Promise<NvcxxVersion | undefined> {
+  let output = "";
+  const code = await exec.exec("nvc++", ["--version"], {
+    ignoreReturnCode: true,
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+      stderr: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  if (code !== 0) return undefined;
+  const match = /nvc\+\+\s+(\d{2})\.(\d{1,2})/.exec(output);
+  if (!match) return undefined;
+  return { major: parseInt(match[1], 10), minor: parseInt(match[2], 10) };
+}
+
+// True when the nvc++ version is older than the given major.minor release.
+function isOlderThan(
+  version: NvcxxVersion,
+  major: number,
+  minor: number,
+): boolean {
+  return (
+    version.major < major || (version.major === major && version.minor < minor)
+  );
+}
+
 // Link flags for the Fortran driver when linking C++ objects: the C++ standard
 // library must be pulled in explicitly, and the correct one depends on the
 // companion C++ compiler (GNU g++ links libstdc++, clang++ companions link
@@ -101,6 +144,7 @@ function getCxxLinkFlags(
   compiler: Compiler,
   platform: OS,
   glibcVersion?: number,
+  nvcxxVersion?: NvcxxVersion,
 ): { flags: string[]; skip?: string } {
   if (
     compiler === Compiler.GFortran &&
@@ -160,20 +204,22 @@ function getCxxLinkFlags(
       return { flags: ["-cxxlib"] };
     case Compiler.NVFortran: {
       // -lstdc++ is passed through to the linker and matches what the nvc++
-      // companion links against. nvc++ before 23.11 still used the EDG front
-      // end, which cannot parse the _FloatN declarations in glibc >= 2.36
-      // headers (verified: fails on glibc 2.39 / ubuntu-24.04, passes on
-      // glibc 2.35 / ubuntu-22.04). Older glibc keeps the test.
-      const version = /\/(\d{2})\.(\d{1,2})\//.exec(process.env.FC ?? "");
-      const companionIsLegacy =
-        version !== null &&
-        (parseInt(version[1], 10) < 23 ||
-          (parseInt(version[1], 10) === 23 && parseInt(version[2], 10) < 11));
-      if (companionIsLegacy && (glibcVersion ?? 0) >= 2.36) {
-        return {
-          flags: [],
-          skip: `the nvc++ companion before 23.11 cannot parse glibc ${String(glibcVersion)} headers`,
-        };
+      // companion links against. nvc++ before 23.11 used the EDG front end,
+      // which cannot parse the _FloatN declarations in glibc >= 2.36 headers
+      // (fails on ubuntu-24.04), and nvc++ before 21.11 additionally fails on
+      // the __malloc__ attribute syntax of glibc 2.35 headers (ubuntu-22.04).
+      // 21.11 through 23.9 still pass on glibc 2.35, and 23.11+ passes
+      // everywhere; those combinations keep running.
+      const version = nvcxxVersion;
+      if (version !== undefined) {
+        const legacy = isOlderThan(version, 23, 11);
+        const tooOldForGlibc235 = isOlderThan(version, 21, 11);
+        if (legacy && (tooOldForGlibc235 || (glibcVersion ?? 0) >= 2.36)) {
+          return {
+            flags: [],
+            skip: `the nvc++ companion before 23.11 cannot parse glibc ${String(glibcVersion ?? "?")} headers`,
+          };
+        }
       }
       return { flags: ["-lstdc++"] };
     }
@@ -389,10 +435,13 @@ async function run(): Promise<void> {
 
     const glibcVersion =
       platform === OS.Linux ? await detectGlibcVersion() : undefined;
+    const nvcxxVersion =
+      compiler === Compiler.NVFortran ? await detectNvcxxVersion() : undefined;
     const { flags: cxxLinkFlags, skip: skipCxxLink } = getCxxLinkFlags(
       compiler,
       platform,
       glibcVersion,
+      nvcxxVersion,
     );
     if (skipCxxLink) {
       skipTest("mixed_cxx_test", skipCxxLink);
