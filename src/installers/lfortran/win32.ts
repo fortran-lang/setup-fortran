@@ -20,6 +20,7 @@ import {
   lfortranEnvironment,
   resetLFortranEnvironment,
 } from "../../lfortran_environment";
+import { persistBinDirForBash } from "../../bash_env";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -156,6 +157,12 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
       "lld-link.exe not found; LFortran may fail to link on Windows.",
     );
   }
+
+  // lfortran links executables by invoking a bare `link` (x86_64-pc-windows-msvc
+  // target). In `shell: bash` steps Git Bash's /usr/bin precedes every
+  // GITHUB_PATH entry, so coreutils' link would shadow the proxy above. Reuse
+  // the MSVC installers' BASH_ENV mechanism to prepend the proxy's directory.
+  persistBinDirForBash(environment.binDir, "lfortran");
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",

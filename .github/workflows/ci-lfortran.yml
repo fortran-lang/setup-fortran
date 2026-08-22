@@ -100,5 +100,14 @@ jobs:
           fc: ${{ steps.setup.outputs.fc }}
           cc: ${{ steps.setup.outputs.cc }}
           cxx: ${{ steps.setup.outputs.cxx }}
+
+      - name: Verify compile and link under bash (Windows native only)
+        if: runner.os == 'Windows' && matrix.toolchain.msystem == ''
+        shell: bash
+        run: |
+          printf 'program smoke\n  print *, "linked from bash"\nend program smoke\n' > smoke.f90
+          "$FC" smoke.f90 -o smoke.exe
+          ./smoke.exe
+
       - name: Run Integration Tests
         run: npm run integration-test

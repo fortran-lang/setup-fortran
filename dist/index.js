@@ -105880,7 +105880,7 @@ async function debian_resolveInstalledVersion() {
     return output.trim();
 }
 
-;// CONCATENATED MODULE: ./src/setup_msvc.ts
+;// CONCATENATED MODULE: ./src/bash_env.ts
 
 
 
@@ -105894,19 +105894,33 @@ function toMsysPath(windowsPath) {
 function quoteForBash(value) {
     return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
-function persistMsvcBinForBash(msvcBin) {
-    const bashEnv = external_path_.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), "setup-fortran-msvc-bash-env.sh");
+// `shell: bash` steps run a non-interactive Bash whose PATH puts Git Bash's
+// own /usr/bin ahead of every GITHUB_PATH entry, so native executables whose
+// names collide with Git utilities (link.exe vs coreutils link is the known
+// case) resolve to the wrong binary in any subprocess spawned from Bash.
+// Non-interactive Bash sources $BASH_ENV on startup, which is the only hook
+// that restores the expected PATH order for those steps.
+function persistBinDirForBash(binDir, name) {
+    const bashEnv = external_path_.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), `setup-fortran-${name}-bash-env.sh`);
     const bashEnvForBash = toMsysPath(bashEnv);
     const previousBashEnv = process.env.BASH_ENV;
     const lines = [
         ...(previousBashEnv && toMsysPath(previousBashEnv) !== bashEnvForBash
             ? [`. ${quoteForBash(toMsysPath(previousBashEnv))}`]
             : []),
-        `export PATH=${quoteForBash(toMsysPath(msvcBin))}:"$PATH"`,
+        `export PATH=${quoteForBash(toMsysPath(binDir))}:"$PATH"`,
     ];
     external_fs_.writeFileSync(bashEnv, `${lines.join("\n")}\n`, { mode: 0o600 });
     exportVariable("BASH_ENV", bashEnvForBash);
     return bashEnv;
+}
+
+;// CONCATENATED MODULE: ./src/setup_msvc.ts
+
+
+
+function persistMsvcBinForBash(msvcBin) {
+    return persistBinDirForBash(msvcBin, "msvc");
 }
 function addMsvcBinFromPath(pathValue) {
     const msvcBin = pathValue.split(";").find((entry) => {
@@ -108553,6 +108567,7 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -108673,6 +108688,11 @@ async function installConda(inputs) {
     else {
         warning("lld-link.exe not found; LFortran may fail to link on Windows.");
     }
+    // lfortran links executables by invoking a bare `link` (x86_64-pc-windows-msvc
+    // target). In `shell: bash` steps Git Bash's /usr/bin precedes every
+    // GITHUB_PATH entry, so coreutils' link would shadow the proxy above. Reuse
+    // the MSVC installers' BASH_ENV mechanism to prepend the proxy's directory.
+    persistBinDirForBash(environment.binDir, "lfortran");
     exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
