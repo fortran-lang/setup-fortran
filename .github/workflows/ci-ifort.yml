@@ -1,0 +1,190 @@
+name: ifort
+
+on:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+      matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-22.04]
+        toolchain:
+          - { compiler: ifort, version: "2021.13" }
+          - { compiler: ifort, version: "2021.12" }
+          - { compiler: ifort, version: "2021.11" }
+          - { compiler: ifort, version: "2021.10" }
+          - { compiler: ifort, version: "2021.9" }
+          - { compiler: ifort, version: "2021.8" }
+          - { compiler: ifort, version: "2021.7.1" }
+          - { compiler: ifort, version: "2021.7" }
+          - { compiler: ifort, version: "2021.6" }
+          - { compiler: ifort, version: "2021.5" }
+          - { compiler: ifort, version: "2021.4" }
+          - { compiler: ifort, version: "2021.3" }
+          - { compiler: ifort, version: "2021.2" }
+          - { compiler: ifort, version: "2021.1.2" }
+          - { compiler: ifort, version: "2021.1" }
+        include:
+          - image: macos-26-intel
+            toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-26
+            toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-14
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-26-intel
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: macos-15-intel
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.13" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.13" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.12" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.12" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.11" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.11" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.7" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.7" }
+          - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.6" }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+        timeout-minutes: 30
+
+      - name: Verify installation
+        shell: bash
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
+        run: |
+          npm run verify-installation
+          echo "Fortran Compiler Setup:"
+          echo "  Version: ${{ steps.setup.outputs.version }}"
+          echo "  FC:      ${{ steps.setup.outputs.fc }}"
+          echo "  CC:      ${{ steps.setup.outputs.cc }}"
+          echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
+
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
+      - name: Run Integration Tests
+        run: npm run integration-test

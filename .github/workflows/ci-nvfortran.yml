@@ -1,0 +1,110 @@
+name: nvfortran
+
+on:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+      matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        toolchain:
+          - { compiler: nvfortran, version: "26.5" }
+          - { compiler: nvfortran, version: "26.3" }
+          - { compiler: nvfortran, version: "26.1" }
+          - { compiler: nvfortran, version: "25.11" }
+          - { compiler: nvfortran, version: "25.9" }
+          - { compiler: nvfortran, version: "25.7" }
+          - { compiler: nvfortran, version: "25.5" }
+          - { compiler: nvfortran, version: "25.3" }
+          - { compiler: nvfortran, version: "25.1" }
+          - { compiler: nvfortran, version: "24.11" }
+          - { compiler: nvfortran, version: "24.9" }
+          - { compiler: nvfortran, version: "24.7" }
+          - { compiler: nvfortran, version: "24.5" }
+          - { compiler: nvfortran, version: "24.3" }
+          - { compiler: nvfortran, version: "24.1" }
+          - { compiler: nvfortran, version: "23.11" }
+          - { compiler: nvfortran, version: "23.9" }
+          - { compiler: nvfortran, version: "23.7" }
+          - { compiler: nvfortran, version: "23.5" }
+          - { compiler: nvfortran, version: "23.3" }
+          - { compiler: nvfortran, version: "23.1" }
+          - { compiler: nvfortran, version: "22.11" }
+          - { compiler: nvfortran, version: "22.9" }
+          - { compiler: nvfortran, version: "22.7" }
+          - { compiler: nvfortran, version: "22.5" }
+          - { compiler: nvfortran, version: "22.3" }
+          - { compiler: nvfortran, version: "22.2" }
+          - { compiler: nvfortran, version: "22.1" }
+          - { compiler: nvfortran, version: "21.11" }
+          - { compiler: nvfortran, version: "21.9" }
+          - { compiler: nvfortran, version: "21.7" }
+          - { compiler: nvfortran, version: "21.5" }
+          - { compiler: nvfortran, version: "21.3" }
+          - { compiler: nvfortran, version: "21.2" }
+          - { compiler: nvfortran, version: "21.1" }
+          - { compiler: nvfortran, version: "20.11" }
+          - { compiler: nvfortran, version: "20.9" }
+          - { compiler: nvfortran, version: "20.7" }
+        include:
+          - image: ubuntu-24.04-arm
+            toolchain: { compiler: nvidia-hpc } # test compatibility alias
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+          cleanup-disk: true
+        timeout-minutes: 30
+
+      - name: Verify installation
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
+        run: |
+          npm run verify-installation
+          echo "Fortran Compiler Setup:"
+          echo "  Version: ${{ steps.setup.outputs.version }}"
+          echo "  FC:      ${{ steps.setup.outputs.fc }}"
+          echo "  CC:      ${{ steps.setup.outputs.cc }}"
+          echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
+
+      - name: Run Integration Tests
+        run: npm run integration-test

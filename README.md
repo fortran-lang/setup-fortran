@@ -1,147 +1,357 @@
-# Setup Fortran
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-setup--fortran-blueviolet?logo=github)](https://github.com/marketplace/actions/setup-fortran-compilers)
+[![GitHub release](https://img.shields.io/github/v/release/fortran-lang/setup-fortran?color=orange)](https://github.com/fortran-lang/setup-fortran/releases)
+[![CI](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml/badge.svg)](https://github.com/fortran-lang/setup-fortran/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-[![Test](https://github.com/fortran-lang/setup-fortran/actions/workflows/test.yml/badge.svg)](https://github.com/fortran-lang/setup-fortran/actions/workflows/test.yml)
-[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
-[![GitHub tag](https://img.shields.io/github/tag/fortran-lang/setup-fortran.svg)](https://github.com/fortran-lang/setup-fortran/tags/latest)
+# setup-fortran
 
+Set up Fortran compiler toolchains for GitHub Actions.
+Supports GNU, Intel, LLVM, NVIDIA, AMD, Arm, and LFortran compilers across
+Linux, macOS, and Windows.
 
-Set up a Fortran compiler on Ubuntu, macOS and Windows runners.
+## Migration Guide
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+Migrating from `v1` requires only a few changes:
 
-- [Usage](#usage)
-- [Options](#options)
-- [Outputs](#outputs)
-- [Environment variables](#environment-variables)
-- [Runner compatibility](#runner-compatibility)
-- [License](#license)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
+- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
+- `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
+- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
 
 ## Usage
 
 ```yaml
+- uses: fortran-lang/setup-fortran@v2
+  with:
+    compiler: <compiler>
+    version: <version>
+```
+
+## Inputs
+
+| Input                | Description                                                                                                                                                    | Default    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `compiler`           | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, `armflang`)                                                         | `gfortran` |
+| `version`            | Compiler version to install. Enclose the version string in quotation marks (e.g. `"2026.1.1"` or `"0.64.0"`)                                                   | `latest`   |
+| `msystem`            | Windows toolchain environment (`native`, `ucrt64`, `clang64`)                                                                                                  | `native`   |
+| `cleanup-disk`       | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`)                                                         | `false`    |
+| `update-environment` | Whether to export toolchain environment variables (`FC`, `CC`, `CXX`, `FPM_*`, `F77`, `F90`, `FORTRAN_COMPILER`) into the runner environment (`true`, `false`) | `true`     |
+
+For compatibility with `fortran-lang/setup-fortran`, the legacy names `gcc`,
+`intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases for
+`gfortran`, `ifx`, `ifort`, and `nvfortran`, respectively. Aliases do not
+change based on platform; for example, `intel` always resolves to `ifx`.
+Use of the canonical names is recommended.
+
+## Compiler Support
+
+### `gfortran`
+
+| Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) |
+| ------- | ------------ | ------------ | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | --------------------- | --------------------- |
+| latest  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓                     | ✓                     |
+| 16      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+| 15      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+| 14      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+| 13      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+| 12      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+| 11      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |
+
+---
+
+### `ifx`
+
+| Version  | ubuntu-24.04 | ubuntu-22.04 | windows-2025 | windows-2022 |
+| -------- | ------------ | ------------ | ------------ | ------------ |
+| latest   | ✓            | ✓            | ✓            | ✓            |
+| 2026.1.1 |              |              | ✓            | ✓            |
+| 2026.1.0 |              |              | ✓            | ✓            |
+| 2026.1   | ✓            | ✓            | ✓            | ✓            |
+| 2026.0   | ✓            | ✓            | ✓            | ✓            |
+| 2025.3.3 |              |              | ✓            | ✓            |
+| 2025.3.2 |              |              | ✓            | ✓            |
+| 2025.3.1 |              |              | ✓            | ✓            |
+| 2025.3.0 |              |              | ✓            | ✓            |
+| 2025.3   | ✓            | ✓            | ✓            | ✓            |
+| 2025.2.1 |              |              | ✓            | ✓            |
+| 2025.2.0 |              |              | ✓            | ✓            |
+| 2025.2   | ✓            | ✓            | ✓            | ✓            |
+| 2025.1.0 |              |              | ✓            | ✓            |
+| 2025.1   | ✓            | ✓            | ✓            | ✓            |
+| 2025.0.0 |              |              | ✓            | ✓            |
+| 2025.0   | ✓            | ✓            | ✓            | ✓            |
+| 2024.2.1 |              |              | ✓            | ✓            |
+| 2024.2.0 |              |              | ✓            | ✓            |
+| 2024.2   | ✓            | ✓            | ✓            | ✓            |
+| 2024.1.0 |              |              | ✓            | ✓            |
+| 2024.1   | ✓            | ✓            | ✓            | ✓            |
+| 2024.0.2 |              |              | ✓            | ✓            |
+| 2024.0.1 |              |              | ✓            | ✓            |
+| 2024.0   | ✓            | ✓            | ✓            | ✓            |
+| 2023.2.4 | ✓            | ✓            |              |              |
+| 2023.2.3 | ✓            | ✓            |              |              |
+| 2023.2.2 | ✓            | ✓            |              |              |
+| 2023.2.1 | ✓            | ✓            | ✓            | ✓            |
+| 2023.2.0 | ✓            | ✓            | ✓            | ✓            |
+| 2023.2   | ✓            | ✓            | ✓            | ✓            |
+| 2023.1.0 | ✓            | ✓            | ✓            | ✓            |
+| 2023.1   | ✓            | ✓            | ✓            | ✓            |
+| 2023.0.0 | ✓            | ✓            |              |              |
+| 2023.0   | ✓            | ✓            |              |              |
+| 2022.3.0 |              |              | ✓            | ✓            |
+| 2022.3   |              |              | ✓            | ✓            |
+| 2022.2.1 | ✓            | ✓            |              |              |
+| 2022.2.0 | ✓            | ✓            | ✓            | ✓            |
+| 2022.2   | ✓            | ✓            | ✓            | ✓            |
+| 2022.1.0 | ✓            | ✓            |              |              |
+| 2022.1   | ✓            | ✓            |              |              |
+| 2022.0.2 | ✓            | ✓            |              |              |
+| 2022.0.1 | ✓            | ✓            |              |              |
+| 2022.0   | ✓            | ✓            |              |              |
+| 2021.4.0 | ✓            | ✓            |              |              |
+| 2021.4   | ✓            | ✓            |              |              |
+| 2021.3.0 | ✓            | ✓            |              |              |
+| 2021.3   | ✓            | ✓            |              |              |
+| 2021.2.0 | ✓            | ✓            |              |              |
+| 2021.2   | ✓            | ✓            |              |              |
+| 2021.1.2 | ✓            | ✓            |              |              |
+| 2021.1.1 | ✓            | ✓            |              |              |
+| 2021.1   | ✓            | ✓            |              |              |
+
+> In 2022, `ifx` compiler version numbers differed from release numbers. Specify the compiler version here, not the release number.
+
+---
+
+### `ifort`
+
+| Version  | ubuntu-24.04 | ubuntu-22.04 | macos-26 | macos-15 | macos-14 | macos-26-intel | macos-15-intel | windows-2025 | windows-2022 |
+| -------- | ------------ | ------------ | -------- | -------- | -------- | -------------- | -------------- | ------------ | ------------ |
+| latest   | ✓            | ✓            | ✓        | ✓        | ✓        | ✓              | ✓              | ✓            | ✓            |
+| 2021.13  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.12  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.11  | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.10  | ✓            | ✓            | ✓        | ✓        | ✓        | ✓              | ✓              | ✓            | ✓            |
+| 2021.9   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              | ✓            | ✓            |
+| 2021.8   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.7.1 | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.7   | ✓            | ✓            |          |          |          |                |                | ✓            | ✓            |
+| 2021.6   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              | ✓            | ✓            |
+| 2021.5   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.4   | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.3   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.2   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+| 2021.1.2 | ✓            | ✓            |          |          |          |                |                |              |              |
+| 2021.1   | ✓            | ✓            | ✓        | ✓        |          | ✓              | ✓              |              |              |
+
+> Intel ships `ifort` for macOS as x86_64 binaries. On ARM64 runners they run
+> under Rosetta 2, which the action verifies (and installs if missing) before
+> installation. To keep companion C/C++ objects linkable there, the action
+> exports `CFLAGS`, `CXXFLAGS`, and `LDFLAGS` with `-arch x86_64`.
+
+---
+
+### `nvfortran`
+
+| Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm |
+| ------- | ------------ | ------------ | ---------------- | ---------------- |
+| latest  | ✓            | ✓            | ✓                | ✓                |
+| 26.5    | ✓            | ✓            | ✓                | ✓                |
+| 26.3    | ✓            | ✓            | ✓                | ✓                |
+| 26.1    | ✓            | ✓            | ✓                | ✓                |
+| 25.11   | ✓            | ✓            | ✓                | ✓                |
+| 25.9    | ✓            | ✓            | ✓                | ✓                |
+| 25.7    | ✓            | ✓            | ✓                | ✓                |
+| 25.5    | ✓            | ✓            | ✓                | ✓                |
+| 25.3    | ✓            | ✓            | ✓                | ✓                |
+| 25.1    | ✓            | ✓            | ✓                | ✓                |
+| 24.11   | ✓            | ✓            | ✓                | ✓                |
+| 24.9    | ✓            | ✓            | ✓                | ✓                |
+| 24.7    | ✓            | ✓            | ✓                | ✓                |
+| 24.5    | ✓            | ✓            | ✓                | ✓                |
+| 24.3    | ✓            | ✓            | ✓                | ✓                |
+| 24.1    | ✓            | ✓            | ✓                | ✓                |
+| 23.11   | ✓            | ✓            | ✓                | ✓                |
+| 23.9    | ✓            | ✓            | ✓                | ✓                |
+| 23.7    | ✓            | ✓            | ✓                | ✓                |
+| 23.5    | ✓            | ✓            | ✓                | ✓                |
+| 23.3    | ✓            | ✓            | ✓                | ✓                |
+| 23.1    | ✓            | ✓            | ✓                | ✓                |
+| 22.11   | ✓            | ✓            | ✓                | ✓                |
+| 22.9    | ✓            | ✓            | ✓                | ✓                |
+| 22.7    | ✓            | ✓            | ✓                | ✓                |
+| 22.5    | ✓            | ✓            | ✓                | ✓                |
+| 22.3    | ✓            | ✓            | ✓                | ✓                |
+| 22.2    | ✓            | ✓            | ✓                | ✓                |
+| 22.1    | ✓            | ✓            | ✓                | ✓                |
+| 21.11   | ✓            | ✓            | ✓                | ✓                |
+| 21.9    | ✓            | ✓            | ✓                | ✓                |
+| 21.7    | ✓            | ✓            | ✓                | ✓                |
+| 21.5    | ✓            | ✓            | ✓                | ✓                |
+| 21.3    | ✓            | ✓            | ✓                | ✓                |
+| 21.2    | ✓            | ✓            | ✓                | ✓                |
+| 21.1    | ✓            | ✓            | ✓                | ✓                |
+| 20.11   | ✓            | ✓            | ✓                | ✓                |
+| 20.9    | ✓            | ✓            | ✓                | ✓                |
+| 20.7    | ✓            | ✓            | ✓                | ✓                |
+
+---
+
+### `aocc`
+
+| Version | ubuntu-24.04 | ubuntu-22.04 |
+| ------- | ------------ | ------------ |
+| latest  | ✓            | ✓            |
+| 5.2     | ✓            | ✓            |
+| 5.1     | ✓            | ✓            |
+| 5.0     | ✓            | ✓            |
+| 4.2     | ✓            | ✓            |
+| 4.1     | ✓            | ✓            |
+
+---
+
+### `lfortran`
+
+| Version | ubuntu-24.04 | ubuntu-22.04 | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
+| ------- | ------------ | ------------ | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- |
+| latest  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      |
+| 0.64.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.63.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.62.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.61.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.60.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.59.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.58.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+| 0.57.0  | ✓            | ✓            | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
+
+---
+
+### `flang` (LLVM Flang)
+
+| Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-11-arm | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
+| ------- | ------------ | ------------ | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | -------------- | --------------------- | --------------------- | ---------------------- | ---------------------- |
+| latest  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓              | ✓                     | ✓                     | ✓                      | ✓                      |
+| 22      | ✓            | ✓            | ✓                | ✓                |          |                |          |                |          | ✓            | ✓            | ✓              |                       |                       |                        |                        |
+| 21      | ✓            | ✓            | ✓                | ✓                | ✓        |                | ✓        |                |          |              |              | ✓              |                       |                       |                        |                        |
+| 20      | ✓            | ✓            | ✓                | ✓                | ✓        |                | ✓        |                |          |              |              | ✓              |                       |                       |                        |                        |
+| 19      | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              |          |              |              |                |                       |                       |                        |                        |
+| 18      | ✓            | ✓            | ✓                | ✓                |          |                |          |                |          |              |              |                |                       |                       |                        |                        |
+| 17      | ✓            | ✓            | ✓                | ✓                |          |                |          |                |          |              |              |                |                       |                       |                        |                        |
+| 16      |              | ✓            |                  |                  |          |                |          |                |          |              |              |                |                       |                       |                        |                        |
+
+> Specific patch versions (e.g. `21.1.6`) are supported on macOS and native
+> Windows runners and validated against available GitHub releases. Patch
+> versions are not individually tested.
+
+---
+
+### `armflang` (Arm Toolchain for Linux)
+
+| Version | ubuntu-24.04-arm | ubuntu-22.04-arm |
+| ------- | ---------------- | ---------------- |
+| latest  | ✓                | ✓                |
+| 22.1    | ✓                | ✓                |
+| 21.1    | ✓                | ✓                |
+| 20.1    | ✓                | ✓                |
+
+---
+
+## Examples
+
+### Basic Usage
+
+```yaml
+steps:
+  - uses: actions/checkout@v7
+  - uses: fortran-lang/setup-fortran@v2
+  - run: ${{ env.FC }} hello.f90
+```
+
+If omitted, `compiler` defaults to `gfortran` and `version` to the latest
+supported version for the platform.
+
+### Specific Version
+
+```yaml
+- uses: fortran-lang/setup-fortran@v2
+  with:
+    compiler: lfortran
+    version: "0.64.0"
+```
+
+### Matrix Build
+
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, macos-latest, windows-latest]
+    toolchain:
+      - { compiler: gfortran, version: "15" }
+      - { compiler: ifx, version: "2026.1" }
+      - { compiler: lfortran, version: "0.64.0" }
+    exclude:
+      - os: macos-latest
+        toolchain: { compiler: ifx, version: "2026.1" }
+    include:
+      - os: windows-11-arm
+        toolchain: { compiler: flang, version: "22" }
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        toolchain:
-          - {compiler: gcc, version: 'latest'}
-          - {compiler: intel, version: '2025.0'}
-          - {compiler: intel-classic, version: '2021.10'}
-          - {compiler: nvidia-hpc, version: 'latest'}
-          - {compiler: lfortran, version: '0.45.0'}
-          - {compiler: aocc, version: '5.1.0'}
-        exclude:
-          - os: macos-latest
-            toolchain: {compiler: intel}
-          - os: macos-latest
-            toolchain: {compiler: intel-classic}
-          - os: macos-latest
-            toolchain: {compiler: nvidia-hpc}
-          - os: windows-latest
-            toolchain: {compiler: nvidia-hpc}
-          - os: macos-latest
-            toolchain: {compiler: aocc}
-          - os: windows-latest
-            toolchain: {compiler: aocc}
-
     steps:
-      - uses: fortran-lang/setup-fortran@v1
-        id: setup-fortran
+      - uses: actions/checkout@v7
+      - uses: fortran-lang/setup-fortran@v2
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-
-      - run: |
-          ${{ env.FC }} ... # environment vars FC, CC, and CXX are set
-          ${{ steps.setup-fortran.outputs.fc }} ... # outputs work too
+      - run: ${{ env.FC }} hello.f90
 ```
 
+### Windows with MSYS2
 
-## Options
-
-- *compiler*: Compiler toolchain to setup, available options are
-  - *gcc* for `gfortran`
-  - *intel* for `ifx`
-  - *intel-classic* for `ifort`
-  - *lfortran* for `lfortran`
-  - *nvidia-hpc* for `nvfortran`
-  - *aocc* for `flang` (AMD Optimizing C/C++ and Fortran Compilers)
-- *version*: Version of the compiler toolchain. See [runner compatibility](#runner-compatibility) charts below.
-- *update-environment*: Whether to set environment variables (`FC` etc, defaults true). 
-
+```yaml
+- uses: fortran-lang/setup-fortran@v2
+  with:
+    compiler: lfortran
+    msystem: ucrt64
+```
 
 ## Outputs
 
-The action sets the following outputs:
+| Output    | Description                                |
+| --------- | ------------------------------------------ |
+| `version` | Resolved version of the installed compiler |
+| `fc`      | Command or path to the Fortran compiler    |
+| `cc`      | Command or path to the C compiler          |
+| `cxx`     | Command or path to the C++ compiler        |
 
-- `fc`: Fortran compiler executable, e.g. `gfortran`
-- `cc`: C compiler executable, e.g. `gcc`
-- `cxx`: C++ compiler executable, e.g. `g++`
+## Environment Variables
 
-C/C++ compilers of the same toolchain/version are provided where available. If a standalone Fortran compiler is selected, the action will attempt to configure compatible C/C++ compilers (typically GCC, or MSVC on Windows), but this is not guaranteed &mdash; use at your own risk.
+| Variable  | Description                                              |
+| --------- | -------------------------------------------------------- |
+| `FC`      | Command or path to the Fortran compiler                  |
+| `CC`      | Command or path to the C compiler                        |
+| `CXX`     | Command or path to the C++ compiler                      |
+| `FPM_FC`  | Command or path to the Fortran compiler for fpm          |
+| `FPM_CC`  | Command or path to the C compiler for fpm                |
+| `FPM_CXX` | Command or path to the C++ compiler for fpm              |
+| `F77`     | Command or path to the Fortran compiler (alias for `FC`) |
+| `F90`     | Command or path to the Fortran compiler (alias for `FC`) |
 
+## Development
 
-## Environment variables
+Requires Node.js 24 or newer (`.nvmrc` pins the version CI uses).
 
-The same values are also set as environment variables:
+Install dependencies with `npm ci`.
 
-- `FC`
-- `CC`
-- `CXX`
+Run `npm run all` to format and lint the source, run unit tests, bundle the
+action into `dist`, and run the smoke tests.
 
-Corresponding FPM environment variables are also set:
+Commit changes to `dist` together with the source changes, as GitHub Actions
+executes the bundled code from this directory.
 
-- `FPM_FC`
-- `FPM_CC`
-- `FPM_CXX`
+## Reporting Issues
 
-These are made available to subsequent workflow steps via the [`GITHUB_ENV` environment file mechanism](https://docs.github.com/en/actions/learn-github-actions/environment-variables#passing-values-between-steps-and-jobs-in-a-workflow).
-
-
-## Runner compatibility
-
-Toolchain support varies across GitHub-hosted runner images.
-
-<!-- compat starts -->
-| runner              | aocc 5.1.0   | gcc 13   | gcc 14   | gcc 15   | intel 2021.1   | intel 2021.1.2   | intel 2021.2   | intel 2021.4   | intel 2022.0   | intel 2022.1   | intel 2022.2   | intel 2022.2.1   | intel 2023.0   | intel 2023.1   | intel 2023.2   | intel 2024.0   | intel 2024.1   | intel 2025.0   | intel 2025.2   | intel 2025.3   | intel 2026.0   | intel 2026.1   | intel-classic 2021.1   | intel-classic 2021.1.2   | intel-classic 2021.2   | intel-classic 2021.3   | intel-classic 2021.4   | intel-classic 2021.5   | intel-classic 2021.6   | intel-classic 2021.7.1   | intel-classic 2021.8   | intel-classic 2021.9   | intel-classic 2021.10   | intel-classic 2021.11   | intel-classic 2021.12   | lfortran 0.57.0   | lfortran 0.58.0   | nvidia-hpc 23.3   | nvidia-hpc 23.5   | nvidia-hpc 23.7   | nvidia-hpc 23.9   | nvidia-hpc 23.11   | nvidia-hpc 24.1   | nvidia-hpc 24.3   | nvidia-hpc 24.5   | nvidia-hpc 25.1   | nvidia-hpc 25.3   | nvidia-hpc 25.5   | nvidia-hpc 25.7   | nvidia-hpc 25.9   | nvidia-hpc 26.1   |
-|:--------------------|:--------------------|:----------------|:----------------|:----------------|:----------------------|:------------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:------------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:----------------------|:------------------------------|:--------------------------------|:------------------------------|:------------------------------|:------------------------------|:------------------------------|:------------------------------|:--------------------------------|:------------------------------|:------------------------------|:-------------------------------|:-------------------------------|:-------------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:--------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|:-------------------------|
-| macos-14            |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    |                    |                    |                    | &check;                       |                              | &check;                       | &check;                       |                            | &check;                       | &check;                       |                              | &check;                       | &check;                       | &check;                        |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| macos-15            |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    |                    |                    |                    | &check;                       |                              | &check;                       | &check;                       |                            | &check;                       | &check;                       |                              | &check;                       | &check;                       | &check;                        |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| macos-15-intel      |                  | &check;         | &check;         | &check;         | &check;               |                      | &check;               |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    |                    |                    |                    | &check;                       |                              | &check;                       | &check;                       |                            | &check;                       | &check;                       |                              | &check;                       | &check;                       | &check;                        |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| macos-26            |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    |                    |                    |                    | &check;                       |                              | &check;                       | &check;                       |                            | &check;                       | &check;                       |                              | &check;                       | &check;                       | &check;                        |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| macos-26-intel      |                  | &check;         | &check;         | &check;         | &check;               |                      | &check;               |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    |                    |                    |                    | &check;                       |                              | &check;                       | &check;                       |                            | &check;                       | &check;                       |                              | &check;                       | &check;                       | &check;                        |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| ubuntu-22.04        |                  | &check;         | &check;         | &check;         | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                       | &check;                         | &check;                       |                            | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                        | &check;                        | &check;                        | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                   | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  |
-| ubuntu-24.04        | &check;             | &check;         | &check;         | &check;         | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                 | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;                       | &check;                         | &check;                       |                            | &check;                       | &check;                       | &check;                       | &check;                         | &check;                       | &check;                       | &check;                        | &check;                        | &check;                        | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  | &check;                  |
-| windows-2022        |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    | &check;               | &check;               |                      |                    | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               | &check;               |                            |                              |                            |                            |                            |                            | &check;                       |                              |                            | &check;                       | &check;                        | &check;                        | &check;                        | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| windows-2025        |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    | &check;               | &check;               | &check;               |                            |                              |                            |                            |                            |                            |                            |                              |                            |                            |                             |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-| windows-2025-vs2026 |                  | &check;         | &check;         | &check;         |                    |                      |                    |                    |                    |                    |                    |                      |                    |                    |                    |                    |                    |                    |                    | &check;               | &check;               | &check;               |                            |                              |                            |                            |                            |                            |                            |                              |                            |                            |                             |                             |                             | &check;                  | &check;                  |                       |                       |                       |                       |                        |                       |                       |                       |                       |                       |                       |                       |                       |                       |
-<!-- compat ends -->
-
-**Note:** Intel's `ifx` compiler is not supported on macOS, so the `intel` option redirects to `intel-classic` (`ifort`).
-
-**Note:** LFortran is currently only discoverable by name with `bash` on Windows, see [here for context](https://github.com/fortran-lang/setup-fortran/pull/57#issuecomment-2021605094).
+Report bugs and feature requests in the [issue tracker](https://github.com/fortran-lang/setup-fortran/issues).
 
 ## License
 
-Licensed under the Apache License, Version 2.0 (the “License”);
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an *“as is” basis*,
-*without warranties or conditions of any kind*, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in this project by you, as defined in the
-Apache-2.0 license, shall be licensed as above, without any additional
-terms or conditions.
+[Apache-2.0](LICENSE)

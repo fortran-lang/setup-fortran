@@ -1,155 +1,55 @@
-name: "Setup Fortran"
-description: "Setup Fortran compiler and toolchain"
+name: "Setup Fortran Compilers"
+description: Set up Fortran compilers on GitHub Actions runners
+author: fortran-lang
+branding:
+  icon: cpu
+  color: purple
+
 inputs:
   compiler:
-    description: "Toolchain or compiler to install"
-    required: true
-    default: "gcc"
+    description: >-
+      Fortran compiler to install. Canonical names are `gfortran`, `ifx`,
+      `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, and `armflang`.
+      Compatibility aliases `gcc`, `intel`, `intel-classic`, and `nvidia-hpc`
+      are also accepted, but canonical names are recommended. Defaults to
+      `gfortran`.
+    required: false
+    default: gfortran
   version:
-    description: "Version of toolchain or compiler"
+    description: >-
+      Compiler version to install. Enclose the version string in quotation marks
+      (e.g. `"2026.1.1"` or `"0.64.0"`). Defaults to the latest version.
     required: false
+  msystem:
+    description: >-
+      Windows toolchain environment to use. Defaults to `native`. Ignored on
+      non-Windows runners.
+    required: false
+    default: native
+  cleanup-disk:
+    description: >-
+      Free up disk space by removing large pre-installed toolkits. Currently
+      only supported for `nvfortran` installations. Defaults to `false`.
+    required: false
+    default: "false"
   update-environment:
-    description: "Whether to set environment variables"
+    description: >-
+      Whether to export toolchain environment variables (FC, CC, CXX, FPM_*,
+      F77, F90, FORTRAN_COMPILER) to the runner environment. Accepts `true` or
+      `false`. Defaults to `true`.
     required: false
-    default: true
+    default: "true"
+
 outputs:
+  version:
+    description: The installed compiler version.
   fc:
-    description: "Path to Fortran compiler"
-    value: ${{ steps.outputs.outputs.fc }}
+    description: The Fortran compiler command or path.
   cc:
-    description: "Path to C compiler"
-    value: ${{ steps.outputs.outputs.cc }}
+    description: The C compiler command or path.
   cxx:
-    description: "Path to C++ compiler"
-    value: ${{ steps.outputs.outputs.cxx }}
+    description: The C++ compiler command or path.
+
 runs:
-  using: "composite"
-  steps:
-    # On Windows runners the Intel toolchain is very slow to install,
-    # setup caching with daily key rotation. Steps are also needed to
-    # activate the oneAPI environment.
-    - name: Set oneAPI install dir
-      id: oneapi-root
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      shell: bash
-      run: echo "ONEAPI_ROOT=C:\Program Files (x86)\Intel\oneAPI" >> "$GITHUB_ENV"
-    - name: Get date
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      id: get-date
-      shell: bash
-      run: echo "date=$(/bin/date -u "+%Y%m%d")" >> "$GITHUB_OUTPUT"
-    - name: Restore cache
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      id: cache
-      uses: actions/cache/restore@v6
-      with:
-        path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
-
-    # Use micromamba for lfortran installs, on all platforms: it gives us a
-    # fresh, empty env to install into, rather than the base env baked into
-    # each runner image's pre-installed system conda, which can carry pins
-    # (python, zstd, etc.) that conflict with lfortran's own dependencies.
-    # Check if micromamba already exists, only install it if needed. If we
-    # install it, clean it up after.
-    - name: Check for micromamba
-      id: check-umamba
-      if: contains(inputs.compiler, 'lfortran')
-      shell: bash
-      run: |
-        if [ "$(command -v micromamba)" ]; then
-          echo "install=false" >> $GITHUB_OUTPUT
-        else
-          echo "install=true" >> $GITHUB_OUTPUT
-        fi
-    - uses: mamba-org/setup-micromamba@v3.2.1
-      if: contains(inputs.compiler, 'lfortran') && steps.check-umamba.outputs.install == 'true'
-      with:
-        init-shell: bash
-        post-cleanup: 'all'
-
-    # Set up the selected toolchain or compiler
-    - name: Setup toolchain
-      id: setup
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      env:
-        COMPILER: ${{ inputs.compiler }}
-        VERSION: ${{ inputs.version }}
-      run: |
-        cd $(echo "/$GITHUB_ACTION_PATH" | sed -e 's/\\/\//g' -e 's/://')
-        source ./main.sh
-
-        if [[ "${{ inputs.update-environment }}" == "true" ]]; then
-          echo "FC=${FC}" >> $GITHUB_ENV
-          echo "CC=${CC}" >> $GITHUB_ENV
-          echo "CXX=${CXX}" >> $GITHUB_ENV
-        fi
-
-    # save oneAPI cache and activate environment
-    - name: Save cache
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel') && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v6
-      with:
-        path: ${{ env.ONEAPI_ROOT }}
-        key: ${{ runner.os }}-${{ inputs.compiler }}-${{ inputs.version || 'latest' }}-${{ steps.get-date.outputs.date }}
-    - name: Activate oneAPI
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'intel')
-      shell: cmd
-      run: |
-        ver | findstr /i "10\.0\.17" && set VS2019INSTALLDIR=C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise
-        ver | findstr /i "10\.0\.20" && set VS2022INSTALLDIR=C:\Program Files\Microsoft Visual Studio\2022\Enterprise
-        call "%ONEAPI_ROOT%\setvars.bat"
-        set | findstr /c:"oneAPI" >> "%GITHUB_ENV%"
-
-    - name: Set outputs and env vars
-      shell: bash
-      id: outputs
-      run: |
-        # Intel compilers may have restored from cache so env vars may not be set
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          if [[ "${{ inputs.compiler }}" == "intel" ]]; then
-            FC=ifx
-            CC=icx
-            CXX=icx
-            echo SETVARS_COMPLETED=1>>$GITHUB_ENV
-          elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
-            FC=ifort
-            CC=icl
-            CXX=icl
-            echo SETVARS_COMPLETED=1>>$GITHUB_ENV
-          fi
-        fi
-
-        if [[ "${{ inputs.update-environment }}" == "true" ]]; then
-          # cmake
-          echo FC=$FC>>$GITHUB_ENV
-          echo CC=$CC>>$GITHUB_ENV
-          echo CXX=$CXX>>$GITHUB_ENV
-          # fpm
-          echo FPM_FC=$FC>>$GITHUB_ENV
-          echo FPM_CC=$CC>>$GITHUB_ENV
-          echo FPM_CXX=$CXX>>$GITHUB_ENV
-        fi
-
-        # set action outputs
-        echo fc=$FC>>$GITHUB_OUTPUT
-        echo cc=$CC>>$GITHUB_OUTPUT
-        echo cxx=$CXX>>$GITHUB_OUTPUT
-
-    - name: Hide GNU linker (Windows)
-      if: runner.os == 'Windows' && !contains(inputs.compiler, 'gcc')
-      shell: bash
-      run: mv /usr/bin/link $RUNNER_TEMP/link
-
-    - name: Get architecture (Windows)
-      id: msvc-arch
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
-      shell: bash
-      run: echo "arch=${RUNNER_ARCH,,}" >> $GITHUB_OUTPUT
-
-    - name: Setup MSVC toolchain (Windows)
-      if: runner.os == 'Windows' && contains(inputs.compiler, 'lfortran')
-      uses: ilammy/msvc-dev-cmd@v1.13.0
-      with:
-        arch: ${{ steps.msvc-arch.outputs.arch }}
+  using: node24
+  main: dist/index.js

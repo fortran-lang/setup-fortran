@@ -1,0 +1,242 @@
+name: ifx
+
+on:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  integration-tests:
+    name: ${{ matrix.toolchain.version }} ${{ matrix.image }} ${{
+      matrix.toolchain.msystem }}
+    if: github.actor != 'dependabot[bot]'
+    timeout-minutes: 60
+    runs-on: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-22.04]
+        toolchain:
+          - { compiler: ifx, version: "2026.1" }
+          - { compiler: ifx, version: "2026.0" }
+          - { compiler: ifx, version: "2025.3" }
+          - { compiler: ifx, version: "2025.2" }
+          - { compiler: ifx, version: "2025.1" }
+          - { compiler: ifx, version: "2025.0" }
+          - { compiler: ifx, version: "2024.2" }
+          - { compiler: ifx, version: "2024.1" }
+          - { compiler: ifx, version: "2024.0" }
+          - { compiler: ifx, version: "2023.2.4" }
+          - { compiler: ifx, version: "2023.2.3" }
+          - { compiler: ifx, version: "2023.2.2" }
+          - { compiler: ifx, version: "2023.2.1" }
+          - { compiler: ifx, version: "2023.2.0" }
+          - { compiler: ifx, version: "2023.1.0" }
+          - { compiler: ifx, version: "2023.0.0" }
+          - { compiler: ifx, version: "2022.2.1" }
+          - { compiler: ifx, version: "2022.2.0" }
+          - { compiler: ifx, version: "2022.1.0" }
+          - { compiler: ifx, version: "2022.0.2" }
+          - { compiler: ifx, version: "2022.0.1" }
+          - { compiler: ifx, version: "2021.4.0" }
+          - { compiler: ifx, version: "2021.3.0" }
+          - { compiler: ifx, version: "2021.2.0" }
+          - { compiler: ifx, version: "2021.1.2" }
+          - { compiler: ifx, version: "2021.1.1" }
+        include:
+          - image: windows-2022
+            toolchain: { compiler: intel } # test compatibility alias
+          - image: ubuntu-24.04
+            toolchain: { compiler: ifx, version: "2023.2" } # make sure that minor is resolved to latest patch
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3" } # make sure that minor is resolved to latest patch
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2026.1.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2026.1.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2026.1.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2026.1.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2026.0.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2026.0.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3.3" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.3.3" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3.2" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.3.2" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.3.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.3.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.3.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.2.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.2.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.2.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.2.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.1.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.1.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.0.4" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.0.4" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.0.3" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.0.3" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.0.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.0.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2025.0.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2025.0.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2024.2.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2024.2.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2024.2.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2024.2.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2024.1.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2024.1.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2024.0.2" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2024.0.2" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2024.0.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2024.0.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2023.2.1" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2023.2.1" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2023.2.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2023.2.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2023.1.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2023.1.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2022.3.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2022.3.0" }
+          - image: windows-2025
+            toolchain: { compiler: ifx, version: "2022.2.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2022.2.0" }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore dist-verify
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-verify --dir dist-verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore dist-tests
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 10
+          command: gh run download ${{ github.run_id }} --name generated-dist-tests --dir dist-tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
+        id: setup
+        uses: ./
+        timeout-minutes: 30
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Verify installation
+        shell: bash
+        env:
+          OUTPUT_VERSION: ${{ steps.setup.outputs.version }}
+          OUTPUT_FC: ${{ steps.setup.outputs.fc }}
+          OUTPUT_CC: ${{ steps.setup.outputs.cc }}
+          OUTPUT_CXX: ${{ steps.setup.outputs.cxx }}
+        run: |
+          npm run verify-installation
+          echo "Fortran Compiler Setup:"
+          echo "  Version: ${{ steps.setup.outputs.version }}"
+          echo "  FC:      ${{ steps.setup.outputs.fc }}"
+          echo "  CC:      ${{ steps.setup.outputs.cc }}"
+          echo "  CXX:     ${{ steps.setup.outputs.cxx }}"
+
+      - name: Verify compiler invocation under pwsh/cmd (Windows only)
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/verify-windows-shells
+        with:
+          fc: ${{ steps.setup.outputs.fc }}
+          cc: ${{ steps.setup.outputs.cc }}
+          cxx: ${{ steps.setup.outputs.cxx }}
+      - name: Run Integration Tests
+        run: npm run integration-test
+
+  negative-macos-fallback:
+    name: intel on macOS fails (no silent ifort fallback)
+    runs-on: macos-26-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install intel on macOS (must fail)
+        id: setup
+        uses: ./
+        with:
+          compiler: intel
+        continue-on-error: true
+        timeout-minutes: 20
+
+      - name: Assert expected failure and no substituted outputs
+        if: always()
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          FC_OUT: ${{ steps.setup.outputs.fc }}
+          CC_OUT: ${{ steps.setup.outputs.cc }}
+          CXX_OUT: ${{ steps.setup.outputs.cxx }}
+          VERSION_OUT: ${{ steps.setup.outputs.version }}
+        run: |
+          echo "Asserting: outcome=$OUTCOME  fc=$FC_OUT  cc=$CC_OUT  cxx=$CXX_OUT  version=$VERSION_OUT"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::Expected 'intel' on macOS to fail, but outcome=$OUTCOME"
+            exit 1
+          fi
+          for value in "$FC_OUT" "$CC_OUT" "$CXX_OUT" "$VERSION_OUT"; do
+            if [ -n "$value" ]; then
+              echo "::error::Expected empty output after failure, got: $value"
+              exit 1
+            fi
+          done
+          echo "intel on macOS failed as expected with no silently substituted compiler"
