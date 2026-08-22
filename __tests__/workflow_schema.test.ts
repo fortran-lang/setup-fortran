@@ -125,9 +125,6 @@ describe("ci.yml canary structure", () => {
     expect(weekday).toBe("5");
   });
 
-  // TEMP: canary-report is commented out in ci.yml for the ifort-only trial
-  // run. Restore these tests together with the job.
-  /*
   it("has a canary-report job", () => {
     expect(ciYml.jobs).toHaveProperty("canary-report");
   });
@@ -172,5 +169,4 @@ describe("ci.yml canary structure", () => {
     expect(steps[0].uses).toBe("actions/github-script@v9");
     expect(steps[0].with.script).toContain("github.rest.issues.create");
   });
-  */
 });

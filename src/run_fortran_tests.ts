@@ -97,6 +97,12 @@ function getCxxLinkFlags(
           skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
         };
       }
+      if (path.basename(process.env.CXX ?? "").startsWith("icpc")) {
+        return {
+          flags: [],
+          skip: "the legacy icpc companion cannot parse modern libstdc++ headers",
+        };
+      }
       return { flags: ["-cxxlib"] };
     case Compiler.NVFortran:
       return { flags: ["-cxxstdlib"] };
