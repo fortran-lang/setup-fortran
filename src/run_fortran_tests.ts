@@ -64,6 +64,50 @@ function getCppFlags(compiler: Compiler, isWindows: boolean): string[] {
   return [];
 }
 
+// Link flags for the Fortran driver when linking C++ objects: the C++ standard
+// library must be pulled in explicitly, and the correct one depends on the
+// companion C++ compiler (GNU g++ links libstdc++, clang++ companions link
+// libc++ on macOS, Intel and NVIDIA have dedicated options). Returns a skip
+// reason for combinations that are not exercised yet.
+function getCxxLinkFlags(
+  compiler: Compiler,
+  platform: OS,
+): { flags: string[]; skip?: string } {
+  switch (compiler) {
+    case Compiler.GFortran:
+    case Compiler.AOCC:
+    case Compiler.ArmFlang:
+      // GNU g++-style companions (brew g++ on macOS, g++ on Linux).
+      return { flags: ["-lstdc++"] };
+    case Compiler.Flang:
+    case Compiler.LFortran:
+      if (platform === OS.Windows) {
+        return {
+          flags: [],
+          skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
+        };
+      }
+      // clang++ companions: libc++ on macOS, libstdc++ on Linux.
+      return { flags: [platform === OS.MacOS ? "-lc++" : "-lstdc++"] };
+    case Compiler.IFort:
+    case Compiler.IFX:
+      if (platform === OS.Windows) {
+        return {
+          flags: [],
+          skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
+        };
+      }
+      return { flags: ["-cxxlib"] };
+    case Compiler.NVFortran:
+      return { flags: ["-cxxstdlib"] };
+    default:
+      return {
+        flags: [],
+        skip: `C++ companion linking not exercised for ${String(compiler)}`,
+      };
+  }
+}
+
 async function run(): Promise<void> {
   const repoRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const buildDir = path.join(repoRoot, "test_build");
@@ -216,10 +260,69 @@ async function run(): Promise<void> {
       core.info(`Skipping ${name}: ${reason}`);
     };
 
+    /**
+     * Compile a standalone C++ source to an object file, then link it with a
+     * Fortran source into a single executable. The C++ source uses the C++
+     * standard library internally, so the link verifies that the companion
+     * C++ runtime is reachable from the Fortran driver.
+     */
+    const execMixedCxxTest = async (
+      name: string,
+      fortranSources: string[],
+      cxxSource: string,
+    ): Promise<void> => {
+      const fortranPath = path.join(testDir, fortranSources[0]);
+      const cxxPath = path.join(testDir, cxxSource);
+      // MSVC-style compilers (cl) use /Fo: and .obj; GCC/Clang use -o and .o
+      const isMsvc =
+        isWindows && (compiler === Compiler.IFort || compiler === Compiler.IFX);
+      const objExt = isMsvc ? ".obj" : ".o";
+      const objPath = path.join(buildDir, `${name}${objExt}`);
+      const outputPath = path.join(buildDir, isWindows ? `${name}.exe` : name);
+      const fflags = (process.env.FFLAGS ?? "").split(" ").filter(Boolean);
+      const cxxflags = (process.env.CXXFLAGS ?? "").split(" ").filter(Boolean);
+
+      core.startGroup(`Test: ${name}`);
+
+      if (isMsvc) {
+        await exec.exec(cxx, ["/EHsc", "/c", `/Fo:${objPath}`, cxxPath]);
+      } else {
+        await exec.exec(cxx, ["-c", ...cxxflags, "-o", objPath, cxxPath]);
+      }
+
+      await exec.exec(fc, [
+        ...baseFlags,
+        ...fflags,
+        fortranPath,
+        objPath,
+        ...cxxLinkFlags,
+        ...linkerFlags,
+        "-o",
+        outputPath,
+      ]);
+
+      await exec.exec(outputPath);
+      core.endGroup();
+    };
+
     await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
     await execTest("math_test", ["math_test.f90"]);
     await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
     await execMixedCTest("mixed_cc_test", ["mixed_cc_test.f90"], "cc_test.c");
+
+    const { flags: cxxLinkFlags, skip: skipCxxLink } = getCxxLinkFlags(
+      compiler,
+      platform,
+    );
+    if (skipCxxLink) {
+      skipTest("mixed_cxx_test", skipCxxLink);
+    } else {
+      await execMixedCxxTest(
+        "mixed_cxx_test",
+        ["mixed_cxx_test.f90"],
+        "cxx_test.cpp",
+      );
+    }
 
     const skipPoly =
       isFlang &&
