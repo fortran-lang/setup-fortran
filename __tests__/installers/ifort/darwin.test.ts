@@ -145,11 +145,50 @@ describe("installDarwin (ifort)", () => {
     expect(mockedCache.saveCache).toHaveBeenCalled();
   });
 
-  it("throws error on ARM64", async () => {
-    const inputs = { ...baseInputs, arch: Arch.ARM64 };
-    await expect(installDarwin(inputs)).rejects.toThrow(
-      "No supported versions found for ifort on darwin (arm64)",
+  it("installs on ARM64 under Rosetta 2", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+
+    await installDarwin({ ...baseInputs, arch: Arch.ARM64 });
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "arch",
+      ["-x86_64", "/usr/bin/true"],
+      expect.objectContaining({ ignoreReturnCode: true }),
     );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["--install-rosetta"]),
+    );
+  });
+
+  it("installs Rosetta 2 on ARM64 when it is missing", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "arch") {
+        return 71;
+      }
+      if (commandLine === "ifort" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(
+          Buffer.from("ifort (IFORT) 2021.10.0 20230609"),
+        );
+      }
+      if (commandLine === "bash" && args?.[1]?.includes("setvars.sh")) {
+        options?.listeners?.stdout?.(
+          Buffer.from(
+            "PATH=/opt/intel/oneapi/compiler/latest/bin\nONEAPI_ROOT=/opt/intel/oneapi",
+          ),
+        );
+      }
+      return 0;
+    });
+
+    await installDarwin({ ...baseInputs, arch: Arch.ARM64 });
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "softwareupdate",
+      "--install-rosetta",
+      "--agree-to-license",
+    ]);
   });
 
   it("exports environment variables", async () => {

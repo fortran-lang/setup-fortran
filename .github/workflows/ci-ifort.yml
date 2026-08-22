@@ -40,6 +40,42 @@ jobs:
             toolchain: { compiler: ifort, version: "2021.10" }
           - image: macos-15-intel
             toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-26
+            toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-14
+            toolchain: { compiler: ifort, version: "2021.10" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.9" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.6" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.5" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.3" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.2" }
+          - image: macos-26
+            toolchain: { compiler: ifort, version: "2021.1" }
+          - image: macos-15
+            toolchain: { compiler: ifort, version: "2021.1" }
           - image: macos-26-intel
             toolchain: { compiler: ifort, version: "2021.9" }
           - image: macos-15-intel

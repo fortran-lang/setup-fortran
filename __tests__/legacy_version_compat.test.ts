@@ -14,10 +14,7 @@ jest.mock("@actions/core");
 // src/installers/*; they are kept in this dedicated test so dropping a legacy
 // spelling produces a visible test failure instead of a quiet behaviour change.
 //
-// Two incumbent cells are deliberate, documented deviations and live in
-// `UNSUPPORTED_INCUMBENT_CELLS` instead of the acceptance table:
-//   - `ifort` on macOS ARM64 runners (macos-14/15/26): the replacement removed
-//     the Rosetta-based ifort support ([Arch.ARM64] is undefined).
+// One incumbent behavior is a deliberate, documented deviation:
 //   - `ifx` (compiler: intel) on macOS: the replacement intentionally fails
 //     instead of silently redirecting to intel-classic/ifort.
 // ===========================================================================
@@ -45,11 +42,14 @@ const INCUMBENT_GREEN_CELLS: readonly CompatCell[] = [
   ["gfortran", "15", "macos", "arm64"],
   ["gfortran", "15", "macos", "x64"],
   ["gfortran", "15", "windows", "x64"],
-  // ifort (intel-classic) on Linux, Intel macOS, and Windows.
+  // ifort (intel-classic) on Linux, macOS (x64 and ARM64 via Rosetta 2), and
+  // Windows.
   ["ifort", "2021.1", "linux", "x64"],
+  ["ifort", "2021.1", "macos", "arm64"],
   ["ifort", "2021.1", "macos", "x64"],
   ["ifort", "2021.1.2", "linux", "x64"],
   ["ifort", "2021.10", "linux", "x64"],
+  ["ifort", "2021.10", "macos", "arm64"],
   ["ifort", "2021.10", "macos", "x64"],
   ["ifort", "2021.10", "windows", "x64"],
   ["ifort", "2021.11", "linux", "x64"],
@@ -57,18 +57,24 @@ const INCUMBENT_GREEN_CELLS: readonly CompatCell[] = [
   ["ifort", "2021.12", "linux", "x64"],
   ["ifort", "2021.12", "windows", "x64"],
   ["ifort", "2021.2", "linux", "x64"],
+  ["ifort", "2021.2", "macos", "arm64"],
   ["ifort", "2021.2", "macos", "x64"],
+  ["ifort", "2021.3", "macos", "arm64"],
   ["ifort", "2021.3", "macos", "x64"],
   ["ifort", "2021.4", "linux", "x64"],
   ["ifort", "2021.5", "linux", "x64"],
+  ["ifort", "2021.5", "macos", "arm64"],
   ["ifort", "2021.5", "macos", "x64"],
   ["ifort", "2021.6", "linux", "x64"],
+  ["ifort", "2021.6", "macos", "arm64"],
   ["ifort", "2021.6", "macos", "x64"],
   ["ifort", "2021.6", "windows", "x64"],
   ["ifort", "2021.7.1", "linux", "x64"],
   ["ifort", "2021.8", "linux", "x64"],
+  ["ifort", "2021.8", "macos", "arm64"],
   ["ifort", "2021.8", "macos", "x64"],
   ["ifort", "2021.9", "linux", "x64"],
+  ["ifort", "2021.9", "macos", "arm64"],
   ["ifort", "2021.9", "macos", "x64"],
   ["ifort", "2021.9", "windows", "x64"],
   // ifx (intel) on Linux — all 18 incumbent spellings.
@@ -127,19 +133,6 @@ const INCUMBENT_GREEN_CELLS: readonly CompatCell[] = [
   ["nvfortran", "25.7", "linux", "x64"],
   ["nvfortran", "25.9", "linux", "x64"],
   ["nvfortran", "26.1", "linux", "x64"],
-];
-
-const UNSUPPORTED_INCUMBENT_CELLS: readonly CompatCell[] = [
-  // ifort (intel-classic) was verified on ARM macOS under Rosetta by the
-  // incumbent; the replacement deliberately marks ARM64 unsupported.
-  ["ifort", "2021.1", "macos", "arm64"],
-  ["ifort", "2021.10", "macos", "arm64"],
-  ["ifort", "2021.2", "macos", "arm64"],
-  ["ifort", "2021.3", "macos", "arm64"],
-  ["ifort", "2021.5", "macos", "arm64"],
-  ["ifort", "2021.6", "macos", "arm64"],
-  ["ifort", "2021.8", "macos", "arm64"],
-  ["ifort", "2021.9", "macos", "arm64"],
 ];
 
 // ---------------------------------------------------------------------------
@@ -368,7 +361,7 @@ function resolve(cell: CompatCell): string {
       }
       return resolveVersion(
         inputs,
-        archTable(os === "macos" ? IFORT_MACOS : IFORT_LINUX),
+        os === "macos" ? bothArchTable(IFORT_MACOS) : archTable(IFORT_LINUX),
       );
     case "nvfortran":
       return resolveVersion(inputs, archTable(NVF));
@@ -388,15 +381,6 @@ describe("incumbent compat.csv parity", () => {
     "accepts %s %s on %s/%s",
     (compiler, version, os, arch) => {
       expect(() => resolve([compiler, version, os, arch])).not.toThrow();
-    },
-  );
-
-  it.each(UNSUPPORTED_INCUMBENT_CELLS)(
-    "deliberately rejects %s %s on %s/%s",
-    (compiler, version, os, arch) => {
-      expect(() => resolve([compiler, version, os, arch])).toThrow(
-        /not supported|No supported versions|is not supported/,
-      );
     },
   );
 });

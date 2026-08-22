@@ -53,7 +53,7 @@ const IFORT_RELEASES = [
 
 const SUPPORTED_VERSIONS = {
   [Arch.X64]: IFORT_RELEASES.map((r) => r.version),
-  [Arch.ARM64]: undefined, // GitHub's macos-14+ runners are ARM64 and cannot run ifort
+  [Arch.ARM64]: IFORT_RELEASES.map((r) => r.version),
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 const ONEAPI_ROOT = "/opt/intel/oneapi";
@@ -103,6 +103,24 @@ async function downloadInstaller(
   return destPath;
 }
 
+async function ensureRosetta(): Promise<void> {
+  const probe = await exec.exec("arch", ["-x86_64", "/usr/bin/true"], {
+    ignoreReturnCode: true,
+    silent: true,
+  });
+  if (probe === 0) {
+    core.info("Rosetta 2 is available; ifort will run as an x86_64 binary.");
+    return;
+  }
+
+  core.info("Rosetta 2 is not installed; installing it via softwareupdate...");
+  await exec.exec("sudo", [
+    "softwareupdate",
+    "--install-rosetta",
+    "--agree-to-license",
+  ]);
+}
+
 async function runInstaller(installScript: string): Promise<void> {
   const args = [
     installScript,
@@ -148,10 +166,7 @@ export async function installDarwin(
   core.info(`Installing ifort ${version} on macOS (${inputs.arch})...`);
 
   if (inputs.arch === Arch.ARM64) {
-    throw new Error(
-      "Intel Fortran (ifort) does not support Apple Silicon (ARM64). " +
-        "Please ensure your workflow uses an x64 runner or Intel environment.",
-    );
+    await ensureRosetta();
   }
 
   const cacheKey = `ifort-darwin-validated-v1-${inputs.arch}-${version}`;
