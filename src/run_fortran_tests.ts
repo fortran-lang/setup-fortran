@@ -231,6 +231,148 @@ function getCxxLinkFlags(
   }
 }
 
+// Shared wording for compiler-capability skips; kept identical to the
+// historical log output of the runner.
+function notSupportedMessage(
+  compiler: Compiler,
+  flangVersion: Latest | number | undefined,
+): string {
+  return `not supported by ${compiler} ${(flangVersion ?? "").toString()} on ${process.platform}`;
+}
+
+/**
+ * Everything the integration tests need to know about the toolchain and
+ * environment, resolved once up front so individual test cases can be
+ * declared as plain data plus small pure predicates.
+ */
+interface TestContext {
+  compiler: Compiler;
+  platform: OS;
+  isWindows: boolean;
+  isDarwin: boolean;
+  isFlang: boolean;
+  isLFortran: boolean;
+  isUCRT64: boolean;
+  isMSYS2: boolean;
+  flangVersion: Latest | number | undefined;
+  glibcVersion: number | undefined;
+  nvcxxVersion: NvcxxVersion | undefined;
+  cppFlags: string[];
+  openmpFlags: string[];
+}
+
+/** Non-Fortran source compiled separately and linked into the test binary. */
+interface CompanionSource {
+  language: "c" | "cxx";
+  source: string;
+}
+
+interface TestCase {
+  name: string;
+  fortranSources: string[];
+  companion?: CompanionSource;
+  /** Extra Fortran compile/link flags, resolved from the context. */
+  extraFlags?: (ctx: TestContext) => string[];
+  /** Returns a human-readable reason when the test must be skipped. */
+  skipReason?: (ctx: TestContext) => string | undefined;
+}
+
+/**
+ * The integration test suite as data: each case names its Fortran sources,
+ * optionally links a C/C++ companion, and carries pure predicates for extra
+ * flags and version/platform-gated skips. Adding a test means adding an entry
+ * here rather than another branch in the runner.
+ */
+function buildTestManifest(): TestCase[] {
+  return [
+    {
+      name: "iso_fortran_env_test",
+      fortranSources: ["iso_fortran_env_test.f90"],
+    },
+    {
+      name: "math_test",
+      fortranSources: ["math_test.f90"],
+    },
+    {
+      name: "c_interop_test",
+      // Capital-F extensions imply preprocessing for gfortran/flang, but
+      // lfortran requires an explicit flag; Intel on Windows uses -fpp.
+      fortranSources: ["c_interop_test.F90"],
+      extraFlags: (ctx) => ctx.cppFlags,
+    },
+    {
+      name: "mixed_cc_test",
+      fortranSources: ["mixed_cc_test.f90"],
+      companion: { language: "c", source: "cc_test.c" },
+    },
+    {
+      name: "mixed_cxx_test",
+      fortranSources: ["mixed_cxx_test.f90"],
+      companion: { language: "cxx", source: "cxx_test.cpp" },
+      extraFlags: (ctx) =>
+        getCxxLinkFlags(
+          ctx.compiler,
+          ctx.platform,
+          ctx.glibcVersion,
+          ctx.nvcxxVersion,
+        ).flags,
+      skipReason: (ctx) =>
+        getCxxLinkFlags(
+          ctx.compiler,
+          ctx.platform,
+          ctx.glibcVersion,
+          ctx.nvcxxVersion,
+        ).skip,
+    },
+    {
+      name: "polymorphism_test",
+      fortranSources: ["polymorphism_mod_test.f90", "polymorphism_test.f90"],
+      // Flang gained the required OOP support in LLVM 19, and the MSYS2
+      // packages lag further behind.
+      skipReason: ({
+        compiler,
+        isFlang,
+        isUCRT64,
+        flangVersion,
+      }): string | undefined => {
+        const tooOldFlang =
+          isFlang &&
+          flangVersion !== undefined &&
+          flangVersion !== LATEST &&
+          flangVersion < 19;
+        return tooOldFlang || (isFlang && isUCRT64)
+          ? notSupportedMessage(compiler, flangVersion)
+          : undefined;
+      },
+    },
+    {
+      name: "omp_test",
+      fortranSources: ["omp_test.f90"],
+      extraFlags: (ctx) => ctx.openmpFlags,
+      skipReason: ({
+        compiler,
+        isFlang,
+        isLFortran,
+        isDarwin,
+        isMSYS2,
+        flangVersion,
+      }): string | undefined => {
+        // lfortran does not implement OpenMP yet. For flang, LATEST from brew
+        // works; let's check whether pinned installs from source work from
+        // major 23 on.
+        const unsupportedFlangOnDarwin =
+          isDarwin &&
+          !!flangVersion &&
+          flangVersion !== LATEST &&
+          flangVersion < 23;
+        return isLFortran || (isFlang && (unsupportedFlangOnDarwin || isMSYS2))
+          ? notSupportedMessage(compiler, flangVersion)
+          : undefined;
+      },
+    },
+  ];
+}
+
 async function run(): Promise<void> {
   const repoRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const buildDir = path.join(repoRoot, "test_build");
@@ -342,6 +484,7 @@ async function run(): Promise<void> {
       name: string,
       fortranSources: string[],
       cSource: string,
+      extraFlags: string[] = [],
     ): Promise<void> => {
       const fortranPath = path.join(testDir, fortranSources[0]);
       const cPath = path.join(testDir, cSource);
@@ -364,12 +507,12 @@ async function run(): Promise<void> {
       }
 
       // Link Fortran + C object into final executable
-      const linkFlags = [objPath];
       await exec.exec(fc, [
         ...baseFlags,
         ...fflags,
+        ...extraFlags,
         fortranPath,
-        ...linkFlags,
+        objPath,
         ...linkerFlags,
         "-o",
         outputPath,
@@ -393,6 +536,7 @@ async function run(): Promise<void> {
       name: string,
       fortranSources: string[],
       cxxSource: string,
+      extraFlags: string[] = [],
     ): Promise<void> => {
       const fortranPath = path.join(testDir, fortranSources[0]);
       const cxxPath = path.join(testDir, cxxSource);
@@ -416,9 +560,9 @@ async function run(): Promise<void> {
       await exec.exec(fc, [
         ...baseFlags,
         ...fflags,
+        ...extraFlags,
         fortranPath,
         objPath,
-        ...cxxLinkFlags,
         ...linkerFlags,
         "-o",
         outputPath,
@@ -428,64 +572,54 @@ async function run(): Promise<void> {
       core.endGroup();
     };
 
-    await execTest("iso_fortran_env_test", ["iso_fortran_env_test.f90"]);
-    await execTest("math_test", ["math_test.f90"]);
-    await execTest("c_interop_test", ["c_interop_test.F90"], cppFlags);
-    await execMixedCTest("mixed_cc_test", ["mixed_cc_test.f90"], "cc_test.c");
-
+    // Toolchain probes are silent best-effort queries; resolve them once so
+    // the manifest cases below can stay pure functions of the context.
     const glibcVersion =
       platform === OS.Linux ? await detectGlibcVersion() : undefined;
     const nvcxxVersion =
       compiler === Compiler.NVFortran ? await detectNvcxxVersion() : undefined;
-    const { flags: cxxLinkFlags, skip: skipCxxLink } = getCxxLinkFlags(
+
+    const ctx: TestContext = {
       compiler,
       platform,
+      isWindows,
+      isDarwin,
+      isFlang,
+      isLFortran,
+      isUCRT64,
+      isMSYS2,
+      flangVersion,
       glibcVersion,
       nvcxxVersion,
-    );
-    if (skipCxxLink) {
-      skipTest("mixed_cxx_test", skipCxxLink);
-    } else {
-      await execMixedCxxTest(
-        "mixed_cxx_test",
-        ["mixed_cxx_test.f90"],
-        "cxx_test.cpp",
-      );
-    }
+      cppFlags,
+      openmpFlags: ompFlag,
+    };
 
-    const skipPoly =
-      isFlang &&
-      ((flangVersion !== undefined &&
-        flangVersion !== LATEST &&
-        flangVersion < 19) ||
-        isUCRT64);
+    for (const test of buildTestManifest()) {
+      const skipReason = test.skipReason?.(ctx);
+      if (skipReason !== undefined) {
+        skipTest(test.name, skipReason);
+        continue;
+      }
 
-    if (!skipPoly) {
-      await execTest("polymorphism_test", [
-        "polymorphism_mod_test.f90",
-        "polymorphism_test.f90",
-      ]);
-    } else {
-      skipTest(
-        "polymorphism_test",
-        `not supported by ${compiler} ${(flangVersion ?? "").toString()} on ${process.platform}`,
-      );
-    }
-
-    const isUnsupportedFlangOnDarwin =
-      isDarwin && flangVersion && flangVersion !== LATEST && flangVersion < 23; // LATEST from brew works, let's check with version 23 if installation from source works, too
-    const skipOmp =
-      isLFortran ||
-      (isFlang && (isUnsupportedFlangOnDarwin === true || isMSYS2));
-    if (!skipOmp) {
-      await execTest("omp_test", ["omp_test.f90"], ompFlag);
-    } else {
-      skipTest(
-        "omp_test",
-        `not supported by ${compiler} ${(
-          flangVersion ?? ""
-        ).toString()} on ${process.platform}`,
-      );
+      const extraFlags = test.extraFlags?.(ctx) ?? [];
+      if (!test.companion) {
+        await execTest(test.name, test.fortranSources, extraFlags);
+      } else if (test.companion.language === "c") {
+        await execMixedCTest(
+          test.name,
+          test.fortranSources,
+          test.companion.source,
+          extraFlags,
+        );
+      } else {
+        await execMixedCxxTest(
+          test.name,
+          test.fortranSources,
+          test.companion.source,
+          extraFlags,
+        );
+      }
     }
 
     core.info("All integration tests passed successfully!");
