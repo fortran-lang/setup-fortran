@@ -285,6 +285,72 @@ describe("resolveWindowsVersion", () => {
   });
 });
 
+describe("resolveVersion / resolveWindowsVersion error paths", () => {
+  const linuxInputs: Inputs = {
+    compiler: Compiler.GFortran,
+    version: LATEST,
+    os: OS.Linux,
+    osVersion: "22.04",
+    arch: Arch.X64,
+    msystem: Msystem.Native,
+    cleanupDisk: false,
+    updateEnvironment: true,
+  };
+
+  it("throws when the requested arch has no supported-versions entry", () => {
+    // An entirely absent arch cell (`undefined`) — the "unsupported" sentinel.
+    expect(() => resolveVersion(linuxInputs, {})).toThrow(
+      "No supported versions found for gfortran on linux (x64).",
+    );
+  });
+
+  it("throws a clear error when 'latest' resolves an empty version list", () => {
+    const supported = { [Arch.X64]: [] as readonly string[] };
+    expect(() => resolveVersion(linuxInputs, supported)).toThrow(
+      "No supported versions found for gfortran on linux (x64).",
+    );
+  });
+
+  it("refuses an explicit version when the version list is empty", () => {
+    const supported = { [Arch.X64]: [] as readonly string[] };
+    const inputs: Inputs = { ...linuxInputs, version: "14" };
+    // `versions[0]` is undefined only for "latest"; an explicit version still
+    // reaches `versionList.includes`, which misses on `[]` and emits a message
+    // whose `Supported versions:` tail is empty — the symptom of a structural
+    // defect that supported_versions.test.ts ("is non-empty") forbids in real
+    // tables. This pins resolveVersion's failure mode regardless.
+    expect(() => resolveVersion(inputs, supported)).toThrow(
+      /gfortran 14 is not supported on linux \(x64\)\. Supported versions: $/,
+    );
+  });
+
+  it("throws when an unsupported arch is requested on Windows", () => {
+    const win: Inputs = {
+      ...linuxInputs,
+      os: OS.Windows,
+      osVersion: "2022",
+      msystem: Msystem.Native,
+    };
+    // x64 is intentionally absent from the table.
+    expect(() => resolveWindowsVersion(win, {} as any)).toThrow(
+      /Architecture "x64" is not supported for gfortran on Windows\./,
+    );
+  });
+
+  it("throws when the msystem is unsupported on Windows", () => {
+    const win: Inputs = {
+      ...linuxInputs,
+      os: OS.Windows,
+      osVersion: "2022",
+      msystem: Msystem.Native,
+    };
+    // x64 is present, but no msystem cell is defined.
+    expect(() => resolveWindowsVersion(win, { [Arch.X64]: {} } as any)).toThrow(
+      /The environment "native" is not supported for Windows x64\./,
+    );
+  });
+});
+
 describe("resolveLatestPatch", () => {
   beforeEach(() => {
     jest.useFakeTimers();
