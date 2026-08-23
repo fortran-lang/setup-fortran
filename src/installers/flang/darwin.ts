@@ -24,7 +24,7 @@ import { verifySha256 } from "../../verify_download";
 //   X64:   LLVM-{patch}-macOS-X64.tar.xz    (availability varies; verified at runtime)
 //
 // LATEST is listed first so it is the default when no version is specified.
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [LATEST, "19"],
   [Arch.ARM64]: [LATEST, "21", "20", "19"], // Only on macos-15+ runners
 } as const satisfies Record<Arch, readonly string[]>;

@@ -34,7 +34,7 @@ import { persistBinDirForBash } from "../../bash_env";
 //   x64 only — MSYS2 does not support ARM64. Version is always LATEST since
 //   pacman tracks the rolling release. The UCRT64 lfortran package tracks
 //   upstream closely (verified at 0.63.0).
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: [
       "0.64.0",

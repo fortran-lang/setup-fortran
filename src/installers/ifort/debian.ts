@@ -31,7 +31,7 @@ const IFORT_BUNDLES = [
   { ifort: "2021.1", bundle: "2021.1.2" },
 ] as const;
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: IFORT_BUNDLES.map((m) => m.ifort),
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;

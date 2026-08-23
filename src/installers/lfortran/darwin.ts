@@ -23,7 +23,7 @@ import {
 //   - Both ARM64 (macos-14+) and X64 (macos-13 and earlier) are supported via
 //     conda-forge. The conda arch strings are `osx-arm64` and `osx-64`.
 //   - LATEST resolves to the first entry in the list.
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "0.64.0",
     "0.63.0",

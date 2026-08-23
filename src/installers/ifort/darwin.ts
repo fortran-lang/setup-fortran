@@ -51,7 +51,7 @@ const IFORT_RELEASES = [
   },
 ] as const;
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: IFORT_RELEASES.map((r) => r.version),
   [Arch.ARM64]: IFORT_RELEASES.map((r) => r.version),
 } as const satisfies Record<Arch, readonly string[] | undefined>;

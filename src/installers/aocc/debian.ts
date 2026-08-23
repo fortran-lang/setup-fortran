@@ -32,7 +32,7 @@ const AOCC_RELEASES = [
   },
 ] as const;
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: AOCC_RELEASES.map((r) => r.version),
   [Arch.ARM64]: undefined,
 } as const satisfies Record<Arch, readonly string[] | undefined>;

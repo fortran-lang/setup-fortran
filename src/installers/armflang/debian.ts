@@ -8,7 +8,7 @@ import * as path from "path";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: undefined,
   [Arch.ARM64]: ["22.1", "21.1", "20.1"],
 } as const satisfies Record<Arch, readonly string[] | undefined>;

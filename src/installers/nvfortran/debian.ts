@@ -28,7 +28,7 @@ const APT_NETWORK_OPTIONS = [
   "Acquire::https::ConnectTimeout=20",
 ];
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "26.5",
     "26.3",

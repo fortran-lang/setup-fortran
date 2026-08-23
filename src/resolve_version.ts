@@ -311,6 +311,59 @@ export function parseMajorOrPatch(input: string): {
   );
 }
 
+// ==========================================
+// Version ordering helpers
+// ==========================================
+
+/**
+ * Numeric sort key for a version string. Releases are calendar-or-sequential
+ * (e.g. "2026.1.2", "0.57.0", "16"), so each dot-separated segment is parsed
+ * as an integer and compared left-to-right: `2026.1.1` outranks `2026.1`, and
+ * `2021.10` outranks `2021.2`.
+ *
+ * `LATEST` represents the newest rolling release (Homebrew, pacman, conda) and
+ * therefore sorts above any concrete version; in a descending list it must
+ * occupy the first (default) position.
+ */
+function versionSortKey(version: string): number[] {
+  if (version === LATEST) return [Number.POSITIVE_INFINITY];
+  return version.split(".").map((segment) => {
+    const n = parseInt(segment, 10);
+    return Number.isNaN(n) ? 0 : n;
+  });
+}
+
+/**
+ * Compares two version strings numerically. Returns a negative number when
+ * `a` is older than `b`, a positive number when `a` is newer, and 0 when equal.
+ * `LATEST` is treated as newer than any concrete version.
+ */
+export function compareVersions(a: string, b: string): number {
+  const ka = versionSortKey(a);
+  const kb = versionSortKey(b);
+  const len = Math.max(ka.length, kb.length);
+  for (let i = 0; i < len; i++) {
+    const va = i < ka.length ? ka[i] : -Number.POSITIVE_INFINITY;
+    const vb = i < kb.length ? kb[i] : -Number.POSITIVE_INFINITY;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
+/**
+ * True when the sequence is non-increasing by version (each entry is newer
+ * than or equal to the next). This is the invariant that keeps
+ * {@link resolveVersion}'s `latest` resolution correct: when no version is
+ * supplied, `versions[0]` is installed, so the first entry must be the newest
+ * release. `LATEST`, when present, is only valid as the leading entry.
+ */
+export function isVersionListDescending(versions: readonly string[]): boolean {
+  for (let i = 0; i < versions.length - 1; i++) {
+    if (compareVersions(versions[i], versions[i + 1]) < 0) return false;
+  }
+  return true;
+}
+
 interface GitHubRelease {
   tag_name: string;
   prerelease: boolean;

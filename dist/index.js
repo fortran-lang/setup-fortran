@@ -102604,7 +102604,7 @@ const Msystem = {
     UCRT64: "ucrt64",
     Clang64: "clang64",
 };
-const LATEST = "latest";
+const types_LATEST = "latest";
 
 ;// CONCATENATED MODULE: ./src/parse_inputs.ts
 
@@ -102612,7 +102612,7 @@ const LATEST = "latest";
 
 const DEFAULTS = {
     compiler: Compiler.GFortran,
-    version: LATEST,
+    version: types_LATEST,
     msystem: Msystem.Native,
     cleanupDisk: false,
     updateEnvironment: true,
@@ -102845,7 +102845,7 @@ function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, 
     if (!versions) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
-    const rawVersion = inputs.version === LATEST ? versions[0] : inputs.version;
+    const rawVersion = inputs.version === types_LATEST ? versions[0] : inputs.version;
     if (!rawVersion) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
     }
@@ -102927,6 +102927,58 @@ function parseMajorOrPatch(input) {
         };
     }
     throw new Error(`Invalid version format: "${input}". Specify a major version (e.g. "22"), minor (e.g. "22.1") or full patch version (e.g. "22.1.3").`);
+}
+// ==========================================
+// Version ordering helpers
+// ==========================================
+/**
+ * Numeric sort key for a version string. Releases are calendar-or-sequential
+ * (e.g. "2026.1.2", "0.57.0", "16"), so each dot-separated segment is parsed
+ * as an integer and compared left-to-right: `2026.1.1` outranks `2026.1`, and
+ * `2021.10` outranks `2021.2`.
+ *
+ * `LATEST` represents the newest rolling release (Homebrew, pacman, conda) and
+ * therefore sorts above any concrete version; in a descending list it must
+ * occupy the first (default) position.
+ */
+function versionSortKey(version) {
+    if (version === LATEST)
+        return [Number.POSITIVE_INFINITY];
+    return version.split(".").map((segment) => {
+        const n = parseInt(segment, 10);
+        return Number.isNaN(n) ? 0 : n;
+    });
+}
+/**
+ * Compares two version strings numerically. Returns a negative number when
+ * `a` is older than `b`, a positive number when `a` is newer, and 0 when equal.
+ * `LATEST` is treated as newer than any concrete version.
+ */
+function compareVersions(a, b) {
+    const ka = versionSortKey(a);
+    const kb = versionSortKey(b);
+    const len = Math.max(ka.length, kb.length);
+    for (let i = 0; i < len; i++) {
+        const va = i < ka.length ? ka[i] : -Number.POSITIVE_INFINITY;
+        const vb = i < kb.length ? kb[i] : -Number.POSITIVE_INFINITY;
+        if (va !== vb)
+            return va - vb;
+    }
+    return 0;
+}
+/**
+ * True when the sequence is non-increasing by version (each entry is newer
+ * than or equal to the next). This is the invariant that keeps
+ * {@link resolveVersion}'s `latest` resolution correct: when no version is
+ * supplied, `versions[0]` is installed, so the first entry must be the newest
+ * release. `LATEST`, when present, is only valid as the leading entry.
+ */
+function isVersionListDescending(versions) {
+    for (let i = 0; i < versions.length - 1; i++) {
+        if (compareVersions(versions[i], versions[i + 1]) < 0)
+            return false;
+    }
+    return true;
 }
 // FIX: Added multi-page fallback strategy to guarantee legacy version visibility
 async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
@@ -105535,7 +105587,7 @@ const GCC_RELEASES = [
 const win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [Msystem.Native]: GCC_RELEASES.map((r) => r.version),
-        [Msystem.UCRT64]: [LATEST],
+        [Msystem.UCRT64]: [types_LATEST],
         [Msystem.Clang64]: undefined,
     },
     [Arch.ARM64]: {
@@ -107811,8 +107863,8 @@ async function flang_debian_resolveInstalledVersion(fc) {
 //
 // LATEST is listed first so it is the default when no version is specified.
 const flang_darwin_SUPPORTED_VERSIONS = {
-    [Arch.X64]: [LATEST, "19"],
-    [Arch.ARM64]: [LATEST, "21", "20", "19"], // Only on macos-15+ runners
+    [Arch.X64]: [types_LATEST, "19"],
+    [Arch.ARM64]: [types_LATEST, "21", "20", "19"], // Only on macos-15+ runners
 };
 // macOS asset suffix per arch in official LLVM GitHub releases.
 const MACOS_ASSET_SUFFIX = {
@@ -107823,7 +107875,7 @@ async function flang_darwin_installDarwin(inputs) {
     const resolved = resolveVersion(inputs, flang_darwin_SUPPORTED_VERSIONS, {
         matchMajorIfPatch: true,
     });
-    if (resolved === LATEST) {
+    if (resolved === types_LATEST) {
         return await installBrew(inputs);
     }
     // User specified a major or full patch version — use GitHub releases.
@@ -107854,7 +107906,7 @@ async function installBrew(inputs) {
     const flangBin = resolveFlangBinary(binDir);
     info(`Using flang binary: ${flangBin}`);
     const llvmBinDir = external_path_.join(brewPrefix, "opt", "llvm", "bin");
-    exportVariable("FLANG_VERSION", LATEST);
+    exportVariable("FLANG_VERSION", types_LATEST);
     // libomp.dylib lives in the llvm formula's lib dir, not a standalone formula.
     const libDir = external_path_.join(flangOptDir, "lib");
     const libompDir = external_path_.join(brewPrefix, "opt", "llvm", "lib");
@@ -108019,8 +108071,8 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 const flang_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [Msystem.Native]: ["22"],
-        [Msystem.UCRT64]: [LATEST],
-        [Msystem.Clang64]: [LATEST],
+        [Msystem.UCRT64]: [types_LATEST],
+        [Msystem.Clang64]: [types_LATEST],
     },
     [Arch.ARM64]: {
         [Msystem.Native]: ["22", "21", "20"],
@@ -108616,8 +108668,8 @@ const lfortran_win32_SUPPORTED_VERSIONS = {
             "0.58.0",
             "0.57.0",
         ],
-        [Msystem.UCRT64]: [LATEST],
-        [Msystem.Clang64]: [LATEST],
+        [Msystem.UCRT64]: [types_LATEST],
+        [Msystem.Clang64]: [types_LATEST],
     },
     [Arch.ARM64]: {
         [Msystem.Native]: undefined,

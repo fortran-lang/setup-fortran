@@ -34,7 +34,7 @@ import { verifySha256 } from "../../verify_download";
 //
 // Only major versions are listed for Native. Full patch versions (e.g. "22.1.3")
 // are validated by extracting the major and checking it against this table.
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: ["22"],
     [Msystem.UCRT64]: [LATEST],

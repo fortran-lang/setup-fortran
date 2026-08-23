@@ -23,7 +23,7 @@ import {
 //   - conda-forge only publishes lfortran for linux-64; linux-aarch64 is
 //     currently not supported (https://anaconda.org/conda-forge/lfortran).
 //   - The binary is always named `lfortran` regardless of version.
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "0.64.0",
     "0.63.0",

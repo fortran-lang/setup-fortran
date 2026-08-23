@@ -48,7 +48,7 @@ const GCC_RELEASES = [
   },
 ] as const;
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: GCC_RELEASES.map((r) => r.version),
     [Msystem.UCRT64]: [LATEST],

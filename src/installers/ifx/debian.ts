@@ -9,7 +9,7 @@ import {
   validateRestoredCompilerCache,
 } from "../../cache_validation";
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
     "2026.1",
     "2026.0",

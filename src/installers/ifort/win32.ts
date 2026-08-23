@@ -57,7 +57,7 @@ const IFORT_RELEASES = [
   },
 ] as const;
 
-const SUPPORTED_VERSIONS = {
+export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: IFORT_RELEASES.map((r) => r.version),
     [Msystem.UCRT64]: undefined,
