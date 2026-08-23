@@ -55,9 +55,12 @@ interface VersionList {
  *   - Linux:  Record<Arch, string[] | undefined>
  *   - Windows: Record<Arch, Record<Msystem, string[] | undefined>>
  * This walker is shape-agnostic: it recurses into objects and collects leaf
- * arrays, ignoring `undefined` cells (unsupported arch/msystem) and empty
- * arrays. `LATEST` entries are kept as-is so the descending assertion also
- * enforces that they lead the list.
+ * arrays, ignoring `undefined` cells (unsupported arch/msystem). Empty arrays
+ * are *not* ignored — they are harvested so the structural test can reject them
+ * (an empty list is truthy, so `resolveVersion` would bypass its `!versions`
+ * guard and then fail on `versions[0] === undefined` with a confusing error).
+ * `LATEST` entries are kept as-is so the descending assertion also enforces
+ * that they lead the list.
  */
 function collectVersionLists(table: unknown, prefix: string): VersionList[] {
   const lists: VersionList[] = [];
@@ -65,10 +68,7 @@ function collectVersionLists(table: unknown, prefix: string): VersionList[] {
   for (const [key, value] of Object.entries(table as Record<string, unknown>)) {
     const loc = `${prefix}[${key}]`;
     if (Array.isArray(value)) {
-      if (
-        value.length > 0 &&
-        value.every((v): v is string => typeof v === "string")
-      ) {
+      if (value.every((v): v is string => typeof v === "string")) {
         lists.push({ label: loc, versions: value });
       }
     } else if (value !== null && typeof value === "object") {
@@ -137,12 +137,24 @@ describe("version ordering helpers", () => {
   });
 });
 
+describe("supported version tables are well-formed", () => {
+  // Each table cell is typed as `readonly string[] | undefined` (unsupported
+  // arch/msystem) — an invariant the compiler already enforces. The one thing
+  // the type system cannot express is that a present list is never empty: an
+  // empty array is truthy, so `resolveVersion` skips its `!versions` guard and
+  // then fails on `versions[0] === undefined` with a misleading error. Catch
+  // that structural defect here rather than at install time.
+  it.each(ALL_VERSION_LISTS)("is non-empty: $label", ({ versions }) => {
+    expect(versions.length).toBeGreaterThan(0);
+  });
+});
+
 describe("supported version tables are ordered newest-first", () => {
   // `resolveVersion` installs `versions[0]` when the user requests "latest".
   // A list that is not descending therefore resolves "latest" to a stale
   // release — exactly the regression the maintainers' "make sure the versions
   // are always in descending order" comments warn about.
-  it.each(ALL_VERSION_LISTS)(
+  it.each(ALL_VERSION_LISTS.filter(({ versions }) => versions.length > 0))(
     "resolves latest correctly for $label",
     ({ versions }) => {
       const newest = versions.reduce((acc, v) =>
