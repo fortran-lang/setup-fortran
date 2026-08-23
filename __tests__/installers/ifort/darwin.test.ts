@@ -170,10 +170,7 @@ describe("installDarwin (ifort)", () => {
 
     await installDarwin({ ...baseInputs, arch: Arch.ARM64 });
 
-    expect(mockedExportVariable).toHaveBeenCalledWith(
-      "CFLAGS",
-      "-arch x86_64",
-    );
+    expect(mockedExportVariable).toHaveBeenCalledWith("CFLAGS", "-arch x86_64");
     expect(mockedExportVariable).toHaveBeenCalledWith(
       "CXXFLAGS",
       "-arch x86_64",

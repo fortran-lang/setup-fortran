@@ -2,13 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import { installDebian } from "../../../src/installers/nvfortran/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -31,7 +25,7 @@ describe("installDebian nvfortran", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -86,11 +80,19 @@ describe("installDebian nvfortran", () => {
     // Should install each .deb via dpkg
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
-      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libtinfo5")]),
+      expect.arrayContaining([
+        "dpkg",
+        "-i",
+        expect.stringContaining("libtinfo5"),
+      ]),
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
-      expect.arrayContaining(["dpkg", "-i", expect.stringContaining("libncursesw5")]),
+      expect.arrayContaining([
+        "dpkg",
+        "-i",
+        expect.stringContaining("libncursesw5"),
+      ]),
     );
   });
 
@@ -222,9 +224,7 @@ describe("installDebian nvfortran", () => {
       "curl",
       expect.arrayContaining([
         "-o",
-        expect.stringContaining(
-          "nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
-        ),
+        expect.stringContaining("nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz"),
         "https://developer.download.nvidia.com/hpc-sdk/26.3/nvhpc_2026_263_Linux_x86_64_cuda_13.1.tar.gz",
       ]),
     );

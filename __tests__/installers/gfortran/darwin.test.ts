@@ -18,7 +18,7 @@ describe("installDarwin (gfortran)", () => {
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -83,10 +83,10 @@ describe("installDarwin (gfortran)", () => {
       "/usr/local/bin/g++-14",
       "/usr/local/bin/g++",
     ]);
-    expect(mockedExec).not.toHaveBeenCalledWith(
-      "bash",
-      ["-c", expect.stringContaining("/usr/local/lib")],
-    );
+    expect(mockedExec).not.toHaveBeenCalledWith("bash", [
+      "-c",
+      expect.stringContaining("/usr/local/lib"),
+    ]);
   });
 
   it("skips install if already present", async () => {

@@ -6,13 +6,7 @@ import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/aocc/debian";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -46,7 +40,7 @@ describe("installDebian (AOCC)", () => {
     os: OS.Linux,
     osVersion: "22.04",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -57,14 +51,27 @@ describe("installDebian (AOCC)", () => {
     jest.clearAllMocks();
     mockedFs.existsSync.mockReturnValue(false); // Assume not installed
     mockedCache.restoreCache.mockResolvedValue(undefined); // Cache miss
-    mockedDownloadTool.mockResolvedValue("/tmp/aocc-compiler-5.1.0_1_amd64.deb");
+    mockedDownloadTool.mockResolvedValue(
+      "/tmp/aocc-compiler-5.1.0_1_amd64.deb",
+    );
     mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (commandLine === "bash" && args?.[1] === 'source "/opt/AMD/aocc-compiler-5.1.0/setenv_AOCC.sh" && env') {
+      if (
+        commandLine === "bash" &&
+        args?.[1] ===
+          'source "/opt/AMD/aocc-compiler-5.1.0/setenv_AOCC.sh" && env'
+      ) {
         if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("PATH=/opt/AMD/aocc/bin:/usr/bin\nLD_LIBRARY_PATH=/opt/AMD/aocc/lib\nAOCC_DIR=/opt/AMD/aocc\n"));
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=/opt/AMD/aocc/bin:/usr/bin\nLD_LIBRARY_PATH=/opt/AMD/aocc/lib\nAOCC_DIR=/opt/AMD/aocc\n",
+            ),
+          );
         }
       }
-      if (commandLine === "/opt/AMD/aocc-compiler-5.1.0/bin/flang" && args?.[0] === "--version") {
+      if (
+        commandLine === "/opt/AMD/aocc-compiler-5.1.0/bin/flang" &&
+        args?.[0] === "--version"
+      ) {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(Buffer.from("AOCC flang version 5.1.0"));
         }
@@ -86,9 +93,18 @@ describe("installDebian (AOCC)", () => {
       undefined,
       { "User-Agent": "Mozilla/5.0" },
     );
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb")]);
-    
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["cp", "-rT", "/opt/AMD/aocc-compiler-5.1.0", tempInstallDir]);
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "dpkg",
+      "-i",
+      expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+    ]);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "cp",
+      "-rT",
+      "/opt/AMD/aocc-compiler-5.1.0",
+      tempInstallDir,
+    ]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       [tempInstallDir],
       expect.stringContaining("aocc-5.1-x64-22.04"),
@@ -99,7 +115,11 @@ describe("installDebian (AOCC)", () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
     await installDebian(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", ["mv", tempInstallDir, "/opt/AMD/aocc-compiler-5.1.0"]);
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "mv",
+      tempInstallDir,
+      "/opt/AMD/aocc-compiler-5.1.0",
+    ]);
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
@@ -109,15 +129,25 @@ describe("installDebian (AOCC)", () => {
     await installDebian(baseInputs);
 
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
-    expect(mockedExec).not.toHaveBeenCalledWith("sudo", ["dpkg", "-i", expect.anything()]);
+    expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+      "dpkg",
+      "-i",
+      expect.anything(),
+    ]);
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
 
   it("sources setenv script and exports variables", async () => {
     await installDebian(baseInputs);
 
-    expect(mockedExportVariable).toHaveBeenCalledWith("PATH", "/opt/AMD/aocc/bin:/usr/bin");
-    expect(mockedExportVariable).toHaveBeenCalledWith("LD_LIBRARY_PATH", "/opt/AMD/aocc/lib");
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "PATH",
+      "/opt/AMD/aocc/bin:/usr/bin",
+    );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "LD_LIBRARY_PATH",
+      "/opt/AMD/aocc/lib",
+    );
   });
 
   it("resolves and returns the installed version", async () => {

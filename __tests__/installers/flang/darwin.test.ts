@@ -30,19 +30,24 @@ jest.mock("fs", () => ({
 
 describe("installDarwin (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => ({
-      ok: true,
-      status: 200,
-      json: async () =>
-        String(input).includes("/releases?")
-          ? [{ tag_name: "llvmorg-19.1.7", prerelease: false }]
-          : {
-              assets: [{
-                name: "LLVM-19.1.7-macOS-X64.tar.xz",
-                digest: `sha256:${"a".repeat(64)}`,
-              }],
-            },
-    }) as unknown as Response);
+    global.fetch = jest.fn().mockImplementation(
+      async (input: string | URL) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () =>
+            String(input).includes("/releases?")
+              ? [{ tag_name: "llvmorg-19.1.7", prerelease: false }]
+              : {
+                  assets: [
+                    {
+                      name: "LLVM-19.1.7-macOS-X64.tar.xz",
+                      digest: `sha256:${"a".repeat(64)}`,
+                    },
+                  ],
+                },
+        }) as unknown as Response,
+    );
   });
 
   afterEach(() => {
@@ -67,7 +72,7 @@ describe("installDarwin (Flang)", () => {
     os: OS.MacOS,
     osVersion: "13",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -99,7 +104,7 @@ describe("installDarwin (Flang)", () => {
     await installDarwin(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
-    });
+  });
 
   it("downloads from GitHub when version is specified", async () => {
     const inputs = { ...baseInputs, version: "19" };

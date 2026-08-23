@@ -73,7 +73,11 @@ describe("platform guards fail fast before any mutation", () => {
     const spy = jest.spyOn(armflangDebian, "installDebian");
     await expect(
       installArmFlang(
-        makeInputs({ compiler: Compiler.ArmFlang, os: OS.Linux, arch: Arch.X64 }),
+        makeInputs({
+          compiler: Compiler.ArmFlang,
+          os: OS.Linux,
+          arch: Arch.X64,
+        }),
       ),
     ).rejects.toThrow(
       /No supported versions found for armflang on linux \(x64\)/,
@@ -123,9 +127,7 @@ describe("platform guards fail fast before any mutation", () => {
           osVersion: "2022",
         }),
       ),
-    ).rejects.toThrow(
-      /not supported for Windows arm64/,
-    );
+    ).rejects.toThrow(/not supported for Windows arm64/);
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });

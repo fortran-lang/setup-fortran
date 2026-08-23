@@ -4,13 +4,7 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
 import { installWin32 } from "../../../src/installers/ifort/win32";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -39,7 +33,7 @@ describe("installWin32 (ifort)", () => {
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -51,11 +45,16 @@ describe("installWin32 (ifort)", () => {
       if (commandLine === "ifort" && args?.[0] === "/what") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(
-            Buffer.from("Intel(R) Fortran Intel(R) 64 Compiler Classic for applications running on Intel(R) 64, Version 2021.10.0 Build 20230609"),
+            Buffer.from(
+              "Intel(R) Fortran Intel(R) 64 Compiler Classic for applications running on Intel(R) 64, Version 2021.10.0 Build 20230609",
+            ),
           );
         }
       }
-      if (commandLine === "cmd" && args?.[1]?.includes("setvars_ifort_dump.bat")) {
+      if (
+        commandLine === "cmd" &&
+        args?.[1]?.includes("setvars_ifort_dump.bat")
+      ) {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(
             Buffer.from(

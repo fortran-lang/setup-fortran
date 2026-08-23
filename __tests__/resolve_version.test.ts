@@ -130,15 +130,23 @@ describe("resolveVersion", () => {
       [Arch.X64]: ["5.2", "5.1", "5.0", "4.2", "4.1"],
     };
 
-    const mockedWarning = core.warning as jest.MockedFunction<typeof core.warning>;
+    const mockedWarning = core.warning as jest.MockedFunction<
+      typeof core.warning
+    >;
 
     beforeEach(() => {
       mockedWarning.mockClear();
     });
 
     it("normalizes X.Y.0 to X.Y when stripPatchZero is true", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.0" };
-      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: "5.1.0",
+      };
+      const result = resolveVersion(inputs, supported, {
+        stripPatchZero: true,
+      });
       expect(result).toBe("5.1");
       expect(mockedWarning).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -148,8 +156,14 @@ describe("resolveVersion", () => {
     });
 
     it("normalizes X.Y.0 for any AOCC-like version", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "4.2.0" };
-      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: "4.2.0",
+      };
+      const result = resolveVersion(inputs, supported, {
+        stripPatchZero: true,
+      });
       expect(result).toBe("4.2");
       expect(mockedWarning).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -159,14 +173,24 @@ describe("resolveVersion", () => {
     });
 
     it("leaves X.Y untouched when stripPatchZero is true", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1" };
-      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: "5.1",
+      };
+      const result = resolveVersion(inputs, supported, {
+        stripPatchZero: true,
+      });
       expect(result).toBe("5.1");
       expect(mockedWarning).not.toHaveBeenCalled();
     });
 
     it("does not normalize X.Y.1 (non-zero patch) and fails clearly", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.1" };
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: "5.1.1",
+      };
       expect(() =>
         resolveVersion(inputs, supported, { stripPatchZero: true }),
       ).toThrow(
@@ -176,7 +200,11 @@ describe("resolveVersion", () => {
     });
 
     it("does not normalize when stripPatchZero is false (default)", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: "5.1.0" };
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: "5.1.0",
+      };
       expect(() => resolveVersion(inputs, supported)).toThrow(
         "aocc 5.1.0 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
       );
@@ -184,8 +212,14 @@ describe("resolveVersion", () => {
     });
 
     it("still resolves latest when stripPatchZero is true", () => {
-      const inputs: Inputs = { ...baseInputs, compiler: Compiler.AOCC, version: LATEST };
-      const result = resolveVersion(inputs, supported, { stripPatchZero: true });
+      const inputs: Inputs = {
+        ...baseInputs,
+        compiler: Compiler.AOCC,
+        version: LATEST,
+      };
+      const result = resolveVersion(inputs, supported, {
+        stripPatchZero: true,
+      });
       expect(result).toBe("5.2");
       expect(mockedWarning).not.toHaveBeenCalled();
     });
@@ -223,7 +257,7 @@ describe("resolveWindowsVersion", () => {
     [Arch.X64]: {
       [Msystem.Native]: ["14", "13"],
       [Msystem.UCRT64]: ["latest"],
-    }
+    },
   };
 
   it("returns the requested version if it matches the first entry for x64", () => {
@@ -290,7 +324,7 @@ describe("resolveLatestPatch", () => {
       });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
@@ -303,17 +337,20 @@ describe("resolveLatestPatch", () => {
 
   it("retries on timeout and eventually succeeds", async () => {
     const mockFetch = global.fetch as jest.Mock;
-    
-    mockFetch.mockImplementationOnce((_url, options) => new Promise((_resolve, reject) => {
-      if (options.signal) {
-        options.signal.addEventListener("abort", () => {
-          const error = new Error("The operation was aborted");
-          error.name = "AbortError";
-          reject(error);
-        });
-      }
-    }));
-    
+
+    mockFetch.mockImplementationOnce(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          if (options.signal) {
+            options.signal.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }
+        }),
+    );
+
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -326,7 +363,7 @@ describe("resolveLatestPatch", () => {
     await Promise.resolve();
 
     await jest.advanceTimersByTimeAsync(5000);
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
@@ -352,12 +389,12 @@ describe("resolveLatestPatch", () => {
     await Promise.resolve();
 
     await jest.advanceTimersByTimeAsync(4000);
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
     await jest.advanceTimersByTimeAsync(8000);
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
@@ -373,11 +410,8 @@ describe("resolveLatestPatch", () => {
       json: async () => [{ tag_name: "v1.2.3", prerelease: false }],
     });
 
-    const result = await resolveLatestPatch(
-      "repo",
-      "1",
-      "v1.",
-      (tag) => tag.substring(1)
+    const result = await resolveLatestPatch("repo", "1", "v1.", (tag) =>
+      tag.substring(1),
     );
     expect(result).toBe("1.2.3");
   });
@@ -394,9 +428,9 @@ describe("resolveLatestPatch", () => {
     });
 
     const promise = resolveLatestPatch("llvm/llvm-project", "19");
-    
+
     await expect(promise).rejects.toThrow(
-      "No stable release found for llvm/llvm-project major 19 within visible historical GitHub releases."
+      "No stable release found for llvm/llvm-project major 19 within visible historical GitHub releases.",
     );
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
@@ -502,7 +536,7 @@ describe("verifyAssetExists", () => {
     });
 
     await expect(
-      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz"),
     ).resolves.not.toThrow();
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -519,7 +553,7 @@ describe("verifyAssetExists", () => {
     });
 
     await expect(
-      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz"),
     ).resolves.toBe(digest);
   });
 
@@ -532,9 +566,9 @@ describe("verifyAssetExists", () => {
     });
 
     await expect(
-      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz"),
     ).rejects.toThrow(
-      'Requested version "19.1.7" does not exist (no release for llvmorg-19.1.7 in repo).'
+      'Requested version "19.1.7" does not exist (no release for llvmorg-19.1.7 in repo).',
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -550,9 +584,9 @@ describe("verifyAssetExists", () => {
     });
 
     await expect(
-      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz")
+      verifyAssetExists("repo", "19.1.7", "fortran.tar.gz"),
     ).rejects.toThrow(
-      'Release llvmorg-19.1.7 in repo exists but has no asset "fortran.tar.gz".'
+      'Release llvmorg-19.1.7 in repo exists but has no asset "fortran.tar.gz".',
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -574,7 +608,7 @@ describe("verifyAssetExists", () => {
       });
 
     const promise = verifyAssetExists("repo", "19.1.7", "fortran.tar.gz");
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
@@ -586,17 +620,20 @@ describe("verifyAssetExists", () => {
 
   it("retries on timeout and succeeds", async () => {
     const mockFetch = global.fetch as jest.Mock;
-    
-    mockFetch.mockImplementationOnce((_url, options) => new Promise((_resolve, reject) => {
-      if (options.signal) {
-        options.signal.addEventListener("abort", () => {
-          const error = new Error("The operation was aborted");
-          error.name = "AbortError";
-          reject(error);
-        });
-      }
-    }));
-    
+
+    mockFetch.mockImplementationOnce(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          if (options.signal) {
+            options.signal.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted");
+              error.name = "AbortError";
+              reject(error);
+            });
+          }
+        }),
+    );
+
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -611,7 +648,7 @@ describe("verifyAssetExists", () => {
     await Promise.resolve();
 
     await jest.advanceTimersByTimeAsync(5000);
-    
+
     await Promise.resolve();
     await Promise.resolve();
 
@@ -631,16 +668,11 @@ describe("verifyAssetExists", () => {
       }),
     });
 
-    await verifyAssetExists(
-      "repo",
-      "1.2.3",
-      "fortran.tar.gz",
-      (p) => `v${p}`
-    );
-    
+    await verifyAssetExists("repo", "1.2.3", "fortran.tar.gz", (p) => `v${p}`);
+
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.github.com/repos/repo/releases/tags/v1.2.3",
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 });
@@ -743,17 +775,25 @@ function nvfortranInputs(version: string): Inputs {
 const AMBIGUOUS_ERROR = /ambiguous and must be quoted/;
 
 describe("year-version coercion: reject ambiguous bare numbers", () => {
-  const mockedWarning = core.warning as jest.MockedFunction<typeof core.warning>;
+  const mockedWarning = core.warning as jest.MockedFunction<
+    typeof core.warning
+  >;
   beforeEach(() => jest.clearAllMocks());
 
   it("rejects a bare year for ifx on Linux with an actionable error", () => {
     const inputs = ifxInputs("2024", OS.Linux);
     expect(() =>
-      resolveVersion(inputs, { [Arch.X64]: IFX_LINUX, [Arch.ARM64]: undefined }),
+      resolveVersion(inputs, {
+        [Arch.X64]: IFX_LINUX,
+        [Arch.ARM64]: undefined,
+      }),
     ).toThrow(AMBIGUOUS_ERROR);
     // The error must NOT be the generic "is not supported" fallthrough.
     expect(() =>
-      resolveVersion(inputs, { [Arch.X64]: IFX_LINUX, [Arch.ARM64]: undefined }),
+      resolveVersion(inputs, {
+        [Arch.X64]: IFX_LINUX,
+        [Arch.ARM64]: undefined,
+      }),
     ).not.toThrow(/is not supported/);
   });
 

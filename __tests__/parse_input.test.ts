@@ -157,16 +157,19 @@ describe("parseInputs", () => {
       ["intel", Compiler.IFX],
       ["intel-classic", Compiler.IFort],
       ["nvidia-hpc", Compiler.NVFortran],
-    ])("warns that the %s alias is deprecated in favor of %s", (alias, canonical) => {
-      mockedGetInput.mockImplementation((name) => {
-        if (name === "compiler") return alias;
-        return "";
-      });
-      parseInputs();
-      expect(core.warning).toHaveBeenCalledWith(
-        `The compiler selector "${alias}" is deprecated; please use "${canonical}" instead.`,
-      );
-    });
+    ])(
+      "warns that the %s alias is deprecated in favor of %s",
+      (alias, canonical) => {
+        mockedGetInput.mockImplementation((name) => {
+          if (name === "compiler") return alias;
+          return "";
+        });
+        parseInputs();
+        expect(core.warning).toHaveBeenCalledWith(
+          `The compiler selector "${alias}" is deprecated; please use "${canonical}" instead.`,
+        );
+      },
+    );
 
     it("warns for aliases case-insensitively and with surrounding whitespace", () => {
       mockedGetInput.mockImplementation((name) => {

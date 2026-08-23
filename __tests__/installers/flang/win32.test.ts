@@ -4,13 +4,7 @@ import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
 import { installWin32 } from "../../../src/installers/flang/win32";
 import { setupMSYS2 } from "../../../src/setup_msys2";
-import {
-  Arch,
-  Compiler,
-  OS,
-  Msystem,
-  type Inputs,
-} from "../../../src/types";
+import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -26,19 +20,24 @@ jest.mock("fs", () => ({
 
 describe("installWin32 (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => ({
-      ok: true,
-      status: 200,
-      json: async () =>
-        String(input).includes("/releases?")
-          ? [{ tag_name: "llvmorg-22.1.0", prerelease: false }]
-          : {
-              assets: [{
-                name: "LLVM-22.1.0-win64.exe",
-                digest: `sha256:${"a".repeat(64)}`,
-              }],
-            },
-    }) as unknown as Response);
+    global.fetch = jest.fn().mockImplementation(
+      async (input: string | URL) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () =>
+            String(input).includes("/releases?")
+              ? [{ tag_name: "llvmorg-22.1.0", prerelease: false }]
+              : {
+                  assets: [
+                    {
+                      name: "LLVM-22.1.0-win64.exe",
+                      digest: `sha256:${"a".repeat(64)}`,
+                    },
+                  ],
+                },
+        }) as unknown as Response,
+    );
   });
 
   afterEach(() => {
@@ -64,7 +63,7 @@ describe("installWin32 (Flang)", () => {
     os: OS.Windows,
     osVersion: "2022",
     arch: Arch.X64,
-  cleanupDisk: false,
+    cleanupDisk: false,
     updateEnvironment: true,
     msystem: Msystem.Native,
   };
@@ -113,13 +112,20 @@ describe("installWin32 (Flang)", () => {
 
       await installWin32(baseInputs);
 
-      expect(mockedExportVariable).toHaveBeenCalledWith("LIB", expect.stringContaining("Cache"));
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "LIB",
+        expect.stringContaining("Cache"),
+      );
     });
   });
 
   describe("MSYS2", () => {
     it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = { ...baseInputs, version: "latest", msystem: Msystem.UCRT64 };
+      const inputs = {
+        ...baseInputs,
+        version: "latest",
+        msystem: Msystem.UCRT64,
+      };
       await installWin32(inputs);
 
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["flang"]);
