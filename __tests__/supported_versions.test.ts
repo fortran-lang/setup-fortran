@@ -16,6 +16,9 @@ import {
   compareVersions,
   isVersionListDescending,
 } from "../src/resolve_version";
+import * as fs from "fs";
+import * as path from "path";
+import { load as yamlLoad } from "js-yaml";
 
 // Installer modules transitively import the `@actions/*` libraries, which
 // assume a live runner. Stub them out so we can import the (static) version
@@ -177,5 +180,286 @@ describe("supported version tables are ordered newest-first", () => {
         ALL_VERSION_LISTS.some((l) => l.label.startsWith(entry.module)),
       ),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test B: every version the action claims to support (SUPPORTED_VERSIONS) must
+// actually be exercised by the per-compiler CI matrix
+// (`.github/workflows/ci-<compiler>.yml`), so a supported release is never
+// shipped untested. Two guarantees:
+//
+//   1. Concrete versions: each non-`LATEST` token in a table must be tested by
+//      its ci-<compiler>.yml matrix. Matching is by version *family* (exact, or
+//      one token extends the other by a dotted-segment boundary) so a table
+//      entry is satisfied by an exact CI pin OR a fuller CI spelling
+//      (e.g. table `21` <-> CI `21.1.6`; `2026.1` <-> `2026.1.0`; `16` is NOT
+//      satisfied by CI `17`). Extra patch-resolution CI entries therefore do
+//      not count as gaps.
+//   2. Rolling-only cells: a leaf list of exactly `[LATEST]` (the
+//      present-only-for-latest platforms, e.g. Windows `ucrt64`/`clang64`) must
+//      have a matching no-`version` CI entry, on the same `msystem` when one is
+//      present.
+//
+// The TS `SUPPORTED_VERSIONS` tables are the source of truth (they are what
+// `resolveVersion` enforces at runtime and what Test A already guards); the
+// README compatibility tables advertise the same set, so agreement holds there
+// too. The `js-yaml` + `fs` reads parse the real CI YAML rather than duplicating
+// its matrix by hand.
+// ---------------------------------------------------------------------------
+
+const WORKFLOWS_DIR = path.resolve(__dirname, "../.github/workflows");
+
+interface CiMatrixInfo {
+  versions: Set<string>;
+  latestMsystrings: Set<string>;
+  hasLatest: boolean;
+}
+const ciCache = new Map<string, CiMatrixInfo>();
+
+// Walk the GitHub Actions document and return the first `strategy.matrix`
+// object found (each ci-<compiler>.yml has a single job with one matrix).
+function findMatrix(doc: unknown): Record<string, unknown> | undefined {
+  if (!doc || typeof doc !== "object") return undefined;
+  const jobs = (doc as Record<string, unknown>).jobs;
+  if (!jobs || typeof jobs !== "object") return undefined;
+  for (const job of Object.values(jobs as Record<string, unknown>)) {
+    if (!job || typeof job !== "object") continue;
+    const matrix = (job as Record<string, unknown>).strategy as
+      { matrix?: unknown } | undefined;
+    if (matrix?.matrix && typeof matrix.matrix === "object") {
+      return matrix.matrix as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+// Extract a Windows msystem (`ucrt64`/`clang64`/`native`) from a table leaf
+// label like "flang/win32[x64][ucrt64]".
+function msystemOf(label: string): string | undefined {
+  const m = /\[(ucrt64|clang64|native)\]/.exec(label);
+  return m ? m[1] : undefined;
+}
+
+function parseCiMatrix(compiler: string): CiMatrixInfo {
+  const cached = ciCache.get(compiler);
+  if (cached) return cached;
+
+  const file = path.join(WORKFLOWS_DIR, `ci-${compiler}.yml`);
+  const doc = yamlLoad(fs.readFileSync(file, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const matrix = findMatrix(doc);
+  if (!matrix) {
+    throw new Error(`No strategy.matrix found in ${file}`);
+  }
+
+  const versions = new Set<string>();
+  const latestMsystrings = new Set<string>();
+  let hasLatest = false;
+
+  // A toolchain entry with no `version` (or version === "latest") pins the
+  // latest available release; record its `msystem` (if any) so [LATEST]-only
+  // cells can be matched to the right Windows build.
+  const visit = (entry: unknown): void => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.compiler !== "string") return; // not a toolchain entry
+    const v = e.version;
+    if (typeof v === "string" && v !== LATEST) {
+      versions.add(v);
+    } else {
+      hasLatest = true;
+      if (typeof e.msystem === "string") latestMsystrings.add(e.msystem);
+    }
+  };
+
+  const tc = matrix.toolchain;
+  if (Array.isArray(tc)) tc.forEach(visit);
+  else if (tc && typeof tc === "object") visit(tc);
+
+  const inc = matrix.include ?? [];
+  if (Array.isArray(inc)) {
+    for (const item of inc) {
+      if (!item || typeof item !== "object") continue;
+      const o = item as Record<string, unknown>;
+      if (o.toolchain) {
+        if (Array.isArray(o.toolchain)) o.toolchain.forEach(visit);
+        else if (o.toolchain && typeof o.toolchain === "object")
+          visit(o.toolchain);
+      } else if (typeof o.image === "string") {
+        hasLatest = true; // image-only include => default compiler at "latest"
+      }
+    }
+  }
+
+  const info: CiMatrixInfo = { versions, latestMsystrings, hasLatest };
+  ciCache.set(compiler, info);
+  return info;
+}
+
+// --- Pure, IO-free coverage predicates (unit-tested below as negative cases) -
+
+// A concrete table token is satisfied by an exact CI pin, a more-specific CI
+// release (CI "21.1.6" covers table "21"), or a less-specific CI release
+// (CI "2026.1" covers table "2026.1.0"). The dotted-segment boundary keeps
+// "2026" from matching "20260" and "21" from matching "21.1".
+function versionFamilyCovered(token: string, ciVersions: Set<string>): boolean {
+  if (ciVersions.has(token)) return true;
+  for (const v of ciVersions) {
+    if (token.startsWith(`${v}.`) || v.startsWith(`${token}.`)) return true;
+  }
+  return false;
+}
+
+// A `[LATEST]`-only cell is satisfied when CI has a no-`version` entry: on the
+// same `msystem` when the cell declares one, or anywhere when it does not.
+function latestCellCovered(
+  label: string,
+  latestMsystrings: Set<string>,
+  hasLatest: boolean,
+): boolean {
+  const msystem = msystemOf(label);
+  return msystem ? latestMsystrings.has(msystem) : hasLatest;
+}
+
+describe("supported version tables are exercised by CI (Test B)", () => {
+  it("every concrete supported version is tested by its ci-<compiler>.yml matrix", () => {
+    const uncovered: Array<{ where: string; compiler: string; token: string }> =
+      [];
+    for (const list of ALL_VERSION_LISTS) {
+      const compiler = list.label.split("/")[0];
+      const ci = parseCiMatrix(compiler);
+      for (const token of list.versions) {
+        if (token === LATEST) continue;
+        if (!versionFamilyCovered(token, ci.versions)) {
+          uncovered.push({ where: list.label, compiler, token });
+        }
+      }
+    }
+    if (uncovered.length > 0) {
+      throw new Error(
+        "These supported versions are not exercised by their CI matrix:\n" +
+          uncovered
+            .map(
+              (u) => `  - ${u.where}: "${u.token}" (compiler "${u.compiler}")`,
+            )
+            .join("\n"),
+      );
+    }
+  });
+
+  it("every [LATEST]-only table cell has a latest test in CI", () => {
+    const onlyLatestLeaves = ALL_VERSION_LISTS.filter(
+      (l) => l.versions.length === 1 && l.versions[0] === LATEST,
+    );
+    const missing: Array<{ where: string; compiler: string }> = [];
+    for (const list of onlyLatestLeaves) {
+      const compiler = list.label.split("/")[0];
+      const ci = parseCiMatrix(compiler);
+      if (!latestCellCovered(list.label, ci.latestMsystrings, ci.hasLatest)) {
+        missing.push({ where: list.label, compiler });
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        "These [LATEST]-only cells have no latest test in CI:\n" +
+          missing
+            .map((m) => `  - ${m.where} (compiler "${m.compiler}")`)
+            .join("\n"),
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test B negative cases: the coverage predicates must *detect* synthetic gaps
+// (not, like the integration tests above, only affirm the green state). These
+// are pure unit tests over `versionFamilyCovered` / `latestCellCovered` so they
+// pin the detection behaviour independently of the live CI YAML. A real
+// mutation (dropping a version from ci-flang.yml) is covered by the runtime
+// integration test above; these cover the contract the integration test relies
+// on.
+// ---------------------------------------------------------------------------
+describe("Test B coverage predicates detect gaps (negative cases)", () => {
+  // [token, ciVersions, expected] — positive rows confirm the rule isn't overly
+  // strict; negative rows confirm it flags a genuinely-missing release and does
+  // NOT false-match across dotted major/minor boundaries.
+  it.each([
+    // --- positives: table release is satisfied by CI ---
+    ["16", ["16"], true], // exact pin
+    ["21", ["21.1.6"], true], // CI patch satisfies table major
+    ["21.1.6", ["21"], true], // CI major satisfies table patch
+    ["2026.1", ["2026.1.0", "2026.1.1"], true], // CI minor satisfies table minor
+    ["2023.2", ["2023.2.4"], true], // ifx-style: minor <-> patch family
+    // --- negatives: missing release (the gap the test exists to catch) ---
+    ["16", ["17", "18", "19", "20", "21", "22"], false], // flang-16-style gap
+    ["18", ["17", "19", "20", "21", "22"], false], // hole in the middle
+    ["16", [], false], // empty CI matrix for the compiler
+    // --- boundary: dotted major/minor must not cross-match ---
+    ["21", ["21.1"], true], // 21 IS the family root of 21.1
+    ["2021.1", ["2021.10"], false], // NOT the same family (no dot extension)
+    ["2021.10", ["2021.1"], false], // symmetric: must not match
+    ["2026", ["20260"], false], // plain vs double-digit, no false match
+  ])("versionFamilyCovered(%p, %p) => %p", (token, ciVersions, expected) => {
+    expect(versionFamilyCovered(token, new Set(ciVersions))).toBe(expected);
+  });
+
+  // The headline negative the user described: a `[LATEST]`-only cell for one
+  // configuration (e.g. Windows ucrt64) while CI only ships a latest entry for
+  // a *different* configuration (clang64) — or ships no latest entry at all.
+  it("flags a [LATEST]-only cell whose msystem has no latest CI entry", () => {
+    // CI only ships a latest flang build for clang64, never ucrt64.
+    const ci = { latestMsystrings: new Set(["clang64"]), hasLatest: true };
+    expect(
+      latestCellCovered(
+        "flang/win32[x64][ucrt64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(false);
+    expect(
+      latestCellCovered(
+        "flang/win32[x64][clang64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(true);
+  });
+
+  it("flags a [LATEST]-only cell when CI ships no latest entry at all", () => {
+    const ci = { latestMsystrings: new Set<string>(), hasLatest: false };
+    expect(
+      latestCellCovered(
+        "flang/win32[x64][ucrt64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(false);
+    // ...and a msystem-less cell is likewise uncovered when there is no latest.
+    expect(
+      latestCellCovered(
+        "gfortran/win32[x64][ucrt64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(false);
+  });
+
+  it("a msystem-less [LATEST] cell is satisfied by any latest CI entry", () => {
+    // Image-only includes (no msystem) only need the compiler to have a latest
+    // build somewhere in CI.
+    const ci = { latestMsystrings: new Set(["ucrt64"]), hasLatest: true };
+    expect(
+      latestCellCovered(
+        "gfortran/darwin[x64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(true);
+    expect(
+      latestCellCovered("gfortran/darwin[x64]", new Set<string>(), false),
+    ).toBe(false);
   });
 });
