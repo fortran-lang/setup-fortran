@@ -193,6 +193,30 @@ async function execWithRetry(
   }
 }
 
+async function runWithRetry<T>(
+  description: string,
+  fn: () => Promise<T>,
+  maxAttempts = 2,
+  delayMs = 15_000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) break;
+      core.warning(
+        `${description} failed (attempt ${String(attempt)}/${String(maxAttempts)}): ${String(error)}. Retrying in ${String(delayMs / 1000)}s...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error(
+    `${description} failed after ${String(maxAttempts)} attempts: ${String(lastError)}`,
+  );
+}
+
 async function needsLegacyNcursesInstall(): Promise<boolean> {
   const result = await exec.getExecOutput(
     "dpkg-query",
@@ -308,13 +332,17 @@ async function findTarballCudaVersion(
     const url =
       `https://developer.download.nvidia.com/hpc-sdk/${version}/` +
       `${archivePrefix}${cudaVersion}.tar.gz`;
-    const result = await exec.getExecOutput(
-      "curl",
-      ["-4", "-fsSI", "--connect-timeout", "15", "--max-time", "30", url],
-      { ignoreReturnCode: true, silent: true },
-    );
-    if (result.exitCode === 0) {
-      return cudaVersion;
+    try {
+      const result = await exec.getExecOutput(
+        "curl",
+        ["-4", "-fsSI", "--connect-timeout", "15", "--max-time", "30", url],
+        { ignoreReturnCode: true, silent: true },
+      );
+      if (result.exitCode === 0) {
+        return cudaVersion;
+      }
+    } catch (error) {
+      core.debug(`Probe for ${url} failed: ${String(error)}`);
     }
   }
 
@@ -371,7 +399,9 @@ export async function installDebian(
       core.info(
         `NVIDIA did not publish ${version} in its apt repository; using the tarball installer.`,
       );
-      await installTarball(version, inputs);
+      await runWithRetry(`Tarball install of nvhpc ${version}`, () =>
+        installTarball(version, inputs),
+      );
     } else {
       const pkgName = `nvhpc-${version.replace(".", "-")}`;
       try {
@@ -424,7 +454,10 @@ export async function installDebian(
         core.warning(
           `APT installation failed for ${pkgName} (${String(aptErr)}). Falling back to NVIDIA's versioned tarball installer...`,
         );
-        await installTarball(version, inputs);
+        await runWithRetry(
+          `Tarball install of nvhpc ${version} (after APT failure)`,
+          () => installTarball(version, inputs),
+        );
       }
     }
 
