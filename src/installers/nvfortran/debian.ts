@@ -298,6 +298,7 @@ async function installTarball(version: string, inputs: Inputs): Promise<void> {
     core.info(`Downloading NVIDIA HPC SDK tarball from ${url}...`);
     await exec.exec("curl", [
       ...CURL_RETRY_ARGS,
+      "--retry-all-errors",
       "--retry-max-time",
       "3600",
       "--max-time",

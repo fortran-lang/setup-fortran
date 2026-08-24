@@ -107282,6 +107282,7 @@ async function installTarball(version, inputs) {
         info(`Downloading NVIDIA HPC SDK tarball from ${url}...`);
         await exec_exec("curl", [
             ...CURL_RETRY_ARGS,
+            "--retry-all-errors",
             "--retry-max-time",
             "3600",
             "--max-time",
