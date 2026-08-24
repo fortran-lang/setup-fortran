@@ -506,13 +506,17 @@ async function run(): Promise<void> {
         await exec.exec(cc, ["-c", ...cflags, "-o", objPath, cPath]);
       }
 
-      // Link Fortran + C object into final executable
+      // Link Fortran + C object into final executable. Extra link flags
+      // (e.g. -lstdc++ for the C++ companion) must come AFTER the object
+      // files: GNU ld defaults to --as-needed, so a library encountered
+      // before the objects that reference it is discarded, producing
+      // unresolved-symbol errors (notably on Ubuntu and Windows mingw).
       await exec.exec(fc, [
         ...baseFlags,
         ...fflags,
-        ...extraFlags,
         fortranPath,
         objPath,
+        ...extraFlags,
         ...linkerFlags,
         "-o",
         outputPath,
@@ -560,9 +564,9 @@ async function run(): Promise<void> {
       await exec.exec(fc, [
         ...baseFlags,
         ...fflags,
-        ...extraFlags,
         fortranPath,
         objPath,
+        ...extraFlags,
         ...linkerFlags,
         "-o",
         outputPath,
