@@ -15,7 +15,7 @@ Migrating from `v1` requires only a few changes:
 
 - The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 - `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
-- For some 2022 `ifx` releases, the release number differed from the compiler version number. For example, `2022.1` on Windows installed compiler version `2022.2.0`. Compiler versions are used consistently here, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
+- In 2022, oneAPI release numbers differed from compiler version numbers. For example, oneAPI `2022.1` on Windows installed `ifx` version `2022.2.0`. Compiler versions are now used consistently, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
 
 ## Usage
 
@@ -347,6 +347,17 @@ action into `dist`, and run the smoke tests.
 
 Commit changes to `dist` together with the source changes, as GitHub Actions
 executes the bundled code from this directory.
+
+## Maintenance
+
+### Adding a New Version
+
+1. Add the version to `SUPPORTED_VERSIONS` in the respective installation script (latest first).
+2. Add the version to the CI matrix for that compiler.
+3. Update the [README](README.md).
+4. Run `npm run all` — it will fail if the version isn't tested or documented.
+
+Compilers have separate installation scripts for each platform they support.
 
 ## Reporting Issues
 
