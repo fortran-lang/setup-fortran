@@ -463,3 +463,170 @@ describe("Test B coverage predicates detect gaps (negative cases)", () => {
     ).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test C: the hand-maintained README "Compiler Support" tables must both
+// (a) not over-promise  — every concrete version the README claims (a checkmark
+//     on any platform column) is family-supported by the TS SUPPORTED_VERSIONS
+//     tables (the runtime source of truth, as in Test B) — and
+// (b) not be incomplete — every concrete version the tables actually support
+//     is advertised in the README, and a table carrying the `LATEST` marker has
+//     a README "latest" row.
+// (b) is what catches a *deleted* README row for a still-supported release
+// (a deletion that (a) alone never detects, since removing an advert can only
+// make the "no over-promise" check stay green).
+//
+// The README "latest" row itself is excluded from the concrete checks:
+// `version: "latest"` always resolves to `versions[0]` (Test A guarantees
+// newest-first ordering), and installers such as ifx represent the newest via a
+// resolved patch rather than the literal LATEST marker — so "latest" is
+// structurally always satisfiable and is only asserted via (b)'s marker check.
+//
+// Flang is handled identically to Test B (family match): the README lists flang
+// as the majors {22..16} and the tables list the same majors, so flang is green
+// here; the family rule also bridges any major<->patch/minor spelling
+// differences for the other compilers (e.g. README `2026.1.1` is family-covered
+// by table `2026.1`, and table `2025.0.4` by README `2025.0`). Matching is
+// platform-agnostic (table union across every arch/msystem), mirroring Test
+// B's compiler-level check, rather than binding each README column to a
+// specific installer leaf.
+// ---------------------------------------------------------------------------
+
+const README_COMPILERS = [
+  "gfortran",
+  "ifx",
+  "ifort",
+  "nvfortran",
+  "aocc",
+  "lfortran",
+  "flang",
+  "armflang",
+] as const;
+
+interface ReadmeTable {
+  versions: Set<string>; // concrete advertised versions (any checkmark)
+  hasLatest: boolean; // a README "latest" row is present for this compiler
+}
+
+// Parse the README "Compiler Support" markdown tables into
+// {compiler -> ReadmeTable}. Only `### \`compiler\`` sections are read; rows
+// with no checkmark and non-table lines are ignored. The `latest` row is
+// recorded in `hasLatest` (it is structurally satisfiable; see Test C comment).
+function parseReadmeTables(md: string): Record<string, ReadmeTable> {
+  const tables: Record<string, ReadmeTable> = {};
+  let current: string | undefined;
+  const begin = (name: string): ReadmeTable => {
+    if (!tables[name]) tables[name] = { versions: new Set(), hasLatest: false };
+    return tables[name];
+  };
+  for (const raw of md.split(/\r?\n/)) {
+    const heading = raw.match(/^###\s+`([a-z0-9_-]+)`/i);
+    if (heading) {
+      const name = heading[1].toLowerCase();
+      current = README_COMPILERS.includes(name as never) ? name : undefined;
+      if (current) begin(current);
+      continue;
+    }
+    if (!current) continue;
+    const row = raw.match(/^\|(.+)\|$/);
+    if (!row) continue; // only markdown table rows carry a version claim
+    const cols = row[1].split("|").map((c) => c.trim());
+    const [first] = cols;
+    if (!first || first === "---" || first.toLowerCase() === "version")
+      continue;
+    if (first.toLowerCase() === "latest") {
+      begin(current).hasLatest = true;
+      continue;
+    }
+    if (cols.slice(1).some((c) => c.includes("✓")))
+      begin(current).versions.add(first);
+  }
+  return tables;
+}
+
+describe("README compatibility tables match SUPPORTED_VERSIONS (Test C)", () => {
+  const advertised = parseReadmeTables(
+    fs.readFileSync(path.resolve(__dirname, "../README.md"), "utf8"),
+  );
+
+  // Union of every table token (across all archs/msystems) for one compiler —
+  // the set a README-advertised version must family-match against.
+  const tableUnion = (compiler: string): Set<string> =>
+    new Set(
+      ALL_VERSION_LISTS.filter((l) =>
+        l.label.startsWith(`${compiler}/`),
+      ).flatMap((l) => l.versions),
+    );
+
+  it("every advertised concrete version is family-supported by the tables", () => {
+    const unsupported: Array<{ compiler: string; version: string }> = [];
+    for (const compiler of README_COMPILERS) {
+      const union = tableUnion(compiler);
+      for (const v of advertised[compiler]?.versions ?? []) {
+        if (!versionFamilyCovered(v, union)) {
+          unsupported.push({ compiler, version: v });
+        }
+      }
+    }
+    if (unsupported.length > 0) {
+      throw new Error(
+        `README advertises versions not supported by SUPPORTED_VERSIONS:\n` +
+          unsupported.map((u) => `  - ${u.compiler}: ${u.version}`).join("\n"),
+      );
+    }
+  });
+
+  // (b) Completeness: the README must document every version the tables support.
+  // This is what fails when a README row for a still-supported release is
+  // deleted — e.g. removing armflang "20.1" while the table still lists it.
+  it("every supported concrete version is advertised in the README", () => {
+    const unadvertised: Array<{ compiler: string; version: string }> = [];
+    for (const compiler of README_COMPILERS) {
+      const union = tableUnion(compiler);
+      for (const token of union) {
+        if (token === LATEST) continue;
+        if (
+          !versionFamilyCovered(
+            token,
+            advertised[compiler]?.versions ?? new Set(),
+          )
+        ) {
+          unadvertised.push({ compiler, version: token });
+        }
+      }
+      if (union.has(LATEST) && !advertised[compiler]?.hasLatest) {
+        unadvertised.push({ compiler, version: "latest" });
+      }
+    }
+    if (unadvertised.length > 0) {
+      throw new Error(
+        `SUPPORTED_VERSIONS lists versions not documented in the README:\n` +
+          unadvertised.map((u) => `  - ${u.compiler}: ${u.version}`).join("\n"),
+      );
+    }
+  });
+
+  // Negative cases for the README parser itself, so a future README edit that
+  // breaks table structure is caught here rather than as a silent no-coverage
+  // false-pass.
+  it("parseReadmeTables only collects checkmarked concrete versions + latest", () => {
+    const md = [
+      "### `flang` (LLVM Flang)",
+      "",
+      "| Version | windows-2025 (ucrt64) | windows-2022 (ucrt64) |",
+      "| ------- | --------------------- | --------------------- |",
+      "| latest  | ✓                     | ✓                     |",
+      "| 16      |                       | ✓                     |",
+      "| 15      |                       |                       |",
+      "",
+      "> Specific patch versions (e.g. `21.1.6`) are supported.",
+      "",
+      "### Basic Usage",
+      "",
+      "some prose | not | a | table",
+    ].join("\n");
+    expect(parseReadmeTables(md)).toEqual({
+      flang: { versions: new Set(["16"]), hasLatest: true },
+    });
+  });
+});
