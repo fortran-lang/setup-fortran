@@ -18,6 +18,11 @@ const INSTALLERS: Record<
       sha256:
         "42260ffe3830fb953d5eee1bbb32229ff06aa7c3833c1ed7a9a0420a95685d94",
     },
+    [Arch.ARM64]: {
+      filename: `Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh`,
+      sha256:
+        "f4096a92482b30f04534cddb63d8bc929118318deffac71d90fb89dc52359d22",
+    },
   },
   [OS.MacOS]: {
     [Arch.X64]: {

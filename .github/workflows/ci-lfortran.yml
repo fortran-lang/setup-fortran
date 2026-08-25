@@ -38,6 +38,10 @@ jobs:
           - { compiler: lfortran, version: "0.58.0" }
           - { compiler: lfortran, version: "0.57.0" }
         include:
+          - image: ubuntu-24.04-arm
+            toolchain: { compiler: lfortran, version: "0.64.0" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: lfortran, version: "0.64.0" }
           - image: windows-2025
             toolchain: { compiler: lfortran, msystem: ucrt64 } # only latest version available from Pacman
           - image: windows-2022

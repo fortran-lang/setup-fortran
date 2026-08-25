@@ -116,10 +116,36 @@ describe("installDebian (LFortran)", () => {
     expect(mockedExec).toHaveBeenCalledWith("curl", expect.any(Array));
   });
 
-  it("throws error on ARM64", async () => {
-    const inputs = { ...baseInputs, arch: Arch.ARM64 };
+  it("installs lfortran on ARM64 via the aarch64 Miniforge installer", async () => {
+    const inputs = { ...baseInputs, arch: Arch.ARM64, version: "0.64.0" };
+    await installDebian(inputs);
+
+    expect(mockedExec).toHaveBeenCalledWith("curl", [
+      "-fsSL",
+      "--retry",
+      "3",
+      "--retry-delay",
+      "15",
+      "-o",
+      expect.stringContaining("miniforge.sh"),
+      expect.stringContaining("Miniforge3-26.3.2-2-Linux-aarch64.sh"),
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      expect.stringContaining("conda"),
+      expect.arrayContaining([
+        "create",
+        "-y",
+        "-p",
+        expect.stringContaining("0.64.0"),
+        "lfortran==0.64.0",
+      ]),
+    );
+  });
+
+  it("rejects ARM64 versions that conda-forge does not publish for aarch64", async () => {
+    const inputs = { ...baseInputs, arch: Arch.ARM64, version: "0.63.0" };
     await expect(installDebian(inputs)).rejects.toThrow(
-      "LFortran is not available for Linux ARM64 on conda-forge",
+      "lfortran 0.63.0 is not supported on linux (arm64). Supported versions: 0.64.0",
     );
   });
 

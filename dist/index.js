@@ -108300,6 +108300,10 @@ const INSTALLERS = {
             filename: `Miniforge3-${MINIFORGE_VERSION}-Linux-x86_64.sh`,
             sha256: "42260ffe3830fb953d5eee1bbb32229ff06aa7c3833c1ed7a9a0420a95685d94",
         },
+        [Arch.ARM64]: {
+            filename: `Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh`,
+            sha256: "f4096a92482b30f04534cddb63d8bc929118318deffac71d90fb89dc52359d22",
+        },
     },
     [OS.MacOS]: {
         [Arch.X64]: {
@@ -108408,9 +108412,10 @@ function createInstallerTempDir() {
 //
 // Notes:
 //   - lfortran is installed via conda-forge, so the version here is the conda
-//     package version (e.g. "0.63.0").
-//   - conda-forge only publishes lfortran for linux-64; linux-aarch64 is
-//     currently not supported (https://anaconda.org/conda-forge/lfortran).
+//     package version (e.g. "0.64.0").
+//   - conda-forge publishes lfortran for linux-64 from 0.57.0 onwards, but for
+//     linux-aarch64 only from 0.64.0 onwards
+//     (https://anaconda.org/conda-forge/lfortran).
 //   - The binary is always named `lfortran` regardless of version.
 const lfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
@@ -108423,6 +108428,7 @@ const lfortran_debian_SUPPORTED_VERSIONS = {
         "0.58.0",
         "0.57.0",
     ],
+    [Arch.ARM64]: ["0.64.0"],
 };
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
@@ -108430,10 +108436,6 @@ const lfortran_debian_SUPPORTED_VERSIONS = {
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
 async function lfortran_debian_installDebian(inputs) {
-    if (inputs.arch === Arch.ARM64) {
-        throw new Error(`LFortran is not available for Linux ARM64 on conda-forge. ` +
-            `See https://anaconda.org/conda-forge/lfortran for supported platforms.`);
-    }
     const version = resolveVersion(inputs, lfortran_debian_SUPPORTED_VERSIONS);
     info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
     const environment = lfortranEnvironment(inputs, version);

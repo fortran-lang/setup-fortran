@@ -4,6 +4,7 @@ import { Arch, OS } from "../src/types";
 describe("Miniforge installer metadata", () => {
   it.each([
     [OS.Linux, Arch.X64],
+    [OS.Linux, Arch.ARM64],
     [OS.MacOS, Arch.X64],
     [OS.MacOS, Arch.ARM64],
     [OS.Windows, Arch.X64],

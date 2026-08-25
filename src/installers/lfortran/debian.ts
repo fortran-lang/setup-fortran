@@ -19,9 +19,10 @@ import {
 //
 // Notes:
 //   - lfortran is installed via conda-forge, so the version here is the conda
-//     package version (e.g. "0.63.0").
-//   - conda-forge only publishes lfortran for linux-64; linux-aarch64 is
-//     currently not supported (https://anaconda.org/conda-forge/lfortran).
+//     package version (e.g. "0.64.0").
+//   - conda-forge publishes lfortran for linux-64 from 0.57.0 onwards, but for
+//     linux-aarch64 only from 0.64.0 onwards
+//     (https://anaconda.org/conda-forge/lfortran).
 //   - The binary is always named `lfortran` regardless of version.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -34,7 +35,8 @@ export const SUPPORTED_VERSIONS = {
     "0.58.0",
     "0.57.0",
   ],
-} as const satisfies Partial<Record<Arch, readonly string[]>>;
+  [Arch.ARM64]: ["0.64.0"],
+} as const satisfies Record<Arch, readonly string[]>;
 
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
@@ -44,13 +46,6 @@ export const SUPPORTED_VERSIONS = {
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  if (inputs.arch === Arch.ARM64) {
-    throw new Error(
-      `LFortran is not available for Linux ARM64 on conda-forge. ` +
-        `See https://anaconda.org/conda-forge/lfortran for supported platforms.`,
-    );
-  }
-
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
 
   core.info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
