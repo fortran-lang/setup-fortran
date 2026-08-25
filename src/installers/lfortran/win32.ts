@@ -15,6 +15,7 @@ import { setupMSYS2 } from "../../setup_msys2";
 import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
 import { verifySha256 } from "../../verify_download";
 import {
+  condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
   lfortranEnvironment,
@@ -109,7 +110,7 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
         "/S",
         `/D=${environment.miniforgePrefix}`,
       ]);
-      await exec.exec(environment.conda, [
+      await condaCreateWithRetry(environment.conda, [
         "create",
         "-y",
         "-p",

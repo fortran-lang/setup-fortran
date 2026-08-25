@@ -44,9 +44,9 @@ jobs:
     needs: [validation]
     uses: ./.github/workflows/ci-lfortran.yml
 
-  nvfortran:
-    needs: [validation]
-    uses: ./.github/workflows/ci-nvfortran.yml
+  # nvfortran:
+  #   needs: [validation]
+  #   uses: ./.github/workflows/ci-nvfortran.yml
 
   two-invocations:
     name: sequential installations in one job

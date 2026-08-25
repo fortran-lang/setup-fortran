@@ -108396,6 +108396,25 @@ function createInstallerTempDir() {
     external_fs_.mkdirSync(runnerTemp, { recursive: true });
     return external_fs_.mkdtempSync(external_path_.join(runnerTemp, "setup-fortran-lfortran-"));
 }
+// `conda create` fetches channel repodata and downloads packages over the
+// network, both of which can fail transiently (read timeouts, 5xx, rate
+// limits). Retrying the whole command is safe: conda reuses its package cache,
+// so a retry only re-fetches what actually failed.
+async function condaCreateWithRetry(condaBin, args, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec(condaBin, args, {
+            ignoreReturnCode: true,
+        });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`conda create failed after ${maxAttempts.toString()} attempts.`);
+        }
+        const delaySeconds = attempt * 15;
+        warning(`conda create failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+}
 
 ;// CONCATENATED MODULE: ./src/installers/lfortran/debian.ts
 
@@ -108579,7 +108598,7 @@ async function lfortran_darwin_installDarwin(inputs) {
                 "-p",
                 environment.miniforgePrefix,
             ]);
-            await exec_exec(environment.conda, [
+            await condaCreateWithRetry(environment.conda, [
                 "create",
                 "-y",
                 "-p",
@@ -108745,7 +108764,7 @@ async function installConda(inputs) {
                 "/S",
                 `/D=${environment.miniforgePrefix}`,
             ]);
-            await exec_exec(environment.conda, [
+            await condaCreateWithRetry(environment.conda, [
                 "create",
                 "-y",
                 "-p",

@@ -89,6 +89,7 @@ describe("installDarwin (LFortran)", () => {
         expect.stringContaining("0.63.0"),
         "lfortran==0.63.0",
       ]),
+      expect.objectContaining({ ignoreReturnCode: true }),
     );
   });
 

@@ -99,3 +99,34 @@ export function createInstallerTempDir(): string {
   fs.mkdirSync(runnerTemp, { recursive: true });
   return fs.mkdtempSync(path.join(runnerTemp, "setup-fortran-lfortran-"));
 }
+
+// `conda create` fetches channel repodata and downloads packages over the
+// network, both of which can fail transiently (read timeouts, 5xx, rate
+// limits). Retrying the whole command is safe: conda reuses its package cache,
+// so a retry only re-fetches what actually failed.
+export async function condaCreateWithRetry(
+  condaBin: string,
+  args: string[],
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec(condaBin, args, {
+      ignoreReturnCode: true,
+    });
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `conda create failed after ${maxAttempts.toString()} attempts.`,
+      );
+    }
+
+    const delaySeconds = attempt * 15;
+    core.warning(
+      `conda create failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+  }
+}
