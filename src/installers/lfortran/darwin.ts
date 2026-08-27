@@ -26,6 +26,7 @@ import {
 //   - LATEST resolves to the first entry in the list.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "0.65.0",
     "0.64.0",
     "0.63.0",
     "0.62.0",
@@ -36,6 +37,7 @@ export const SUPPORTED_VERSIONS = {
     "0.57.0",
   ],
   [Arch.ARM64]: [
+    "0.65.0",
     "0.64.0",
     "0.63.0",
     "0.62.0",

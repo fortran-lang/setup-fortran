@@ -145,7 +145,7 @@ describe("installDebian (LFortran)", () => {
   it("rejects ARM64 versions that conda-forge does not publish for aarch64", async () => {
     const inputs = { ...baseInputs, arch: Arch.ARM64, version: "0.63.0" };
     await expect(installDebian(inputs)).rejects.toThrow(
-      "lfortran 0.63.0 is not supported on linux (arm64). Supported versions: 0.64.0",
+      "lfortran 0.63.0 is not supported on linux (arm64). Supported versions: 0.65.0, 0.64.0",
     );
   });
 

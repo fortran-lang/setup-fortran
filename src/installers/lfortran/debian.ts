@@ -26,6 +26,7 @@ import {
 //   - The binary is always named `lfortran` regardless of version.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "0.65.0",
     "0.64.0",
     "0.63.0",
     "0.62.0",
@@ -35,7 +36,7 @@ export const SUPPORTED_VERSIONS = {
     "0.58.0",
     "0.57.0",
   ],
-  [Arch.ARM64]: ["0.64.0"],
+  [Arch.ARM64]: ["0.65.0", "0.64.0"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 // Downloads and installs a self-contained Miniforge installer into a temporary

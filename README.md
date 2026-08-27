@@ -213,6 +213,7 @@ Use of the canonical names is recommended.
 | Version | ubuntu-24.04 | ubuntu-22.04 | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | macos-14 | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
 | ------- | ------------ | ------------ | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | -------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- |
 | latest  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      |
+| 0.65.0  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
 | 0.64.0  | ✓            | ✓            | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
 | 0.63.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
 | 0.62.0  | ✓            | ✓            |                  |                  | ✓        | ✓              | ✓        | ✓              | ✓        | ✓            | ✓            |                       |                       |                        |                        |
@@ -274,7 +275,7 @@ supported version for the platform.
 - uses: fortran-lang/setup-fortran@v2
   with:
     compiler: lfortran
-    version: "0.64.0"
+    version: "0.65.0"
 ```
 
 ### Matrix Build
@@ -286,7 +287,7 @@ strategy:
     toolchain:
       - { compiler: gfortran, version: "15" }
       - { compiler: ifx, version: "2026.1" }
-      - { compiler: lfortran, version: "0.64.0" }
+      - { compiler: lfortran, version: "0.65.0" }
     exclude:
       - os: macos-latest
         toolchain: { compiler: ifx, version: "2026.1" }
