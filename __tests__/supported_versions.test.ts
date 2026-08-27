@@ -186,16 +186,29 @@ describe("supported version tables are ordered newest-first", () => {
 // ---------------------------------------------------------------------------
 // Test B: every version the action claims to support (SUPPORTED_VERSIONS) must
 // actually be exercised by the per-compiler CI matrix
-// (`.github/workflows/ci-<compiler>.yml`), so a supported release is never
-// shipped untested. Two guarantees:
+// (`.github/workflows/ci-<compiler>.yml`) — on a runner that matches the table
+// leaf it comes from — so a supported release is never shipped untested. Two
+// guarantees:
 //
-//   1. Concrete versions: each non-`LATEST` token in a table must be tested by
-//      its ci-<compiler>.yml matrix. Matching is by version *family* (exact, or
-//      one token extends the other by a dotted-segment boundary) so a table
-//      entry is satisfied by an exact CI pin OR a fuller CI spelling
-//      (e.g. table `21` <-> CI `21.1.6`; `2026.1` <-> `2026.1.0`; `16` is NOT
-//      satisfied by CI `17`). Extra patch-resolution CI entries therefore do
-//      not count as gaps.
+//   1. Concrete versions: each non-`LATEST` token in a table *leaf* (a leaf is
+//      one `Record<Arch, ...>` cell, e.g. `lfortran/debian[arm64]`) must have
+//      a matching (image, toolchain) combination in its ci-<compiler>.yml
+//      matrix. Matching is leaf-aware three ways:
+//        - OS:      the leaf's platform (debian/darwin/win32) must match the
+//                   runner image's OS (ubuntu-*/macos-*/windows-*);
+//        - arch:    the leaf's arch must match the runner image's arch
+//                   (`-arm` suffix => arm64, `-intel` suffix => x64, bare
+//                   `macos-*` => arm64 since macos-14);
+//        - msystem: Windows leaves carry the table's msystem key; `native`
+//                   (and non-Windows leaves) match toolchain entries without
+//                   an `msystem`, `ucrt64`/`clang64` match entries with it.
+//      Version matching is by *family* (exact, or one token extends the other
+//      by a dotted-segment boundary) so a table entry is satisfied by an exact
+//      CI pin OR a fuller CI spelling (e.g. table `21` <-> CI `21.1.6`;
+//      `2026.1` <-> `2026.1.0`; `16` is NOT satisfied by CI `17`). Extra
+//      patch-resolution CI entries therefore do not count as gaps.
+//      A version tested only on the wrong OS/arch/msystem does NOT cover the
+//      leaf — this is what guards e.g. the ubuntu-arm `include:` entries.
 //   2. Rolling-only cells: a leaf list of exactly `[LATEST]` (the
 //      present-only-for-latest platforms, e.g. Windows `ucrt64`/`clang64`) must
 //      have a matching no-`version` CI entry, on the same `msystem` when one is
@@ -210,8 +223,22 @@ describe("supported version tables are ordered newest-first", () => {
 
 const WORKFLOWS_DIR = path.resolve(__dirname, "../.github/workflows");
 
+type RunnerOs = "linux" | "macos" | "windows";
+type RunnerArch = "x64" | "arm64";
+
+// One (image, toolchain) combination the CI matrix actually executes: the
+// cross-product `image` x `toolchain` minus `exclude`, plus every `include`
+// entry that pairs an image with a toolchain.
+interface CiCombo {
+  image: string;
+  os: RunnerOs;
+  arch: RunnerArch;
+  version?: string; // undefined for `latest` / version-less entries
+  msystem: string; // "" when the toolchain entry carries no msystem (native)
+}
+
 interface CiMatrixInfo {
-  versions: Set<string>;
+  combos: CiCombo[];
   latestMsystrings: Set<string>;
   hasLatest: boolean;
 }
@@ -241,6 +268,50 @@ function msystemOf(label: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
+// Classify a GitHub Actions runner image by OS and architecture.
+//   - `-arm` suffix   => arm64 (ubuntu-*-arm, windows-11-arm)
+//   - `-intel` suffix => x64   (macos-*-intel, the old Intel Mac runners)
+//   - bare `macos-*`  => arm64 (macos-14 and later are Apple Silicon)
+//   - everything else => x64   (ubuntu, windows)
+// `*-latest` aliases resolve by the same rules (macos-latest is arm64 since
+// it points at macos-14+); they only ever appear in version-less includes, so
+// they never satisfy a concrete-version leaf.
+function classifyImage(
+  image: string,
+): { os: RunnerOs; arch: RunnerArch } | undefined {
+  if (image.startsWith("ubuntu-")) {
+    return { os: "linux", arch: image.endsWith("-arm") ? "arm64" : "x64" };
+  }
+  if (image.startsWith("macos-")) {
+    return { os: "macos", arch: image.endsWith("-intel") ? "x64" : "arm64" };
+  }
+  if (image.startsWith("windows-")) {
+    return { os: "windows", arch: image.endsWith("-arm") ? "arm64" : "x64" };
+  }
+  return undefined;
+}
+
+interface LeafSpec {
+  os: RunnerOs;
+  arch: RunnerArch;
+  msystem?: string; // only Windows leaves carry one; "native" = no msystem
+}
+
+// Parse a table leaf label (as produced by `collectVersionLists`) into the
+// runner characteristics a covering CI combination must have:
+//   "lfortran/debian[arm64]"            -> linux/arm64, no msystem
+//   "flang/win32[x64][ucrt64]"          -> windows/x64, ucrt64
+function leafSpec(label: string): LeafSpec {
+  const m =
+    /^([a-z0-9]+)\/(debian|darwin|win32)\[(x64|arm64)\](?:\[(ucrt64|clang64|native)\])?$/.exec(
+      label,
+    );
+  if (!m) throw new Error(`Unrecognized version table label: ${label}`);
+  const os: RunnerOs =
+    m[2] === "debian" ? "linux" : m[2] === "darwin" ? "macos" : "windows";
+  return { os, arch: m[3] as RunnerArch, msystem: m[4] };
+}
+
 function parseCiMatrix(compiler: string): CiMatrixInfo {
   const cached = ciCache.get(compiler);
   if (cached) return cached;
@@ -255,46 +326,117 @@ function parseCiMatrix(compiler: string): CiMatrixInfo {
     throw new Error(`No strategy.matrix found in ${file}`);
   }
 
-  const versions = new Set<string>();
+  const combos: CiCombo[] = [];
   const latestMsystrings = new Set<string>();
   let hasLatest = false;
+
+  const makeCombo = (
+    image: string,
+    e: Record<string, unknown>,
+  ): CiCombo | undefined => {
+    const cls = classifyImage(image);
+    if (!cls) return undefined;
+    const version =
+      typeof e.version === "string" && e.version !== LATEST
+        ? e.version
+        : undefined;
+    return {
+      image,
+      os: cls.os,
+      arch: cls.arch,
+      version,
+      msystem: typeof e.msystem === "string" ? e.msystem : "",
+    };
+  };
 
   // A toolchain entry with no `version` (or version === "latest") pins the
   // latest available release; record its `msystem` (if any) so [LATEST]-only
   // cells can be matched to the right Windows build.
-  const visit = (entry: unknown): void => {
+  const visit = (image: string, entry: unknown): void => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return;
     const e = entry as Record<string, unknown>;
     if (typeof e.compiler !== "string") return; // not a toolchain entry
+    const combo = makeCombo(image, e);
+    if (combo) combos.push(combo);
     const v = e.version;
-    if (typeof v === "string" && v !== LATEST) {
-      versions.add(v);
-    } else {
+    if (typeof v !== "string" || v === LATEST) {
       hasLatest = true;
       if (typeof e.msystem === "string") latestMsystrings.add(e.msystem);
     }
   };
 
+  const images = Array.isArray(matrix.image)
+    ? matrix.image.filter((i): i is string => typeof i === "string")
+    : [];
   const tc = matrix.toolchain;
-  if (Array.isArray(tc)) tc.forEach(visit);
-  else if (tc && typeof tc === "object") visit(tc);
+  const toolchains: unknown[] = Array.isArray(tc)
+    ? tc
+    : tc && typeof tc === "object"
+      ? [tc]
+      : [];
+
+  // GitHub semantics: an `exclude` item removes every cross-product
+  // combination whose keys all match. Includes are never excluded.
+  const excludes = Array.isArray(matrix.exclude)
+    ? matrix.exclude.filter(
+        (x): x is Record<string, unknown> =>
+          !!x && typeof x === "object" && !Array.isArray(x),
+      )
+    : [];
+  const isExcluded = (image: string, entry: Record<string, unknown>): boolean =>
+    excludes.some((x) => {
+      if (typeof x.image === "string" && x.image !== image) return false;
+      const xt = x.toolchain;
+      if (xt && typeof xt === "object" && !Array.isArray(xt)) {
+        for (const [k, v] of Object.entries(xt as Record<string, unknown>)) {
+          if (entry[k] !== v) return false;
+        }
+      }
+      return true;
+    });
+
+  for (const image of images) {
+    for (const t of toolchains) {
+      if (!t || typeof t !== "object" || Array.isArray(t)) continue;
+      const e = t as Record<string, unknown>;
+      if (typeof e.compiler !== "string") continue;
+      if (isExcluded(image, e)) continue;
+      visit(image, e);
+    }
+  }
 
   const inc = matrix.include ?? [];
   if (Array.isArray(inc)) {
     for (const item of inc) {
       if (!item || typeof item !== "object") continue;
       const o = item as Record<string, unknown>;
-      if (o.toolchain) {
-        if (Array.isArray(o.toolchain)) o.toolchain.forEach(visit);
-        else if (o.toolchain && typeof o.toolchain === "object")
-          visit(o.toolchain);
-      } else if (typeof o.image === "string") {
+      const image = typeof o.image === "string" ? o.image : undefined;
+      const entries: unknown[] = Array.isArray(o.toolchain)
+        ? o.toolchain
+        : o.toolchain && typeof o.toolchain === "object"
+          ? [o.toolchain]
+          : [];
+      if (entries.length > 0) {
+        for (const t of entries) {
+          if (!t || typeof t !== "object" || Array.isArray(t)) continue;
+          const e = t as Record<string, unknown>;
+          if (typeof e.compiler !== "string") continue;
+          if (image) {
+            visit(image, e);
+          } else if (typeof e.version !== "string" || e.version === LATEST) {
+            // Toolchain-only include without an image: only meaningful for
+            // latest tracking, it can never cover a concrete-version leaf.
+            hasLatest = true;
+            if (typeof e.msystem === "string") latestMsystrings.add(e.msystem);
+          }
+        }
+      } else if (image) {
         hasLatest = true; // image-only include => default compiler at "latest"
       }
     }
   }
 
-  const info: CiMatrixInfo = { versions, latestMsystrings, hasLatest };
+  const info: CiMatrixInfo = { combos, latestMsystrings, hasLatest };
   ciCache.set(compiler, info);
   return info;
 }
@@ -324,23 +466,44 @@ function latestCellCovered(
   return msystem ? latestMsystrings.has(msystem) : hasLatest;
 }
 
+// A concrete table token is covered by a CI combination only when that
+// combination runs on a runner matching the token's leaf (OS, arch, and —
+// for Windows leaves — msystem) AND pins a version in the token's family.
+// A version-less (latest) combination never covers a concrete token.
+function comboCoversLeaf(
+  combo: CiCombo,
+  spec: LeafSpec,
+  token: string,
+): boolean {
+  if (combo.os !== spec.os || combo.arch !== spec.arch) return false;
+  const requiredMsystem =
+    spec.msystem === undefined || spec.msystem === "native" ? "" : spec.msystem;
+  if (combo.msystem !== requiredMsystem) return false;
+  return (
+    combo.version !== undefined &&
+    versionFamilyCovered(token, new Set([combo.version]))
+  );
+}
+
 describe("supported version tables are exercised by CI (Test B)", () => {
-  it("every concrete supported version is tested by its ci-<compiler>.yml matrix", () => {
+  it("every concrete supported version is tested by its ci-<compiler>.yml matrix on a matching runner", () => {
     const uncovered: Array<{ where: string; compiler: string; token: string }> =
       [];
     for (const list of ALL_VERSION_LISTS) {
       const compiler = list.label.split("/")[0];
+      const spec = leafSpec(list.label);
       const ci = parseCiMatrix(compiler);
       for (const token of list.versions) {
         if (token === LATEST) continue;
-        if (!versionFamilyCovered(token, ci.versions)) {
+        if (!ci.combos.some((c) => comboCoversLeaf(c, spec, token))) {
           uncovered.push({ where: list.label, compiler, token });
         }
       }
     }
     if (uncovered.length > 0) {
       throw new Error(
-        "These supported versions are not exercised by their CI matrix:\n" +
+        "These supported versions have no CI coverage on a matching runner " +
+          "(OS/arch/msystem of their table leaf):\n" +
           uncovered
             .map(
               (u) => `  - ${u.where}: "${u.token}" (compiler "${u.compiler}")`,
@@ -461,6 +624,135 @@ describe("Test B coverage predicates detect gaps (negative cases)", () => {
     expect(
       latestCellCovered("gfortran/darwin[x64]", new Set<string>(), false),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Negative cases for the leaf-aware coverage building blocks: `classifyImage`
+// must map runner names to the right OS/arch, and `comboCoversLeaf` must
+// reject combinations that run the right version on the wrong runner
+// (the regression that used to slip through: a supported ubuntu-arm release
+// covered only by x64 CI jobs).
+// ---------------------------------------------------------------------------
+describe("leaf-aware CI coverage building blocks (negative cases)", () => {
+  const combo = (image: string, version?: string, msystem = ""): CiCombo => {
+    const cls = classifyImage(image);
+    if (!cls) throw new Error(`test helper: unclassifiable image ${image}`);
+    return { image, os: cls.os, arch: cls.arch, version, msystem };
+  };
+  const covered = (spec: LeafSpec, token: string, combos: CiCombo[]) =>
+    combos.some((c) => comboCoversLeaf(c, spec, token));
+
+  it.each([
+    ["ubuntu-24.04", { os: "linux", arch: "x64" }],
+    ["ubuntu-22.04", { os: "linux", arch: "x64" }],
+    ["ubuntu-24.04-arm", { os: "linux", arch: "arm64" }],
+    ["ubuntu-22.04-arm", { os: "linux", arch: "arm64" }],
+    ["macos-14", { os: "macos", arch: "arm64" }],
+    ["macos-15", { os: "macos", arch: "arm64" }],
+    ["macos-26", { os: "macos", arch: "arm64" }],
+    ["macos-15-intel", { os: "macos", arch: "x64" }],
+    ["macos-26-intel", { os: "macos", arch: "x64" }],
+    ["windows-2022", { os: "windows", arch: "x64" }],
+    ["windows-2025", { os: "windows", arch: "x64" }],
+    ["windows-11-arm", { os: "windows", arch: "arm64" }],
+    ["ubuntu-latest", { os: "linux", arch: "x64" }],
+    ["macos-latest", { os: "macos", arch: "arm64" }],
+    ["windows-latest", { os: "windows", arch: "x64" }],
+  ])("classifyImage(%p) => %p", (image, expected) => {
+    expect(classifyImage(image)).toEqual(expected);
+  });
+
+  it("classifies unknown runner names as unusable", () => {
+    expect(classifyImage("self-hosted")).toBeUndefined();
+  });
+
+  it.each([
+    ["lfortran/debian[arm64]", { os: "linux", arch: "arm64" }],
+    ["lfortran/debian[x64]", { os: "linux", arch: "x64" }],
+    ["flang/darwin[arm64]", { os: "macos", arch: "arm64" }],
+    [
+      "ifx/win32[x64][native]",
+      { os: "windows", arch: "x64", msystem: "native" },
+    ],
+    [
+      "flang/win32[x64][ucrt64]",
+      { os: "windows", arch: "x64", msystem: "ucrt64" },
+    ],
+    [
+      "lfortran/win32[x64][clang64]",
+      { os: "windows", arch: "x64", msystem: "clang64" },
+    ],
+  ])("leafSpec(%p) => %p", (label, expected) => {
+    expect(leafSpec(label)).toEqual(expected);
+  });
+
+  it("flags a version that is only tested on the wrong architecture", () => {
+    // The headline regression: 0.65.0 is supported on linux/arm64 but the CI
+    // entries for it were deleted from the ubuntu-arm includes, leaving only
+    // x64 jobs.
+    const spec = leafSpec("lfortran/debian[arm64]");
+    const x64Only = [
+      combo("ubuntu-24.04", "0.65.0"),
+      combo("ubuntu-22.04", "0.65.0"),
+      combo("macos-14", "0.65.0"),
+      combo("windows-2025", "0.65.0"),
+    ];
+    expect(covered(spec, "0.65.0", x64Only)).toBe(false);
+    expect(
+      covered(spec, "0.65.0", [
+        ...x64Only,
+        combo("ubuntu-24.04-arm", "0.65.0"),
+      ]),
+    ).toBe(true);
+  });
+
+  it("flags a version that is only tested on the wrong OS", () => {
+    const spec = leafSpec("lfortran/debian[x64]");
+    expect(
+      covered(spec, "0.65.0", [
+        combo("macos-14", "0.65.0"),
+        combo("windows-2025", "0.65.0"),
+      ]),
+    ).toBe(false);
+  });
+
+  it("requires the msystem to match for Windows leaves", () => {
+    const native = leafSpec("lfortran/win32[x64][native]");
+    const ucrt64 = leafSpec("lfortran/win32[x64][ucrt64]");
+    // A native (msystem-less) entry never covers an ucrt64 leaf and vice
+    // versa, even at the same version.
+    expect(covered(native, "0.65.0", [combo("windows-2025", "0.65.0")])).toBe(
+      true,
+    );
+    expect(
+      covered(native, "0.65.0", [combo("windows-2025", "0.65.0", "ucrt64")]),
+    ).toBe(false);
+    expect(
+      covered(ucrt64, "0.65.0", [combo("windows-2025", "0.65.0", "ucrt64")]),
+    ).toBe(true);
+    expect(covered(ucrt64, "0.65.0", [combo("windows-2025", "0.65.0")])).toBe(
+      false,
+    );
+  });
+
+  it("never lets a msystem-bearing combination cover a non-Windows leaf", () => {
+    const spec = leafSpec("lfortran/debian[arm64]");
+    expect(
+      covered(spec, "0.65.0", [combo("ubuntu-24.04-arm", "0.65.0", "ucrt64")]),
+    ).toBe(false);
+  });
+
+  it("a latest (version-less) combination never covers a concrete token", () => {
+    const spec = leafSpec("lfortran/debian[arm64]");
+    expect(covered(spec, "0.65.0", [combo("ubuntu-24.04-arm")])).toBe(false);
+  });
+
+  it("still applies version-family matching within a matching combination", () => {
+    const spec = leafSpec("flang/darwin[x64]");
+    const combos = [combo("macos-15-intel", "21.1.6")];
+    expect(covered(spec, "21", combos)).toBe(true);
+    expect(covered(spec, "22", combos)).toBe(false);
   });
 });
 

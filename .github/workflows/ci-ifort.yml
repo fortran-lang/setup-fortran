@@ -125,6 +125,10 @@ jobs:
           - image: windows-2022
             toolchain: { compiler: ifort, version: "2021.9" }
           - image: windows-2025
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: windows-2022
+            toolchain: { compiler: ifort, version: "2021.8" }
+          - image: windows-2025
             toolchain: { compiler: ifort, version: "2021.7" }
           - image: windows-2022
             toolchain: { compiler: ifort, version: "2021.7" }
