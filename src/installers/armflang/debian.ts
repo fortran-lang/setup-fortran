@@ -7,6 +7,7 @@ import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { indexFetchFailed } from "../../apt_sources";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: undefined,
@@ -202,6 +203,64 @@ async function aptGetWithRetry(args: string[], maxAttempts = 3): Promise<void> {
   }
 }
 
+// Updates the apt package index. Repositories baked into the runner image
+// that are unrelated to the Arm toolchain (e.g. packages.microsoft.com
+// returning a transient 403) must not fail the job. When `requiredHost` is
+// given, a fetch failure of that host is treated as fatal and retried; any
+// other non-zero exit is tolerated with a warning.
+async function aptGetUpdateWithRetry(
+  requiredHost?: string,
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let output = "";
+    const exitCode = await exec.exec(
+      "sudo",
+      ["apt-get", ...APT_ACQUIRE_OPTS, "update", "-y"],
+      {
+        ignoreReturnCode: true,
+        env: {
+          ...process.env,
+          DEBIAN_FRONTEND: "noninteractive",
+        },
+        listeners: {
+          stdout: (data: Buffer) => {
+            output += data.toString();
+          },
+          stderr: (data: Buffer) => {
+            output += data.toString();
+          },
+        },
+      },
+    );
+    if (exitCode === 0) return;
+
+    const requiredFetchFailed =
+      requiredHost !== undefined && indexFetchFailed(output, requiredHost);
+    if (!requiredFetchFailed) {
+      core.warning(
+        "apt-get update did not complete cleanly; continuing with the existing package lists.",
+      );
+      return;
+    }
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `apt-get update failed after ${maxAttempts.toString()} attempts ` +
+          `with exit code ${exitCode.toString()}.`,
+      );
+    }
+
+    const delayMs = attempt * 10_000;
+    core.warning(
+      `apt-get update failed ` +
+        `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
+        `Retrying in ${(delayMs / 1000).toString()} seconds...`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+}
+
 function findLibraryDirectories(baseDir: string): string[] {
   const results: string[] = [];
   if (!fs.existsSync(baseDir)) return results;
@@ -310,7 +369,9 @@ export async function installDebian(
       );
     }
 
-    await aptGetWithRetry(["update", "-y"]);
+    // Best effort: curl and gpg ship with the runner images, so a broken
+    // unrelated repository must not block this step.
+    await aptGetUpdateWithRetry();
     await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
 
     if (version === "22.1") {
@@ -345,7 +406,7 @@ export async function installDebian(
       ]);
     }
 
-    await aptGetWithRetry(["update", "-y"]);
+    await aptGetUpdateWithRetry("developer.arm.com");
     const packageVersion = await availablePackageVersion(version);
 
     await aptGetWithRetry([

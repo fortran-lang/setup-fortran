@@ -4,10 +4,13 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { scopedSourceListOptions } from "../../apt_sources";
 import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+
+const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -91,7 +94,7 @@ export async function installDebian(
     await addOneApiAptRepo();
     await exec.exec("bash", [
       "-c",
-      `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
+      `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${ONEAPI_SOURCE_LIST_FILE}`,
     ]);
 
     await aptGetUpdateWithRetry();
@@ -203,12 +206,13 @@ async function resolveInstalledVersion(): Promise<string> {
   return output.trim().split("\n")[0];
 }
 
+// The update is scoped to the Intel oneAPI source list and retried a couple
+// of times with bounded backoff, so a transiently flaky mirror stalls the job
+// only briefly and unrelated repositories in the runner image cannot break it.
 async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let output = "";
-    await exec.exec(
-      "sudo",
-      [
+    try {
+      await exec.exec("sudo", [
         "timeout",
         "--signal=TERM",
         "--kill-after=10s",
@@ -216,32 +220,17 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
         "apt-get",
         "update",
         "-y",
+        ...scopedSourceListOptions(ONEAPI_SOURCE_LIST_FILE),
         ...APT_TIMEOUT_OPTS,
-      ],
-      {
-        listeners: {
-          stdout: (data: Buffer) => {
-            output += data.toString();
-          },
-          stderr: (data: Buffer) => {
-            output += data.toString();
-          },
-        },
-      },
-    );
-
-    const intelFetchFailed =
-      output.includes("Failed to fetch") &&
-      output.includes("apt.repos.intel.com");
-    if (!intelFetchFailed) return;
-
-    if (attempt === maxAttempts) {
-      throw new Error("Failed to fetch the Intel oneAPI apt repository index.");
+      ]);
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      core.warning(
+        `Intel oneAPI apt repository update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
+      );
+      await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
-    core.warning(
-      `Intel oneAPI apt repository unreachable (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
-    );
-    await new Promise((res) => setTimeout(res, attempt * 10_000));
   }
 }
 

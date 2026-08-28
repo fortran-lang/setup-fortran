@@ -175,8 +175,39 @@ describe("installDebian nvfortran", () => {
     expect(mockedExec).not.toHaveBeenCalledWith(
       "sudo",
       expect.arrayContaining([
-        expect.stringMatching(/apt\.conf\.d|sources\.list|ubuntu\.sources/),
+        // Scoped-update options (`Dir::Etc::SourceList=...`) are runtime
+        // overrides, not file writes, so only real /etc/apt paths are checked.
+        expect.stringMatching(
+          /apt\.conf\.d|\/etc\/apt\/sources\.list|ubuntu\.sources/,
+        ),
       ]),
+    );
+  });
+
+  it("scopes apt-get update to the NVIDIA repository", async () => {
+    await installDebian(baseInputs);
+
+    // Unrelated repositories baked into the runner image (e.g. transient
+    // packages.microsoft.com failures) must not break the nvhpc install.
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "apt-get",
+        "update",
+        "-o",
+        "Dir::Etc::SourceList=sources.list.d/nvhpc.list",
+        "-o",
+        "Dir::Etc::SourceParts=-",
+      ]),
+    );
+  });
+
+  it("allows 25 minutes for the nvhpc apt install", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["25m", "apt-get", "install", "nvhpc-24-1"]),
     );
   });
 

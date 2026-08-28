@@ -159,6 +159,12 @@ describe("installDebian (Flang)", () => {
         "apt-get",
         "update",
         "-y",
+        // Scoped to the LLVM source list; unrelated repositories in the
+        // runner image cannot fail the install.
+        "-o",
+        "Dir::Etc::SourceList=sources.list.d/llvm.list",
+        "-o",
+        "Dir::Etc::SourceParts=-",
         "-o",
         "Acquire::ForceIPv4=true",
         "-o",

@@ -7,6 +7,7 @@ import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { indexFetchFailed } from "../../apt_sources";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -78,12 +79,13 @@ export async function installDebian(
     );
   }
 
-  if (needsPpa(version, inputs.osVersion)) {
+  const ppaAdded = needsPpa(version, inputs.osVersion);
+  if (ppaAdded) {
     core.info(`Adding PPA for GFortran ${version}...`);
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
   }
 
-  await aptGetUpdateWithRetry(!!cacheHit);
+  await aptGetUpdateWithRetry(!!cacheHit, ppaAdded);
 
   if (cacheHit) {
     core.info(`Cache hit for ${cacheKey}, installing from cache...`);
@@ -177,11 +179,14 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
 
 async function aptGetUpdateWithRetry(
   cacheHit: boolean,
+  ppaAdded: boolean,
   maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await exec.exec("sudo", [
+    let output = "";
+    const exitCode = await exec.exec(
+      "sudo",
+      [
         "timeout",
         "--signal=TERM",
         "--kill-after=10s",
@@ -190,25 +195,43 @@ async function aptGetUpdateWithRetry(
         "update",
         "-y",
         ...APT_TIMEOUT_OPTS,
-      ]);
-      return;
-    } catch (err) {
-      // A warm cache already holds the package archives; a transiently
-      // unreachable index mirror (e.g. the Azure mirror going stale) must
-      // not block an otherwise-cached installation — continue with the
-      // cached/stale package index instead of hanging or failing the job.
-      if (cacheHit) {
-        core.warning(
-          "apt-get update did not complete cleanly; continuing with cached/stale package index.",
-        );
-        return;
-      }
-      if (attempt === maxAttempts) throw err;
+      ],
+      {
+        ignoreReturnCode: true,
+        listeners: {
+          stdout: (data: Buffer) => {
+            output += data.toString();
+          },
+          stderr: (data: Buffer) => {
+            output += data.toString();
+          },
+        },
+      },
+    );
+    if (exitCode === 0) return;
+
+    // Repositories baked into the runner image that have nothing to do with
+    // the toolchain (e.g. packages.microsoft.com returning a transient 403)
+    // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
+    // PPA — whose index is required to resolve the gcc packages — is fatal.
+    const ppaFetchFailed =
+      ppaAdded && indexFetchFailed(output, "ppa.launchpad");
+    if (cacheHit || !ppaFetchFailed) {
       core.warning(
-        `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+        "apt-get update did not complete cleanly; continuing with cached/stale package index.",
       );
-      await new Promise((res) => setTimeout(res, attempt * 10_000));
+      return;
     }
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
+      );
+    }
+    core.warning(
+      `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+    );
+    await new Promise((res) => setTimeout(res, attempt * 10_000));
   }
 }
 
@@ -245,7 +268,15 @@ async function addAptRepositoryWithRetry(
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await exec.exec("sudo", ["add-apt-repository", "--yes", ppa]);
+      // --no-update: skip add-apt-repository's own package-list refresh (a
+      // global update on 22.04 that could trip over unrelated broken repos).
+      // The index is refreshed right after by aptGetUpdateWithRetry instead.
+      await exec.exec("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        ppa,
+      ]);
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;

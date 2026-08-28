@@ -7,6 +7,7 @@ import * as os from "os";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { scopedSourceListOptions } from "../../apt_sources";
 import { verifySha256 } from "../../verify_download";
 import {
   saveCompilerCache,
@@ -27,6 +28,8 @@ const APT_NETWORK_OPTIONS = [
   "-o",
   "Acquire::https::ConnectTimeout=20",
 ];
+
+const NVHPC_SOURCE_LIST_FILE = "nvhpc.list";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -414,7 +417,7 @@ export async function installDebian(
           "-c",
           `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
             ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
-            ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
+            ` | sudo tee /etc/apt/sources.list.d/${NVHPC_SOURCE_LIST_FILE}`,
         ]);
 
         core.info("Updating apt repositories with retry...");
@@ -428,6 +431,7 @@ export async function installDebian(
             "apt-get",
             "update",
             "-y",
+            ...scopedSourceListOptions(NVHPC_SOURCE_LIST_FILE),
             ...APT_NETWORK_OPTIONS,
           ],
           3,
@@ -439,7 +443,7 @@ export async function installDebian(
           "timeout",
           "--signal=TERM",
           "--kill-after=30s",
-          "15m",
+          "25m",
           "apt-get",
           "install",
           "-y",

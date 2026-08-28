@@ -288,6 +288,12 @@ describe("installDebian ifx", () => {
       "apt-get",
       "update",
       "-y",
+      // The update is scoped to the Intel oneAPI source list so unrelated
+      // repositories baked into the runner image cannot fail the install.
+      "-o",
+      "Dir::Etc::SourceList=sources.list.d/oneAPI.list",
+      "-o",
+      "Dir::Etc::SourceParts=-",
       "-o",
       "Acquire::http::Timeout=30",
       "-o",

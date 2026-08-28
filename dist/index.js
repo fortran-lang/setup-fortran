@@ -103044,7 +103044,40 @@ function githubHeaders() {
     return headers;
 }
 
+;// CONCATENATED MODULE: ./src/apt_sources.ts
+/**
+ * apt-get options that scope a command to a single source list file,
+ * ignoring every other configured repository.
+ *
+ * Used for `apt-get update` after this action has added its own repository:
+ * unrelated repositories baked into the GitHub runner images (e.g.
+ * packages.microsoft.com) can return transient 403/5xx responses and fail an
+ * unscoped update, breaking compiler installs that never needed them.
+ *
+ * `Dir::Etc::SourceList` is resolved relative to `/etc/apt`; pointing
+ * `Dir::Etc::SourceParts` at a non-existent entry ("-") suppresses loading
+ * of all other source files.
+ */
+function scopedSourceListOptions(sourceListFile) {
+    return [
+        "-o",
+        `Dir::Etc::SourceList=sources.list.d/${sourceListFile}`,
+        "-o",
+        "Dir::Etc::SourceParts=-",
+    ];
+}
+/**
+ * Whether captured apt-get output indicates that fetching an index from the
+ * given repository host failed. Distinguishes failures of the repository the
+ * installer needs from failures of unrelated repositories baked into the
+ * runner image.
+ */
+function indexFetchFailed(output, repositoryHost) {
+    return output.includes("Failed to fetch") && output.includes(repositoryHost);
+}
+
 ;// CONCATENATED MODULE: ./src/installers/gfortran/debian.ts
+
 
 
 
@@ -103103,11 +103136,12 @@ async function installDebian(inputs) {
     catch (err) {
         warning(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
     }
-    if (needsPpa(version, inputs.osVersion)) {
+    const ppaAdded = needsPpa(version, inputs.osVersion);
+    if (ppaAdded) {
         info(`Adding PPA for GFortran ${version}...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
-    await aptGetUpdateWithRetry(!!cacheHit);
+    await aptGetUpdateWithRetry(!!cacheHit, ppaAdded);
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
         try {
@@ -103190,35 +103224,45 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(cacheHit, maxAttempts = 3) {
+async function aptGetUpdateWithRetry(cacheHit, ppaAdded, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            await exec_exec("sudo", [
-                "timeout",
-                "--signal=TERM",
-                "--kill-after=10s",
-                "5m",
-                "apt-get",
-                "update",
-                "-y",
-                ...APT_TIMEOUT_OPTS,
-            ]);
+        let output = "";
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            "5m",
+            "apt-get",
+            "update",
+            "-y",
+            ...APT_TIMEOUT_OPTS,
+        ], {
+            ignoreReturnCode: true,
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+                stderr: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+        if (exitCode === 0)
+            return;
+        // Repositories baked into the runner image that have nothing to do with
+        // the toolchain (e.g. packages.microsoft.com returning a transient 403)
+        // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
+        // PPA — whose index is required to resolve the gcc packages — is fatal.
+        const ppaFetchFailed = ppaAdded && indexFetchFailed(output, "ppa.launchpad");
+        if (cacheHit || !ppaFetchFailed) {
+            warning("apt-get update did not complete cleanly; continuing with cached/stale package index.");
             return;
         }
-        catch (err) {
-            // A warm cache already holds the package archives; a transiently
-            // unreachable index mirror (e.g. the Azure mirror going stale) must
-            // not block an otherwise-cached installation — continue with the
-            // cached/stale package index instead of hanging or failing the job.
-            if (cacheHit) {
-                warning("apt-get update did not complete cleanly; continuing with cached/stale package index.");
-                return;
-            }
-            if (attempt === maxAttempts)
-                throw err;
-            warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
-            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
+        warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+        await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
 }
 async function aptGetInstallFromCache(packages, cacheDir) {
@@ -103247,7 +103291,15 @@ function needsPpa(version, osVersion) {
 async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            await exec_exec("sudo", ["add-apt-repository", "--yes", ppa]);
+            // --no-update: skip add-apt-repository's own package-list refresh (a
+            // global update on 22.04 that could trip over unrelated broken repos).
+            // The index is refreshed right after by aptGetUpdateWithRetry instead.
+            await exec_exec("sudo", [
+                "add-apt-repository",
+                "--yes",
+                "--no-update",
+                ppa,
+            ]);
             return;
         }
         catch (err) {
@@ -105728,6 +105780,8 @@ async function saveCompilerCache(paths, key) {
 
 
 
+
+const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 const debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
         "2026.1",
@@ -105807,7 +105861,7 @@ async function debian_installDebian(inputs) {
         ]);
         await exec_exec("bash", [
             "-c",
-            `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
+            `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${ONEAPI_SOURCE_LIST_FILE}`,
         ]);
         await debian_aptGetUpdateWithRetry();
         const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
@@ -105897,6 +105951,8 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
 // non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
 // a couple of bounded retries rather than stalling the whole job. Total worst
 // case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
+// The update is scoped to the Intel oneAPI source list so unrelated failing
+// repositories in the runner image cannot break the installation.
 async function debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
@@ -105908,6 +105964,7 @@ async function debian_aptGetUpdateWithRetry(maxAttempts = 3) {
                 "apt-get",
                 "update",
                 "-y",
+                ...scopedSourceListOptions(ONEAPI_SOURCE_LIST_FILE),
                 ...debian_APT_TIMEOUT_OPTS,
             ]);
             return;
@@ -106359,6 +106416,8 @@ async function installIFX(inputs) {
 
 
 
+
+const debian_ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -106424,7 +106483,7 @@ async function ifort_debian_installDebian(inputs) {
         await addOneApiAptRepo();
         await exec_exec("bash", [
             "-c",
-            `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
+            `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${debian_ONEAPI_SOURCE_LIST_FILE}`,
         ]);
         await ifort_debian_aptGetUpdateWithRetry();
         // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
@@ -106517,37 +106576,31 @@ async function ifort_debian_resolveInstalledVersion() {
     // We grab just the first line which contains the actual version string.
     return output.trim().split("\n")[0];
 }
+// The update is scoped to the Intel oneAPI source list and retried a couple
+// of times with bounded backoff, so a transiently flaky mirror stalls the job
+// only briefly and unrelated repositories in the runner image cannot break it.
 async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        let output = "";
-        await exec_exec("sudo", [
-            "timeout",
-            "--signal=TERM",
-            "--kill-after=10s",
-            "5m",
-            "apt-get",
-            "update",
-            "-y",
-            ...ifort_debian_APT_TIMEOUT_OPTS,
-        ], {
-            listeners: {
-                stdout: (data) => {
-                    output += data.toString();
-                },
-                stderr: (data) => {
-                    output += data.toString();
-                },
-            },
-        });
-        const intelFetchFailed = output.includes("Failed to fetch") &&
-            output.includes("apt.repos.intel.com");
-        if (!intelFetchFailed)
+        try {
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=10s",
+                "5m",
+                "apt-get",
+                "update",
+                "-y",
+                ...scopedSourceListOptions(debian_ONEAPI_SOURCE_LIST_FILE),
+                ...ifort_debian_APT_TIMEOUT_OPTS,
+            ]);
             return;
-        if (attempt === maxAttempts) {
-            throw new Error("Failed to fetch the Intel oneAPI apt repository index.");
         }
-        warning(`Intel oneAPI apt repository unreachable (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
-        await new Promise((res) => setTimeout(res, attempt * 10_000));
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            warning(`Intel oneAPI apt repository update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
     }
 }
 async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
@@ -107039,6 +107092,7 @@ async function installIFort(inputs) {
 
 
 
+
 const APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
@@ -107053,6 +107107,7 @@ const APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::https::ConnectTimeout=20",
 ];
+const NVHPC_SOURCE_LIST_FILE = "nvhpc.list";
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
         "26.5",
@@ -107361,7 +107416,7 @@ async function nvfortran_debian_installDebian(inputs) {
                     "-c",
                     `echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg]` +
                         ` https://developer.download.nvidia.com/hpc-sdk/ubuntu/${aptArch} /'` +
-                        ` | sudo tee /etc/apt/sources.list.d/nvhpc.list`,
+                        ` | sudo tee /etc/apt/sources.list.d/${NVHPC_SOURCE_LIST_FILE}`,
                 ]);
                 info("Updating apt repositories with retry...");
                 await execWithRetry("sudo", [
@@ -107372,6 +107427,7 @@ async function nvfortran_debian_installDebian(inputs) {
                     "apt-get",
                     "update",
                     "-y",
+                    ...scopedSourceListOptions(NVHPC_SOURCE_LIST_FILE),
                     ...APT_NETWORK_OPTIONS,
                 ], 3, 10_000);
                 info(`Installing apt package ${pkgName}...`);
@@ -107379,7 +107435,7 @@ async function nvfortran_debian_installDebian(inputs) {
                     "timeout",
                     "--signal=TERM",
                     "--kill-after=30s",
-                    "15m",
+                    "25m",
                     "apt-get",
                     "install",
                     "-y",
@@ -107636,6 +107692,7 @@ async function installAOCC(inputs) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -107655,6 +107712,7 @@ const flang_debian_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
 };
 const LLVM_APT_KEY_SHA256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const LLVM_SOURCE_LIST_FILE = "llvm.list";
 const debian_APT_NETWORK_OPTIONS = [
     "-o",
     "Acquire::ForceIPv4=true",
@@ -107717,7 +107775,7 @@ async function configureLlvmAptRepository(version, osVersion) {
             "-m",
             "0644",
             sourceList,
-            "/etc/apt/sources.list.d/llvm.list",
+            `/etc/apt/sources.list.d/${LLVM_SOURCE_LIST_FILE}`,
         ]);
     }
     finally {
@@ -107836,6 +107894,7 @@ async function flang_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
             "apt-get",
             "update",
             "-y",
+            ...scopedSourceListOptions(LLVM_SOURCE_LIST_FILE),
             ...debian_APT_NETWORK_OPTIONS,
         ], { ignoreReturnCode: true });
         if (exitCode === 0)
@@ -108902,6 +108961,7 @@ async function installLFortran(inputs) {
 
 
 
+
 const armflang_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: undefined,
     [Arch.ARM64]: ["22.1", "21.1", "20.1"],
@@ -109033,6 +109093,47 @@ async function aptGetWithRetry(args, maxAttempts = 3) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 }
+// Updates the apt package index. Repositories baked into the runner image
+// that are unrelated to the Arm toolchain (e.g. packages.microsoft.com
+// returning a transient 403) must not fail the job. When `requiredHost` is
+// given, a fetch failure of that host is treated as fatal and retried; any
+// other non-zero exit is tolerated with a warning.
+async function armflang_debian_aptGetUpdateWithRetry(requiredHost, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let output = "";
+        const exitCode = await exec_exec("sudo", ["apt-get", ...APT_ACQUIRE_OPTS, "update", "-y"], {
+            ignoreReturnCode: true,
+            env: {
+                ...process.env,
+                DEBIAN_FRONTEND: "noninteractive",
+            },
+            listeners: {
+                stdout: (data) => {
+                    output += data.toString();
+                },
+                stderr: (data) => {
+                    output += data.toString();
+                },
+            },
+        });
+        if (exitCode === 0)
+            return;
+        const requiredFetchFailed = requiredHost !== undefined && indexFetchFailed(output, requiredHost);
+        if (!requiredFetchFailed) {
+            warning("apt-get update did not complete cleanly; continuing with the existing package lists.");
+            return;
+        }
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts ` +
+                `with exit code ${exitCode.toString()}.`);
+        }
+        const delayMs = attempt * 10_000;
+        warning(`apt-get update failed ` +
+            `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
+            `Retrying in ${(delayMs / 1000).toString()} seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+}
 function findLibraryDirectories(baseDir) {
     const results = [];
     if (!external_fs_.existsSync(baseDir))
@@ -109123,7 +109224,9 @@ async function armflang_debian_installDebian(inputs) {
         if (cacheHit) {
             warning(`Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`);
         }
-        await aptGetWithRetry(["update", "-y"]);
+        // Best effort: curl and gpg ship with the runner images, so a broken
+        // unrelated repository must not block this step.
+        await armflang_debian_aptGetUpdateWithRetry();
         await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
         if (version === "22.1") {
             await configureCurrentRepository(repository.codename);
@@ -109155,7 +109258,7 @@ async function armflang_debian_installDebian(inputs) {
                 `echo "deb [signed-by=${keyring}] ${legacyBaseUrl}/ ./" > "${sourceList}"`,
             ]);
         }
-        await aptGetWithRetry(["update", "-y"]);
+        await armflang_debian_aptGetUpdateWithRetry("developer.arm.com");
         const packageVersion = await availablePackageVersion(version);
         await aptGetWithRetry([
             "install",

@@ -4,10 +4,13 @@ import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import { scopedSourceListOptions } from "../../apt_sources";
 import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+
+const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
@@ -102,7 +105,7 @@ export async function installDebian(
     ]);
     await exec.exec("bash", [
       "-c",
-      `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list`,
+      `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${ONEAPI_SOURCE_LIST_FILE}`,
     ]);
 
     await aptGetUpdateWithRetry();
@@ -227,6 +230,8 @@ async function aptInstallWithRetry(
 // non-zero exit (e.g. a flaky repo / stale signature) should be tolerated with
 // a couple of bounded retries rather than stalling the whole job. Total worst
 // case is bounded by APT_TIMEOUT_OPTS' ConnectTimeout plus the backoff sleeps.
+// The update is scoped to the Intel oneAPI source list so unrelated failing
+// repositories in the runner image cannot break the installation.
 async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -238,6 +243,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
         "apt-get",
         "update",
         "-y",
+        ...scopedSourceListOptions(ONEAPI_SOURCE_LIST_FILE),
         ...APT_TIMEOUT_OPTS,
       ]);
       return;

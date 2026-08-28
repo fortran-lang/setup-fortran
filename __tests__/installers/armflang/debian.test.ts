@@ -201,7 +201,7 @@ describe("installDebian (ArmFlang)", () => {
     );
   });
 
-  it("retries apt operations after a transient failure", async () => {
+  it("tolerates unrelated update failures and retries Arm repo failures", async () => {
     const timeoutSpy = jest
       .spyOn(global, "setTimeout")
       .mockImplementation((callback: Parameters<typeof setTimeout>[0]) => {
@@ -219,7 +219,25 @@ describe("installDebian (ArmFlang)", () => {
         args.includes("update")
       ) {
         updateAttempts++;
-        if (updateAttempts === 1) return 100;
+        if (updateAttempts === 1) {
+          // Best-effort update (before the Arm repo is configured) fails on
+          // an unrelated, pre-baked repository: tolerated without retry.
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "E: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  403  Forbidden\n",
+            ),
+          );
+          return 100;
+        }
+        if (updateAttempts === 2) {
+          // Arm-repository update fails transiently: must be retried.
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "E: Failed to fetch https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/InRelease  Connection timed out\n",
+            ),
+          );
+          return 100;
+        }
       }
       return 0;
     });
@@ -230,10 +248,46 @@ describe("installDebian (ArmFlang)", () => {
       timeoutSpy.mockRestore();
     }
 
+    // 1 tolerated best-effort attempt + 1 failed Arm attempt + 1 successful retry.
     expect(updateAttempts).toBe(3);
     expect(core.warning).toHaveBeenCalledWith(
       expect.stringContaining("Retrying in 10 seconds"),
     );
+  });
+
+  it("fails when the Arm repository stays unreachable", async () => {
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback: Parameters<typeof setTimeout>[0]) => {
+        callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+    mockedExec.mockImplementation(async (command, args, options) => {
+      if (command.endsWith("/armflang") && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("ArmFlang 22.1.0"));
+      }
+      if (
+        command === "sudo" &&
+        args?.[0] === "apt-get" &&
+        args.includes("update")
+      ) {
+        options?.listeners?.stderr?.(
+          Buffer.from(
+            "E: Failed to fetch https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/InRelease  Connection timed out\n",
+          ),
+        );
+        return 100;
+      }
+      return 0;
+    });
+
+    try {
+      await expect(installDebian(inputs)).rejects.toThrow(
+        /apt-get update failed after 3 attempts/,
+      );
+    } finally {
+      timeoutSpy.mockRestore();
+    }
   });
 
   it("exports absolute compiler paths", async () => {

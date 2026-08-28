@@ -98,6 +98,7 @@ describe("GFortran Debian Installer", () => {
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "add-apt-repository",
         "--yes",
+        "--no-update",
         "ppa:ubuntu-toolchain-r/test",
       ]);
     });
@@ -109,6 +110,7 @@ describe("GFortran Debian Installer", () => {
       expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
         "add-apt-repository",
         "--yes",
+        "--no-update",
         "ppa:ubuntu-toolchain-r/test",
       ]);
     });
@@ -123,25 +125,29 @@ describe("GFortran Debian Installer", () => {
         [cacheDir],
         cacheKey,
       );
-      expect(mockedExec).toHaveBeenCalledWith("sudo", [
-        "timeout",
-        "--signal=TERM",
-        "--kill-after=10s",
-        "5m",
-        "apt-get",
-        "update",
-        "-y",
-        "-o",
-        "Acquire::http::Timeout=30",
-        "-o",
-        "Acquire::http::ConnectTimeout=20",
-        "-o",
-        "Acquire::https::Timeout=30",
-        "-o",
-        "Acquire::https::ConnectTimeout=20",
-        "-o",
-        "Acquire::Retries=0",
-      ]);
+      expect(mockedExec).toHaveBeenCalledWith(
+        "sudo",
+        [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=10s",
+          "5m",
+          "apt-get",
+          "update",
+          "-y",
+          "-o",
+          "Acquire::http::Timeout=30",
+          "-o",
+          "Acquire::http::ConnectTimeout=20",
+          "-o",
+          "Acquire::https::Timeout=30",
+          "-o",
+          "Acquire::https::ConnectTimeout=20",
+          "-o",
+          "Acquire::Retries=0",
+        ],
+        expect.objectContaining({ ignoreReturnCode: true }),
+      );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "timeout",
         "--signal=TERM",
@@ -176,6 +182,84 @@ describe("GFortran Debian Installer", () => {
       expect(fs.existsSync(path.join(cacheDir, "partial"))).toBe(false);
     });
 
+    it("tolerates apt-get update failures in unrelated repositories", async () => {
+      // Simulates the packages.microsoft.com 403 outages seen on GitHub
+      // runner images: the toolchain repositories fetch fine, but an
+      // unrelated pre-baked repository fails the overall update.
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "E: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  403  Forbidden\n",
+            ),
+          );
+          return 100;
+        }
+        return 0;
+      });
+
+      const result = await installDebian(baseInputs);
+
+      expect(result.fc).toBe("gfortran-14");
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("continuing with cached/stale package index"),
+      );
+    });
+
+    it("retries apt-get update when the toolchain PPA cannot be fetched", async () => {
+      const timeoutSpy = jest
+        .spyOn(global, "setTimeout")
+        .mockImplementation((callback) => {
+          if (typeof callback === "function") callback();
+          return 0 as unknown as NodeJS.Timeout;
+        });
+
+      let updateAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          updateAttempts++;
+          if (updateAttempts === 1) {
+            options?.listeners?.stderr?.(
+              Buffer.from(
+                "E: Failed to fetch https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/InRelease  503  Service Unavailable\n",
+              ),
+            );
+            return 100;
+          }
+        }
+        return 0;
+      });
+
+      try {
+        await installDebian(baseInputs);
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+
+      expect(updateAttempts).toBe(2); // failed once, succeeded on retry
+      expect(core.warning).toHaveBeenCalledWith(
+        expect.stringContaining("apt-get update failed (attempt 1/3)"),
+      );
+    });
+
     it("separates x64 and ARM64 caches", async () => {
       await installDebian({ ...baseInputs, arch: Arch.ARM64 });
 
@@ -200,25 +284,29 @@ describe("GFortran Debian Installer", () => {
         "g++-14",
         "gfortran-14",
       ]);
-      expect(mockedExec).toHaveBeenCalledWith("sudo", [
-        "timeout",
-        "--signal=TERM",
-        "--kill-after=10s",
-        "5m",
-        "apt-get",
-        "update",
-        "-y",
-        "-o",
-        "Acquire::http::Timeout=30",
-        "-o",
-        "Acquire::http::ConnectTimeout=20",
-        "-o",
-        "Acquire::https::Timeout=30",
-        "-o",
-        "Acquire::https::ConnectTimeout=20",
-        "-o",
-        "Acquire::Retries=0",
-      ]);
+      expect(mockedExec).toHaveBeenCalledWith(
+        "sudo",
+        [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=10s",
+          "5m",
+          "apt-get",
+          "update",
+          "-y",
+          "-o",
+          "Acquire::http::Timeout=30",
+          "-o",
+          "Acquire::http::ConnectTimeout=20",
+          "-o",
+          "Acquire::https::Timeout=30",
+          "-o",
+          "Acquire::https::ConnectTimeout=20",
+          "-o",
+          "Acquire::Retries=0",
+        ],
+        expect.objectContaining({ ignoreReturnCode: true }),
+      );
       expect(mockedCache.saveCache).not.toHaveBeenCalled();
     });
 

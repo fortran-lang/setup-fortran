@@ -6,6 +6,7 @@ import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
+import { scopedSourceListOptions } from "../../apt_sources";
 import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are always in descending order. The first one will be
@@ -29,6 +30,7 @@ export const SUPPORTED_VERSIONS = {
 
 const LLVM_APT_KEY_SHA256 =
   "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const LLVM_SOURCE_LIST_FILE = "llvm.list";
 const APT_NETWORK_OPTIONS = [
   "-o",
   "Acquire::ForceIPv4=true",
@@ -104,7 +106,7 @@ async function configureLlvmAptRepository(
       "-m",
       "0644",
       sourceList,
-      "/etc/apt/sources.list.d/llvm.list",
+      `/etc/apt/sources.list.d/${LLVM_SOURCE_LIST_FILE}`,
     ]);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -254,6 +256,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
         "apt-get",
         "update",
         "-y",
+        ...scopedSourceListOptions(LLVM_SOURCE_LIST_FILE),
         ...APT_NETWORK_OPTIONS,
       ],
       { ignoreReturnCode: true },
