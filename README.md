@@ -117,7 +117,7 @@ Use of the canonical names is recommended.
 | 2021.1.1 | ✓            | ✓            |              |              |
 | 2021.1   | ✓            | ✓            |              |              |
 
-> In 2022, `ifx` compiler version numbers differed from release numbers. Specify the compiler version here, not the release number.
+> In 2022, `ifx` compiler version numbers differed from oneAPI release numbers. Specify the compiler version here, not the oneAPI release number.
 
 ---
 
