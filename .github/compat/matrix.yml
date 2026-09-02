@@ -56,6 +56,7 @@ toolchain:
   - {compiler: nvidia-hpc, version: '23.5'}
   - {compiler: nvidia-hpc, version: '23.3'}
   - {compiler: nvidia-hpc, version: '23.1'}
+  - {compiler: aocc, version: '5.2.0'}
   - {compiler: aocc, version: '5.1.0'}
 exclude:
   # ifx not available on ARM macs
