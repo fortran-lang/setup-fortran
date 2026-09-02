@@ -410,6 +410,11 @@ install_aocc_linux()
       aocc_url="https://download.amd.com/developer/eula/aocc/aocc-5-1/${aocc_deb}"
       aocc_sha256="42f9ed0713a8fe269d5a5b40b1992a5380ff59b4441e58d38eb9f27df5bfe6df"
       ;;
+    5.2.0)
+      aocc_deb="aocc-compiler-5.2.0_1_amd64.deb"
+      aocc_url="https://download.amd.com/developer/eula/aocc/aocc-5-2/${aocc_deb}"
+      aocc_sha256="10e8287be61d0181caf6bf00603a15b143ec79a5010f3fb7642036cc08763cb3"
+      ;;
     *)
       echo "Unsupported AOCC version: $resolved_version"
       exit 1
