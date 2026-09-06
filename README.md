@@ -242,11 +242,6 @@ Use of the canonical names is recommended.
 > Specific patch versions (e.g. `21.1.6`) are supported on macOS and native
 > Windows runners and validated against available GitHub releases. Patch
 > versions are not individually tested.
->
-> Flang 23 platform notes: the LLVM apt repository no longer publishes LLVM 23+
-> for Ubuntu 22.04 (jammy), so Flang 23 requires an ubuntu-24.04 runner. LLVM
-> stopped publishing macOS release binaries with 23.1.0, so on macOS Flang 23
-> is only available as `version: latest` (installed via Homebrew).
 
 ---
 
