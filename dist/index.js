@@ -107707,9 +107707,12 @@ async function installAOCC(inputs) {
 //   - ARM64: LLVM 15/16 have no noble (24.04) repo and broken jammy (22.04)
 //     packaging. 17 is the effective floor on arm64.
 //   - X64: LLVM 15/16 are available on jammy (22.04) only; no noble repo.
+//   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
+//     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
+//     rejected with an explicit error in installDebian.
 const flang_debian_SUPPORTED_VERSIONS = {
-    [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16"],
-    [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
+    [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
+    [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
 };
 const LLVM_APT_KEY_SHA256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
 const LLVM_SOURCE_LIST_FILE = "llvm.list";
@@ -107732,8 +107735,7 @@ function ubuntuCodename(osVersion) {
     }
     throw new Error(`Flang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
 }
-async function configureLlvmAptRepository(version, osVersion) {
-    const codename = ubuntuCodename(osVersion);
+async function configureLlvmAptRepository(version, codename) {
     const tempDir = external_fs_.mkdtempSync(external_path_.join(external_os_.tmpdir(), "setup-fortran-llvm-"));
     const downloadedKey = external_path_.join(tempDir, "llvm-snapshot.gpg.key");
     const keyring = external_path_.join(tempDir, "llvm-snapshot.gpg");
@@ -107820,9 +107822,17 @@ function resolveFlangBinaryPath(major, version) {
 async function flang_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
     const major = parseInt(version, 10);
+    const codename = ubuntuCodename(inputs.osVersion);
+    // apt.llvm.org stopped publishing for jammy (22.04) with LLVM 23; without
+    // this guard the failure surfaces as an opaque apt-get update 404.
+    if (major >= 23 && codename === "jammy") {
+        throw new Error(`Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
+            `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
+            `Use an ubuntu-24.04 runner or request Flang 22 or older.`);
+    }
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     info(`Adding the verified LLVM ${version} apt repository...`);
-    await configureLlvmAptRepository(version, inputs.osVersion);
+    await configureLlvmAptRepository(version, codename);
     await flang_debian_aptGetUpdateWithRetry();
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
@@ -107935,8 +107945,14 @@ async function flang_debian_resolveInstalledVersion(fc) {
 // Major or patch version → download from official LLVM GitHub releases.
 //
 // macOS asset naming on GitHub releases:
-//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available from at least 19+)
-//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (availability varies; verified at runtime)
+//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available for 19–21)
+//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (available for 19; verified at runtime)
+//
+// LLVM stopped publishing macOS release binaries with 23.1.0 (the MACOS_* asset
+// links in its release notes are commented out upstream), so 23+ cannot be
+// added as concrete versions here. On macOS, Flang 23 is only available through
+// `version: latest`, which tracks the Homebrew formula (23.1.0 at the time of
+// the 23.1.0 release).
 //
 // LATEST is listed first so it is the default when no version is specified.
 const flang_darwin_SUPPORTED_VERSIONS = {
@@ -108138,21 +108154,26 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 //   x64:   flang.exe was absent from official Windows x64 installers through
 //          at least LLVM 21. LLVM 22 is the first confirmed working version.
 //   ARM64: flang has been present since LLVM 20 (Linaro maintains the woa64 build).
+//   LLVM 23 replaced the NSIS .exe installers with WiX .msi installers
+//   (LLVM-<patch>-win64.msi / LLVM-<patch>-woa64.msi) carrying the same
+//   toolchain, flang included. The .msi payload is extracted with an
+//   `msiexec /a` administrative install because 7-Zip cannot resolve the
+//   WiX file table (it only exposes the embedded cabinet with mangled names).
 //
 // UCRT64 (MSYS2/pacman rolling release):
 //   x64 only — MSYS2 does not support ARM64.
 //   Version is always LATEST since pacman tracks the rolling release.
 //
-// Only major versions are listed for Native. Full patch versions (e.g. "22.1.3")
+// Only major versions are listed for Native. Full patch versions (e.g. "23.1.0")
 // are validated by extracting the major and checking it against this table.
 const flang_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
-        [Msystem.Native]: ["22"],
+        [Msystem.Native]: ["23", "22"],
         [Msystem.UCRT64]: [types_LATEST],
         [Msystem.Clang64]: [types_LATEST],
     },
     [Arch.ARM64]: {
-        [Msystem.Native]: ["22", "21", "20"],
+        [Msystem.Native]: ["23", "22", "21", "20"],
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
     },
@@ -108163,12 +108184,38 @@ const WINDOWS_INSTALLER_SUFFIX = {
     [Arch.X64]: "win64",
     [Arch.ARM64]: "woa64",
 };
-// Extracts an LLVM NSIS .exe installer using 7-Zip (pre-installed on all
-// GitHub Actions Windows runners).
-async function extractExe(installerPath, destDir) {
+// LLVM 23 switched the Windows installer format from NSIS (.exe) to WiX (.msi).
+function installerExtension(major) {
+    return major >= 23 ? "msi" : "exe";
+}
+// Extracts an LLVM installer into destDir and returns the directory that holds
+// the install tree (bin/, lib/, ...).
+//
+//   .exe (LLVM 22 and earlier): NSIS payload; 7-Zip extraction places bin/ at
+//        the destination root.
+//   .msi (LLVM 23+): WiX package; the `msiexec /a` administrative install
+//        extracts via the file table without registering anything, and adds a
+//        single top-level `LLVM` directory (CPack's INSTALL_ROOT).
+async function extractInstaller(installerPath, destDir) {
+    if (installerPath.toLowerCase().endsWith(".msi")) {
+        info("Extracting installer with msiexec administrative install...");
+        await exec_exec("msiexec", [
+            "/a",
+            installerPath,
+            "/qn",
+            `TARGETDIR=${destDir}`,
+        ]);
+        const installDir = external_path_.join(destDir, "LLVM");
+        if (!external_fs_.existsSync(external_path_.join(installDir, "bin"))) {
+            throw new Error(`msiexec administrative install did not produce the expected layout ` +
+                `(missing ${external_path_.join(installDir, "bin")}).`);
+        }
+        return installDir;
+    }
     const sevenZip = "C:\\Program Files\\7-Zip\\7z.exe";
     info("Extracting installer with 7-Zip...");
     await exec_exec(`"${sevenZip}"`, ["x", installerPath, `-o${destDir}`, "-y"]);
+    return destDir;
 }
 // Locates the MSVC toolchain and Windows SDK library directories using vswhere
 // and adds them to the LIB environment variable so flang's linker backend can
@@ -108255,7 +108302,7 @@ async function win32_installNative(inputs) {
         patch = await resolveLatestPatch("llvm/llvm-project", major);
     }
     const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
-    const filename = `LLVM-${patch}-${suffix}.exe`;
+    const filename = `LLVM-${patch}-${suffix}.${installerExtension(parseInt(major, 10))}`;
     const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
     info(`Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`);
@@ -108268,9 +108315,9 @@ async function win32_installNative(inputs) {
         }
         const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
         external_fs_.mkdirSync(tempExtractDir, { recursive: true });
-        await extractExe(downloadPath, tempExtractDir);
+        const installDir = await extractInstaller(downloadPath, tempExtractDir);
         info("Caching...");
-        toolRoot = await cacheDir(tempExtractDir, "flang-verified", patch, inputs.arch);
+        toolRoot = await cacheDir(installDir, "flang-verified", patch, inputs.arch);
     }
     else {
         info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
@@ -108299,8 +108346,9 @@ async function win32_installNative(inputs) {
 async function win32_installMSYS2(inputs) {
     const version = resolveWindowsVersion(inputs, flang_win32_SUPPORTED_VERSIONS);
     info(`Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`);
-    // The MSYS2 package for flang in the UCRT64 environment.
-    await setupMSYS2(inputs.msystem, ["flang"]);
+    // The MSYS2 flang package only lists llvm-openmp as an optional dependency;
+    // without it -fopenmp fails to link (omp_lib modules and libomp are missing).
+    await setupMSYS2(inputs.msystem, ["flang", "llvm-openmp"]);
     const msysRoot = external_path_.join("C:\\msys64", inputs.msystem);
     const msysBin = external_path_.join(msysRoot, "bin");
     const flangExe = external_path_.join(msysBin, "flang.exe");

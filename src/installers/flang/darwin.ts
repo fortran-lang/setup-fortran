@@ -20,8 +20,14 @@ import { verifySha256 } from "../../verify_download";
 // Major or patch version → download from official LLVM GitHub releases.
 //
 // macOS asset naming on GitHub releases:
-//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available from at least 19+)
-//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (availability varies; verified at runtime)
+//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available for 19–21)
+//   X64:   LLVM-{patch}-macOS-X64.tar.xz    (available for 19; verified at runtime)
+//
+// LLVM stopped publishing macOS release binaries with 23.1.0 (the MACOS_* asset
+// links in its release notes are commented out upstream), so 23+ cannot be
+// added as concrete versions here. On macOS, Flang 23 is only available through
+// `version: latest`, which tracks the Homebrew formula (23.1.0 at the time of
+// the 23.1.0 release).
 //
 // LATEST is listed first so it is the default when no version is specified.
 export const SUPPORTED_VERSIONS = {

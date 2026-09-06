@@ -104,6 +104,63 @@ describe("installDebian (Flang)", () => {
     ]);
   });
 
+  it("installs flang-23 from the noble repository with the flang binary name", async () => {
+    const inputs = { ...baseInputs, version: "23", osVersion: "24.04" };
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (
+        commandLine === "flang-23" &&
+        args?.[0] === "--version" &&
+        options?.listeners?.stdout
+      ) {
+        options.listeners.stdout(Buffer.from("flang version 23.1.0"));
+      }
+      return 0;
+    });
+
+    const result = await installDebian(inputs);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=30s",
+      "15m",
+      "apt-get",
+      "install",
+      "-y",
+      "-o",
+      "Acquire::ForceIPv4=true",
+      "-o",
+      "Acquire::Retries=0",
+      "-o",
+      "Acquire::http::Timeout=10",
+      "-o",
+      "Acquire::https::Timeout=10",
+      "clang-23",
+      "flang-23",
+      "libomp-23-dev",
+      "libclang-rt-23-dev",
+    ]);
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "update-alternatives",
+      "--install",
+      "/usr/bin/flang",
+      "flang",
+      "/usr/lib/llvm-23/bin/flang",
+      "100",
+    ]);
+    expect(result.fc).toBe("flang-23");
+  });
+
+  it("rejects LLVM 23+ on Ubuntu 22.04 with an actionable error", async () => {
+    const inputs = { ...baseInputs, version: "23", osVersion: "22.04" };
+
+    await expect(installDebian(inputs)).rejects.toThrow(
+      /no longer publishes LLVM 23\+ packages for jammy/,
+    );
+    // The guard fires before any repository configuration or download.
+    expect(mockedExec).not.toHaveBeenCalled();
+  });
+
   it("retries apt-get update after a transient failure", async () => {
     // Avoid the real backoff sleep inside aptGetUpdateWithRetry.
     const timeoutSpy = jest

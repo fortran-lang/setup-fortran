@@ -23,9 +23,12 @@ import { verifySha256 } from "../../verify_download";
 //   - ARM64: LLVM 15/16 have no noble (24.04) repo and broken jammy (22.04)
 //     packaging. 17 is the effective floor on arm64.
 //   - X64: LLVM 15/16 are available on jammy (22.04) only; no noble repo.
+//   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
+//     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
+//     rejected with an explicit error in installDebian.
 export const SUPPORTED_VERSIONS = {
-  [Arch.X64]: ["22", "21", "20", "19", "18", "17", "16"],
-  [Arch.ARM64]: ["22", "21", "20", "19", "18", "17"],
+  [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
+  [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
 } as const satisfies Record<Arch, readonly string[]>;
 
 const LLVM_APT_KEY_SHA256 =
@@ -56,9 +59,8 @@ function ubuntuCodename(osVersion: string): string {
 
 async function configureLlvmAptRepository(
   version: string,
-  osVersion: string,
+  codename: string,
 ): Promise<void> {
-  const codename = ubuntuCodename(osVersion);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "setup-fortran-llvm-"));
   const downloadedKey = path.join(tempDir, "llvm-snapshot.gpg.key");
   const keyring = path.join(tempDir, "llvm-snapshot.gpg");
@@ -160,11 +162,22 @@ export async function installDebian(
 ): Promise<InstallationResult> {
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
+  const codename = ubuntuCodename(inputs.osVersion);
+
+  // apt.llvm.org stopped publishing for jammy (22.04) with LLVM 23; without
+  // this guard the failure surfaces as an opaque apt-get update 404.
+  if (major >= 23 && codename === "jammy") {
+    throw new Error(
+      `Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
+        `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
+        `Use an ubuntu-24.04 runner or request Flang 22 or older.`,
+    );
+  }
 
   core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
 
   core.info(`Adding the verified LLVM ${version} apt repository...`);
-  await configureLlvmAptRepository(version, inputs.osVersion);
+  await configureLlvmAptRepository(version, codename);
   await aptGetUpdateWithRetry();
 
   const pkgName = `flang-${version}`;

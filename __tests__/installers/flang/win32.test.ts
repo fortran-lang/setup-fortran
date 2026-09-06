@@ -27,15 +27,27 @@ describe("installWin32 (Flang)", () => {
           status: 200,
           json: async () =>
             String(input).includes("/releases?")
-              ? [{ tag_name: "llvmorg-22.1.0", prerelease: false }]
-              : {
-                  assets: [
-                    {
-                      name: "LLVM-22.1.0-win64.exe",
-                      digest: `sha256:${"a".repeat(64)}`,
-                    },
-                  ],
-                },
+              ? [
+                  { tag_name: "llvmorg-23.1.0", prerelease: false },
+                  { tag_name: "llvmorg-22.1.0", prerelease: false },
+                ]
+              : String(input).includes("llvmorg-23.1.0")
+                ? {
+                    assets: [
+                      {
+                        name: "LLVM-23.1.0-win64.msi",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
+                    ],
+                  }
+                : {
+                    assets: [
+                      {
+                        name: "LLVM-22.1.0-win64.exe",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
+                    ],
+                  },
         }) as unknown as Response,
     );
   });
@@ -107,6 +119,46 @@ describe("installWin32 (Flang)", () => {
       expect(mockedTc.cacheDir).toHaveBeenCalled();
     });
 
+    it("extracts the LLVM 23 MSI with an msiexec administrative install", async () => {
+      const inputs = { ...baseInputs, version: "23" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.msi");
+      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang23");
+
+      const result = await installWin32(inputs);
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledWith(
+        expect.stringContaining("LLVM-23.1.0-win64.msi"),
+      );
+      expect(mockedExec).toHaveBeenCalledWith("msiexec", [
+        "/a",
+        "C:\\Temp\\llvm.msi",
+        "/qn",
+        expect.stringContaining("TARGETDIR="),
+      ]);
+      // The WiX layout nests the install tree under a single LLVM directory,
+      // which is what gets cached so bin/ sits at the tool cache root.
+      expect(mockedTc.cacheDir).toHaveBeenCalledWith(
+        expect.stringMatching(/LLVM$/),
+        "flang-verified",
+        "23.1.0",
+        Arch.X64,
+      );
+      expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+    });
+
+    it("fails loudly when the msiexec extraction misses the bin directory", async () => {
+      const inputs = { ...baseInputs, version: "23" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.msi");
+      mockedFs.existsSync.mockImplementation(
+        (p) => !/LLVM[/\\]bin$/.test(String(p)),
+      );
+
+      await expect(installWin32(inputs)).rejects.toThrow(/expected layout/);
+      expect(mockedTc.cacheDir).not.toHaveBeenCalled();
+    });
+
     it("sets up MSVC libs and exports variables", async () => {
       mockedTc.find.mockReturnValue("C:\\Cache\\flang");
 
@@ -128,7 +180,12 @@ describe("installWin32 (Flang)", () => {
       };
       await installWin32(inputs);
 
-      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, ["flang"]);
+      // llvm-openmp is required for -fopenmp; the flang package only lists it
+      // as an optional dependency.
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
+        "flang",
+        "llvm-openmp",
+      ]);
     });
   });
 });

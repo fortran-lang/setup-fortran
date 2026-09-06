@@ -106,6 +106,14 @@ describe("installDarwin (Flang)", () => {
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
   });
 
+  it("rejects concrete LLVM 23 on macOS (upstream publishes no macOS release binaries)", async () => {
+    const inputs = { ...baseInputs, version: "23" };
+
+    await expect(installDarwin(inputs)).rejects.toThrow(
+      /flang 23 is not supported on darwin/,
+    );
+  });
+
   it("downloads from GitHub when version is specified", async () => {
     const inputs = { ...baseInputs, version: "19" };
     mockedTc.find.mockReturnValue("");

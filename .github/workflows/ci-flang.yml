@@ -18,12 +18,18 @@ jobs:
       matrix:
         image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
         toolchain:
+          - { compiler: flang, version: "23" }
           - { compiler: flang, version: "22" }
           - { compiler: flang, version: "21" }
           - { compiler: flang, version: "20" }
           - { compiler: flang, version: "19" }
           - { compiler: flang, version: "18" }
           - { compiler: flang, version: "17" }
+        exclude:
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "23" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: flang, version: "23" }
         include:
           - image: ubuntu-22.04
             toolchain: { compiler: flang, version: "16" }
@@ -56,11 +62,15 @@ jobs:
           - image: macos-15-intel
             toolchain: { compiler: flang, version: "19" }
           - image: windows-2025
-            toolchain: { compiler: flang, version: "22" }
+            toolchain: { compiler: flang, version: "23" }
           - image: windows-2025
-            toolchain: { compiler: flang, version: "22.1.0" } # test that patch versions are accepted and resolved correctly
+            toolchain: { compiler: flang, version: "23.1.0" } # test that patch versions are accepted and resolved correctly
+          - image: windows-2025
+            toolchain: { compiler: flang, version: "22" }
           - image: windows-2022
             toolchain: { compiler: flang, version: "22" }
+          - image: windows-11-arm
+            toolchain: { compiler: flang, version: "23" }
           - image: windows-11-arm
             toolchain: { compiler: flang, version: "22" }
           - image: windows-11-arm

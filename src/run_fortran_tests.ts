@@ -143,6 +143,7 @@ function isOlderThan(
 function getCxxLinkFlags(
   compiler: Compiler,
   platform: OS,
+  isMSYS2: boolean,
   glibcVersion?: number,
   nvcxxVersion?: NvcxxVersion,
 ): { flags: string[]; skip?: string } {
@@ -163,18 +164,15 @@ function getCxxLinkFlags(
       // GNU g++-style companions (brew g++ on macOS, g++ on Linux).
       return { flags: ["-lstdc++"] };
     case Compiler.Flang:
-    case Compiler.LFortran:
       if (platform === OS.Windows) {
-        return {
-          flags: [],
-          skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
-        };
+        // MSVC-ABI objects (LLVM native installers) carry /DEFAULTLIB
+        // directives for the CRT and the C++ runtime, which lld-link resolves
+        // through the LIB paths the installer exports. mingw objects (MSYS2)
+        // carry no such directives, so libstdc++ must be linked explicitly
+        // after the objects (GNU ld defaults to --as-needed).
+        return { flags: isMSYS2 ? ["-lstdc++"] : [] };
       }
-      if (
-        compiler === Compiler.Flang &&
-        platform === OS.MacOS &&
-        process.env.FLANG_VERSION !== LATEST
-      ) {
+      if (platform === OS.MacOS && process.env.FLANG_VERSION !== LATEST) {
         // The llvm.org tarballs ship libc++ headers that emit ODR ABI tags
         // their own dylib does not define, and their dylib set cannot be
         // linked through the Fortran driver with the new Apple linker
@@ -183,6 +181,15 @@ function getCxxLinkFlags(
         return {
           flags: [],
           skip: "llvm.org flang toolchains ship a C++ runtime that cannot be linked through the Fortran driver on macOS",
+        };
+      }
+      // System clang++ companions match the system libc++ the drivers link.
+      return { flags: [platform === OS.MacOS ? "-lc++" : "-lstdc++"] };
+    case Compiler.LFortran:
+      if (platform === OS.Windows) {
+        return {
+          flags: [],
+          skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
         };
       }
       // System clang++ companions match the system libc++ the drivers link.
@@ -313,6 +320,7 @@ function buildTestManifest(): TestCase[] {
         getCxxLinkFlags(
           ctx.compiler,
           ctx.platform,
+          ctx.isMSYS2,
           ctx.glibcVersion,
           ctx.nvcxxVersion,
         ).flags,
@@ -320,6 +328,7 @@ function buildTestManifest(): TestCase[] {
         getCxxLinkFlags(
           ctx.compiler,
           ctx.platform,
+          ctx.isMSYS2,
           ctx.glibcVersion,
           ctx.nvcxxVersion,
         ).skip,
@@ -327,20 +336,14 @@ function buildTestManifest(): TestCase[] {
     {
       name: "polymorphism_test",
       fortranSources: ["polymorphism_mod_test.f90", "polymorphism_test.f90"],
-      // Flang gained the required OOP support in LLVM 19, and the MSYS2
-      // packages lag further behind.
-      skipReason: ({
-        compiler,
-        isFlang,
-        isUCRT64,
-        flangVersion,
-      }): string | undefined => {
+      // Flang gained the required OOP support in LLVM 19.
+      skipReason: ({ compiler, isFlang, flangVersion }): string | undefined => {
         const tooOldFlang =
           isFlang &&
           flangVersion !== undefined &&
           flangVersion !== LATEST &&
           flangVersion < 19;
-        return tooOldFlang || (isFlang && isUCRT64)
+        return tooOldFlang
           ? notSupportedMessage(compiler, flangVersion)
           : undefined;
       },
@@ -354,18 +357,17 @@ function buildTestManifest(): TestCase[] {
         isFlang,
         isLFortran,
         isDarwin,
-        isMSYS2,
         flangVersion,
       }): string | undefined => {
-        // lfortran does not implement OpenMP yet. For flang, LATEST from brew
-        // works; let's check whether pinned installs from source work from
-        // major 23 on.
+        // lfortran does not implement OpenMP yet. For flang, pinned llvm.org
+        // tarballs on macOS don't provide a working OpenMP runtime (brew
+        // LATEST does); the MSYS2 installer ships llvm-openmp so Windows works.
         const unsupportedFlangOnDarwin =
           isDarwin &&
           !!flangVersion &&
           flangVersion !== LATEST &&
           flangVersion < 23;
-        return isLFortran || (isFlang && (unsupportedFlangOnDarwin || isMSYS2))
+        return isLFortran || (isFlang && unsupportedFlangOnDarwin)
           ? notSupportedMessage(compiler, flangVersion)
           : undefined;
       },

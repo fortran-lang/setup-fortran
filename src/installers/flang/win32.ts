@@ -27,21 +27,26 @@ import { verifySha256 } from "../../verify_download";
 //   x64:   flang.exe was absent from official Windows x64 installers through
 //          at least LLVM 21. LLVM 22 is the first confirmed working version.
 //   ARM64: flang has been present since LLVM 20 (Linaro maintains the woa64 build).
+//   LLVM 23 replaced the NSIS .exe installers with WiX .msi installers
+//   (LLVM-<patch>-win64.msi / LLVM-<patch>-woa64.msi) carrying the same
+//   toolchain, flang included. The .msi payload is extracted with an
+//   `msiexec /a` administrative install because 7-Zip cannot resolve the
+//   WiX file table (it only exposes the embedded cabinet with mangled names).
 //
 // UCRT64 (MSYS2/pacman rolling release):
 //   x64 only — MSYS2 does not support ARM64.
 //   Version is always LATEST since pacman tracks the rolling release.
 //
-// Only major versions are listed for Native. Full patch versions (e.g. "22.1.3")
+// Only major versions are listed for Native. Full patch versions (e.g. "23.1.0")
 // are validated by extracting the major and checking it against this table.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
-    [Msystem.Native]: ["22"],
+    [Msystem.Native]: ["23", "22"],
     [Msystem.UCRT64]: [LATEST],
     [Msystem.Clang64]: [LATEST],
   },
   [Arch.ARM64]: {
-    [Msystem.Native]: ["22", "21", "20"],
+    [Msystem.Native]: ["23", "22", "21", "20"],
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
   },
@@ -56,15 +61,47 @@ const WINDOWS_INSTALLER_SUFFIX: Record<Arch, string> = {
   [Arch.X64]: "win64",
   [Arch.ARM64]: "woa64",
 };
-// Extracts an LLVM NSIS .exe installer using 7-Zip (pre-installed on all
-// GitHub Actions Windows runners).
-async function extractExe(
+
+// LLVM 23 switched the Windows installer format from NSIS (.exe) to WiX (.msi).
+function installerExtension(major: number): string {
+  return major >= 23 ? "msi" : "exe";
+}
+
+// Extracts an LLVM installer into destDir and returns the directory that holds
+// the install tree (bin/, lib/, ...).
+//
+//   .exe (LLVM 22 and earlier): NSIS payload; 7-Zip extraction places bin/ at
+//        the destination root.
+//   .msi (LLVM 23+): WiX package; the `msiexec /a` administrative install
+//        extracts via the file table without registering anything, and adds a
+//        single top-level `LLVM` directory (CPack's INSTALL_ROOT).
+async function extractInstaller(
   installerPath: string,
   destDir: string,
-): Promise<void> {
+): Promise<string> {
+  if (installerPath.toLowerCase().endsWith(".msi")) {
+    core.info("Extracting installer with msiexec administrative install...");
+    await exec.exec("msiexec", [
+      "/a",
+      installerPath,
+      "/qn",
+      `TARGETDIR=${destDir}`,
+    ]);
+
+    const installDir = path.join(destDir, "LLVM");
+    if (!fs.existsSync(path.join(installDir, "bin"))) {
+      throw new Error(
+        `msiexec administrative install did not produce the expected layout ` +
+          `(missing ${path.join(installDir, "bin")}).`,
+      );
+    }
+    return installDir;
+  }
+
   const sevenZip = "C:\\Program Files\\7-Zip\\7z.exe";
   core.info("Extracting installer with 7-Zip...");
   await exec.exec(`"${sevenZip}"`, ["x", installerPath, `-o${destDir}`, "-y"]);
+  return destDir;
 }
 
 // Locates the MSVC toolchain and Windows SDK library directories using vswhere
@@ -186,7 +223,9 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
   }
 
   const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
-  const filename = `LLVM-${patch}-${suffix}.exe`;
+  const filename = `LLVM-${patch}-${suffix}.${installerExtension(
+    parseInt(major, 10),
+  )}`;
   const expectedSha256 = await verifyAssetExists(
     "llvm/llvm-project",
     patch,
@@ -213,11 +252,11 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     );
     fs.mkdirSync(tempExtractDir, { recursive: true });
 
-    await extractExe(downloadPath, tempExtractDir);
+    const installDir = await extractInstaller(downloadPath, tempExtractDir);
 
     core.info("Caching...");
     toolRoot = await tc.cacheDir(
-      tempExtractDir,
+      installDir,
       "flang-verified",
       patch,
       inputs.arch,
@@ -263,8 +302,9 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     `Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`,
   );
 
-  // The MSYS2 package for flang in the UCRT64 environment.
-  await setupMSYS2(inputs.msystem, ["flang"]);
+  // The MSYS2 flang package only lists llvm-openmp as an optional dependency;
+  // without it -fopenmp fails to link (omp_lib modules and libomp are missing).
+  await setupMSYS2(inputs.msystem, ["flang", "llvm-openmp"]);
 
   const msysRoot = path.join("C:\\msys64", inputs.msystem);
   const msysBin = path.join(msysRoot, "bin");
