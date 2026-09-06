@@ -3,7 +3,7 @@ import * as exec from "@actions/exec";
 import * as path from "path";
 import { Msystem } from "./types";
 
-const MSYS2_ROOT = "C:\\msys64";
+export const MSYS2_ROOT = "C:\\msys64";
 
 const PKG_PREFIX: Record<Msystem, string | undefined> = {
   [Msystem.UCRT64]: "mingw-w64-ucrt-x86_64",

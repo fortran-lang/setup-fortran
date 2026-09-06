@@ -75,11 +75,17 @@ function installerExtension(major: number): string {
 //   .msi (LLVM 23+): WiX package; the `msiexec /a` administrative install
 //        extracts via the file table without registering anything, and adds a
 //        single top-level `LLVM` directory (CPack's INSTALL_ROOT).
+//
+// The caller declares which flavor it downloaded: tc.downloadTool saves to an
+// extensionless GUID path when no destination is given, so the file name
+// cannot be used for dispatch (7-Zip then "extracts" the WiX package into
+// mangled flat cabinet entries instead of the install tree).
 async function extractInstaller(
   installerPath: string,
   destDir: string,
+  isMsi: boolean,
 ): Promise<string> {
-  if (installerPath.toLowerCase().endsWith(".msi")) {
+  if (isMsi) {
     core.info("Extracting installer with msiexec administrative install...");
     await exec.exec("msiexec", [
       "/a",
@@ -223,9 +229,9 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
   }
 
   const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
-  const filename = `LLVM-${patch}-${suffix}.${installerExtension(
-    parseInt(major, 10),
-  )}`;
+  const majorNum = parseInt(major, 10);
+  const isMsi = majorNum >= 23;
+  const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
   const expectedSha256 = await verifyAssetExists(
     "llvm/llvm-project",
     patch,
@@ -240,19 +246,35 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
   let toolRoot = tc.find("flang-verified", patch, inputs.arch);
 
   if (!toolRoot) {
-    core.info(`Downloading ${filename}...`);
-    const downloadPath = await tc.downloadTool(downloadUrl);
-    if (expectedSha256) {
-      await verifySha256(downloadPath, expectedSha256);
-    }
-
+    // Download under the real installer filename into a dedicated directory:
+    // tc.downloadTool would otherwise return an extensionless GUID path, and
+    // the extraction directory must not contain the installer itself because
+    // for the .exe path that whole directory is what gets tool-cached.
+    const tempDownloadDir = path.join(
+      process.env.RUNNER_TEMP ?? "C:\\Temp",
+      `flang-download-${patch}`,
+    );
     const tempExtractDir = path.join(
       process.env.RUNNER_TEMP ?? "C:\\Temp",
       `flang-extract-${patch}`,
     );
+    fs.mkdirSync(tempDownloadDir, { recursive: true });
     fs.mkdirSync(tempExtractDir, { recursive: true });
 
-    const installDir = await extractInstaller(downloadPath, tempExtractDir);
+    core.info(`Downloading ${filename}...`);
+    const downloadPath = await tc.downloadTool(
+      downloadUrl,
+      path.join(tempDownloadDir, filename),
+    );
+    if (expectedSha256) {
+      await verifySha256(downloadPath, expectedSha256);
+    }
+
+    const installDir = await extractInstaller(
+      downloadPath,
+      tempExtractDir,
+      isMsi,
+    );
 
     core.info("Caching...");
     toolRoot = await tc.cacheDir(

@@ -108196,8 +108196,13 @@ function installerExtension(major) {
 //   .msi (LLVM 23+): WiX package; the `msiexec /a` administrative install
 //        extracts via the file table without registering anything, and adds a
 //        single top-level `LLVM` directory (CPack's INSTALL_ROOT).
-async function extractInstaller(installerPath, destDir) {
-    if (installerPath.toLowerCase().endsWith(".msi")) {
+//
+// The caller declares which flavor it downloaded: tc.downloadTool saves to an
+// extensionless GUID path when no destination is given, so the file name
+// cannot be used for dispatch (7-Zip then "extracts" the WiX package into
+// mangled flat cabinet entries instead of the install tree).
+async function extractInstaller(installerPath, destDir, isMsi) {
+    if (isMsi) {
         info("Extracting installer with msiexec administrative install...");
         await exec_exec("msiexec", [
             "/a",
@@ -108302,20 +108307,28 @@ async function win32_installNative(inputs) {
         patch = await resolveLatestPatch("llvm/llvm-project", major);
     }
     const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
-    const filename = `LLVM-${patch}-${suffix}.${installerExtension(parseInt(major, 10))}`;
+    const majorNum = parseInt(major, 10);
+    const isMsi = majorNum >= 23;
+    const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
     const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
     info(`Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`);
     let toolRoot = find("flang-verified", patch, inputs.arch);
     if (!toolRoot) {
+        // Download under the real installer filename into a dedicated directory:
+        // tc.downloadTool would otherwise return an extensionless GUID path, and
+        // the extraction directory must not contain the installer itself because
+        // for the .exe path that whole directory is what gets tool-cached.
+        const tempDownloadDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-download-${patch}`);
+        const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
+        external_fs_.mkdirSync(tempDownloadDir, { recursive: true });
+        external_fs_.mkdirSync(tempExtractDir, { recursive: true });
         info(`Downloading ${filename}...`);
-        const downloadPath = await downloadTool(downloadUrl);
+        const downloadPath = await downloadTool(downloadUrl, external_path_.join(tempDownloadDir, filename));
         if (expectedSha256) {
             await verifySha256(downloadPath, expectedSha256);
         }
-        const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
-        external_fs_.mkdirSync(tempExtractDir, { recursive: true });
-        const installDir = await extractInstaller(downloadPath, tempExtractDir);
+        const installDir = await extractInstaller(downloadPath, tempExtractDir, isMsi);
         info("Caching...");
         toolRoot = await cacheDir(installDir, "flang-verified", patch, inputs.arch);
     }

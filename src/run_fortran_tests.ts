@@ -3,6 +3,7 @@ import * as core from "@actions/core";
 import * as path from "path";
 import * as fs from "fs";
 import { Compiler, LATEST, OS, Msystem, type Latest } from "./types";
+import { MSYS2_ROOT } from "./setup_msys2";
 
 interface CompilerFlags {
   module: string[];
@@ -598,7 +599,18 @@ async function run(): Promise<void> {
       glibcVersion,
       nvcxxVersion,
       cppFlags,
-      openmpFlags: ompFlag,
+      openmpFlags: [
+        ...ompFlag,
+        // The MSYS2 llvm-openmp package installs omp_lib.mod in the
+        // environment's include dir, which the flang driver does not search
+        // by default.
+        ...(isFlang && isMSYS2
+          ? [
+              "-I",
+              path.join(MSYS2_ROOT, msystem, "include").replace(/\\/g, "/"),
+            ]
+          : []),
+      ],
     };
 
     for (const test of buildTestManifest()) {

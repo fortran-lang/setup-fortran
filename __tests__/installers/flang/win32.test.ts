@@ -122,17 +122,23 @@ describe("installWin32 (Flang)", () => {
     it("extracts the LLVM 23 MSI with an msiexec administrative install", async () => {
       const inputs = { ...baseInputs, version: "23" };
       mockedTc.find.mockReturnValue("");
-      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm.msi");
+      // tc.downloadTool saves to an extensionless GUID path when no
+      // destination is passed — extraction must not dispatch on the extension.
+      mockedTc.downloadTool.mockResolvedValue(
+        "D:\\a\\_temp\\e50d54fe-ad02-446d-9587-48dee931e0c6",
+      );
       mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang23");
 
       const result = await installWin32(inputs);
 
+      // The installer is downloaded under its real (extension-bearing) name.
       expect(mockedTc.downloadTool).toHaveBeenCalledWith(
+        expect.stringContaining("LLVM-23.1.0-win64.msi"),
         expect.stringContaining("LLVM-23.1.0-win64.msi"),
       );
       expect(mockedExec).toHaveBeenCalledWith("msiexec", [
         "/a",
-        "C:\\Temp\\llvm.msi",
+        "D:\\a\\_temp\\e50d54fe-ad02-446d-9587-48dee931e0c6",
         "/qn",
         expect.stringContaining("TARGETDIR="),
       ]);
