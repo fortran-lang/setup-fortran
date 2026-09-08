@@ -20,19 +20,19 @@ import { verifySha256 } from "../../verify_download";
 // Major or patch version → download from official LLVM GitHub releases.
 //
 // macOS asset naming on GitHub releases:
-//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available for 19–21)
+//   ARM64: LLVM-{patch}-macOS-ARM64.tar.xz  (available for 19–21, 23.1.1+)
 //   X64:   LLVM-{patch}-macOS-X64.tar.xz    (available for 19; verified at runtime)
 //
-// LLVM stopped publishing macOS release binaries with 23.1.0 (the MACOS_* asset
-// links in its release notes are commented out upstream), so 23+ cannot be
-// added as concrete versions here. On macOS, Flang 23 is only available through
-// `version: latest`, which tracks the Homebrew formula (23.1.0 at the time of
-// the 23.1.0 release).
+// LLVM omitted macOS release binaries for 23.1.0 (the MACOS_* asset
+// links in its release notes were commented out upstream). They returned
+// with 23.1.1 for ARM64 only (no macOS-X64 asset), so 23 is supported on
+// ARM64 here but not on X64. On X64, Flang 23 remains available only through
+// `version: latest`, which tracks the Homebrew formula.
 //
 // LATEST is listed first so it is the default when no version is specified.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [LATEST, "19"],
-  [Arch.ARM64]: [LATEST, "21", "20", "19"], // Only on macos-15+ runners
+  [Arch.ARM64]: [LATEST, "23", "21", "20", "19"], // Only on macos-15+ runners
 } as const satisfies Record<Arch, readonly string[]>;
 
 // macOS asset suffix per arch in official LLVM GitHub releases.
