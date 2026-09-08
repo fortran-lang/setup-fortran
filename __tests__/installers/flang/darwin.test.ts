@@ -37,23 +37,12 @@ describe("installDarwin (Flang)", () => {
           status: 200,
           json: async () =>
             String(input).includes("/releases?")
-              ? [
-                  { tag_name: "llvmorg-23.1.1", prerelease: false },
-                  { tag_name: "llvmorg-19.1.7", prerelease: false },
-                ]
+              ? [{ tag_name: "llvmorg-19.1.7", prerelease: false }]
               : {
                   assets: [
                     {
                       name: "LLVM-19.1.7-macOS-X64.tar.xz",
                       digest: `sha256:${"a".repeat(64)}`,
-                    },
-                    {
-                      name: "LLVM-19.1.7-macOS-ARM64.tar.xz",
-                      digest: `sha256:${"b".repeat(64)}`,
-                    },
-                    {
-                      name: "LLVM-23.1.1-macOS-ARM64.tar.xz",
-                      digest: `sha256:${"c".repeat(64)}`,
                     },
                   ],
                 },
@@ -117,28 +106,11 @@ describe("installDarwin (Flang)", () => {
     expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
   });
 
-  it("rejects concrete LLVM 23 on macOS X64 (upstream publishes no macOS-X64 release binaries)", async () => {
+  it("rejects concrete LLVM 23 on macOS (upstream publishes no macOS release binaries)", async () => {
     const inputs = { ...baseInputs, version: "23" };
 
     await expect(installDarwin(inputs)).rejects.toThrow(
       /flang 23 is not supported on darwin/,
-    );
-  });
-
-  it("downloads from GitHub when version 23 is specified on ARM64", async () => {
-    const inputs = { ...baseInputs, version: "23", arch: Arch.ARM64 };
-    mockedTc.find.mockReturnValue("");
-    mockedTc.downloadTool.mockResolvedValue("/tmp/llvm23.tar.xz");
-    mockedTc.extractTar.mockResolvedValue("/tmp/llvm23-extracted");
-    mockedTc.cacheDir.mockResolvedValue("/cache/llvm23");
-
-    await installDarwin(inputs);
-
-    expect(mockedTc.downloadTool).toHaveBeenCalledWith(
-      expect.stringContaining("LLVM-23."),
-    );
-    expect(mockedTc.downloadTool).toHaveBeenCalledWith(
-      expect.stringContaining("macOS-ARM64"),
     );
   });
 

@@ -44,8 +44,6 @@ jobs:
           - image: macos-14
             toolchain: { compiler: flang } # only latest version available from brew
           - image: macos-26
-            toolchain: { compiler: flang, version: "23" }
-          - image: macos-26
             toolchain: { compiler: flang, version: "21" }
           - image: macos-26
             toolchain: { compiler: flang, version: "21.1.6" } # test that patch versions are accepted and resolved correctly
@@ -53,8 +51,6 @@ jobs:
             toolchain: { compiler: flang, version: "20" }
           - image: macos-26
             toolchain: { compiler: flang, version: "19" }
-          - image: macos-15
-            toolchain: { compiler: flang, version: "23" }
           - image: macos-15
             toolchain: { compiler: flang, version: "21" }
           - image: macos-15
