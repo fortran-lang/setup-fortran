@@ -198,10 +198,8 @@ function getCxxLinkFlags(
     case Compiler.IFort:
     case Compiler.IFX:
       if (platform === OS.Windows) {
-        return {
-          flags: [],
-          skip: `C++ companion linking not exercised for ${compiler} on windows yet`,
-        };
+        // Same as Flang native-Windows above: MSVC objects link via /DEFAULTLIB.
+        return { flags: [] };
       }
       if (path.basename(process.env.CXX ?? "").startsWith("icpc")) {
         return {
