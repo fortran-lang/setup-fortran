@@ -92,7 +92,7 @@ function parseCompiler(raw: string): Compiler {
   if (canonicalCompilers.includes(compiler)) {
     if (val in COMPILER_ALIASES) {
       core.warning(
-        `The compiler selector "${val}" is deprecated; please use "${compiler}" instead.`,
+        `The compiler selector "${val}" is deprecated. Please use "${compiler}" instead.`,
       );
     }
     return compiler;

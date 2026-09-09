@@ -166,7 +166,7 @@ describe("parseInputs", () => {
         });
         parseInputs();
         expect(core.warning).toHaveBeenCalledWith(
-          `The compiler selector "${alias}" is deprecated; please use "${canonical}" instead.`,
+          `The compiler selector "${alias}" is deprecated. Please use "${canonical}" instead.`,
         );
       },
     );
@@ -178,7 +178,7 @@ describe("parseInputs", () => {
       });
       parseInputs();
       expect(core.warning).toHaveBeenCalledWith(
-        'The compiler selector "intel-classic" is deprecated; please use "ifort" instead.',
+        'The compiler selector "intel-classic" is deprecated. Please use "ifort" instead.',
       );
     });
 
