@@ -103153,8 +103153,8 @@ async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `l
             `See https://github.com/${repo}/releases/tag/${tag} for available assets.`);
     }
     if (!asset.digest?.startsWith("sha256:")) {
-        warning(`GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}; ` +
-            `download integrity cannot be verified automatically for this legacy asset.`);
+        info(`GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}. ` +
+            `Download integrity cannot be verified automatically.`);
         return undefined;
     }
     const digest = asset.digest.slice("sha256:".length).toLowerCase();

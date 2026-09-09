@@ -450,9 +450,9 @@ export async function verifyAssetExists(
   }
 
   if (!asset.digest?.startsWith("sha256:")) {
-    core.warning(
-      `GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}; ` +
-        `download integrity cannot be verified automatically for this legacy asset.`,
+    core.info(
+      `GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}. ` +
+        `Download integrity cannot be verified automatically.`,
     );
     return undefined;
   }
