@@ -44,7 +44,7 @@ describe("compiler cache validation", () => {
       ]),
     ).resolves.toBe(false);
     expect(mockedExec).not.toHaveBeenCalled();
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("missing: /setup"),
     );
   });

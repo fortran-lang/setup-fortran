@@ -105879,7 +105879,7 @@ async function installGFortran(inputs) {
 async function validateRestoredCompilerCache(label, requiredPaths, command, args) {
     const missing = requiredPaths.filter((entry) => !external_fs_.existsSync(entry));
     if (missing.length > 0) {
-        warning(`Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`);
+        info(`Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`);
         return false;
     }
     try {
@@ -105889,10 +105889,10 @@ async function validateRestoredCompilerCache(label, requiredPaths, command, args
         });
         if (exitCode === 0)
             return true;
-        warning(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
+        info(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
     }
     catch (error) {
-        warning(`Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`);
+        info(`Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`);
     }
     return false;
 }

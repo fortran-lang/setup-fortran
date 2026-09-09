@@ -11,7 +11,7 @@ export async function validateRestoredCompilerCache(
 ): Promise<boolean> {
   const missing = requiredPaths.filter((entry) => !fs.existsSync(entry));
   if (missing.length > 0) {
-    core.warning(
+    core.info(
       `Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`,
     );
     return false;
@@ -23,11 +23,11 @@ export async function validateRestoredCompilerCache(
       silent: true,
     });
     if (exitCode === 0) return true;
-    core.warning(
+    core.info(
       `Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`,
     );
   } catch (error) {
-    core.warning(
+    core.info(
       `Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`,
     );
   }
