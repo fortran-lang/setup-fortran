@@ -175,7 +175,7 @@ jobs:
       - name: Install ${{ matrix.toolchain.compiler }} ${{ matrix.toolchain.version }}
         id: setup
         uses: ./
-        timeout-minutes: 30
+        timeout-minutes: 45
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
