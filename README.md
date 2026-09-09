@@ -13,9 +13,10 @@ Linux, macOS, and Windows.
 
 Migrating from `v1` requires only a few changes:
 
-- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 - `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
 - In 2022, oneAPI release numbers differed from compiler version numbers. For example, oneAPI `2022.1` on Windows installed `ifx` version `2022.2.0`. Compiler versions are now used consistently, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
+- Intel's Fortran-only installer for Windows does not come with a working `icx` backend, so the preferred C/C++ companion compiler has been changed to `cl`. If you have hardcoded `CC=icx`/`CXX=icx` anywhere in your own workflow, remove these settings and let the action provide the appropriate values.
+- The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 
 ## Usage
 
