@@ -106405,9 +106405,23 @@ async function win32_installWin32(inputs) {
                 // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
                 // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
                 // we no longer need the secondary TypeScript vswhere lookup.
+                // TEST PATCH: dedupe entries (case-insensitive, first occurrence wins)
+                // before the full-overwrite export, so a redundant downstream
+                // setvars.bat/vcvarsall.bat call re-prepending an already-set PATH
+                // doesn't blow past cmd.exe's line-length limit.
+                const seenPathEntries = new Set();
                 const filteredPath = val
                     .split(";")
                     .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+                    .filter((p) => {
+                    if (p === "")
+                        return false;
+                    const key = p.toLowerCase();
+                    if (seenPathEntries.has(key))
+                        return false;
+                    seenPathEntries.add(key);
+                    return true;
+                })
                     .join(";");
                 exportVariable("PATH", filteredPath);
                 addMsvcBinFromPath(filteredPath);
@@ -107154,9 +107168,23 @@ async function ifort_win32_installWin32(inputs) {
                 // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
                 // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
                 // we no longer need the secondary TypeScript vswhere lookup.
+                // TEST PATCH: dedupe entries (case-insensitive, first occurrence wins)
+                // before the full-overwrite export, so a redundant downstream
+                // setvars.bat/vcvarsall.bat call re-prepending an already-set PATH
+                // doesn't blow past cmd.exe's line-length limit.
+                const seenPathEntries = new Set();
                 const filteredPath = val
                     .split(";")
                     .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+                    .filter((p) => {
+                    if (p === "")
+                        return false;
+                    const key = p.toLowerCase();
+                    if (seenPathEntries.has(key))
+                        return false;
+                    seenPathEntries.add(key);
+                    return true;
+                })
                     .join(";");
                 exportVariable("PATH", filteredPath);
                 addMsvcBinFromPath(filteredPath);
