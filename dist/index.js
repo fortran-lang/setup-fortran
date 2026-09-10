@@ -109159,7 +109159,7 @@ async function installLFortran(inputs) {
 
 const armflang_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: undefined,
-    [Arch.ARM64]: ["22.1", "21.1", "20.1"],
+    [Arch.ARM64]: ["23.1", "22.1", "21.1", "20.1"],
 };
 const PACKAGE = "arm-toolchain-for-linux";
 const ARM_ROOT = "/opt/arm";
@@ -109423,7 +109423,15 @@ async function armflang_debian_installDebian(inputs) {
         // unrelated repository must not block this step.
         await armflang_debian_aptGetUpdateWithRetry();
         await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
-        if (version === "22.1") {
+        // Versions shipped through the current Arm Toolchains repository
+        // (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older
+        // releases live in the legacy OBS repositories and need the Release.key
+        // flow below.
+        const CURRENT_REPOSITORY_VERSIONS = new Set([
+            "23.1",
+            "22.1",
+        ]);
+        if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
             await configureCurrentRepository(repository.codename);
         }
         else {
