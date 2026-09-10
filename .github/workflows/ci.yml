@@ -8,16 +8,16 @@ on:
     - cron: "0 0 * * 5"
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
-
 permissions:
   actions: read
   contents: read
 
 jobs:
   validation:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      (github.event.pull_request.head.ref != 'main' && github.event.pull_request.head.ref != 'develop')
     uses: ./.github/workflows/validation.yml
 
   aocc:
