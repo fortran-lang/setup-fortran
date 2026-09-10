@@ -252,6 +252,7 @@ Use of the canonical names is recommended.
 | Version | ubuntu-24.04-arm | ubuntu-22.04-arm |
 | ------- | ---------------- | ---------------- |
 | latest  | ✓                | ✓                |
+| 23.1    | ✓                | ✓                |
 | 22.1    | ✓                | ✓                |
 | 21.1    | ✓                | ✓                |
 | 20.1    | ✓                | ✓                |

@@ -17,6 +17,7 @@ jobs:
       matrix:
         image: [ubuntu-24.04-arm, ubuntu-22.04-arm]
         toolchain:
+          - { compiler: armflang, version: "23.1" }
           - { compiler: armflang, version: "22.1" }
           - { compiler: armflang, version: "21.1" }
           - { compiler: armflang, version: "20.1" }

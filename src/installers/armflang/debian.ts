@@ -11,7 +11,7 @@ import { indexFetchFailed } from "../../apt_sources";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: undefined,
-  [Arch.ARM64]: ["22.1", "21.1", "20.1"],
+  [Arch.ARM64]: ["23.1", "22.1", "21.1", "20.1"],
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
 const PACKAGE = "arm-toolchain-for-linux";
@@ -374,7 +374,15 @@ export async function installDebian(
     await aptGetUpdateWithRetry();
     await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
 
-    if (version === "22.1") {
+    // Versions shipped through the current Arm Toolchains repository
+    // (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older
+    // releases live in the legacy OBS repositories and need the Release.key
+    // flow below.
+    const CURRENT_REPOSITORY_VERSIONS: ReadonlySet<string> = new Set([
+      "23.1",
+      "22.1",
+    ]);
+    if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
       await configureCurrentRepository(repository.codename);
     } else {
       const releaseKeyPath = path.join(

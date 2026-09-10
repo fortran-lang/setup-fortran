@@ -107,6 +107,52 @@ describe("installDebian (ArmFlang)", () => {
     );
   });
 
+  it("configures the current repository and installs ArmFlang 23.1", async () => {
+    mockedGetExecOutput.mockImplementation(async (command) => {
+      if (command === "sha256sum") {
+        return {
+          stdout: `${"a".repeat(64)}  repository.deb\n`,
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return {
+        stdout:
+          " arm-toolchain-for-linux | 23.1.0-12 | https://developer.arm.com\n",
+        stderr: "",
+        exitCode: 0,
+      };
+    });
+    mockedExec.mockImplementation(async (command, args, options) => {
+      if (command.endsWith("/armflang") && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("ArmFlang 23.1.0"));
+      }
+      return 0;
+    });
+
+    const result = await installDebian({ ...inputs, version: "23.1" });
+
+    // 23.1 ships through the current repository, like 22.1 — not the legacy
+    // OBS Release.key flow.
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        expect.stringContaining("arm-toolchains-repository_2-2~noble_all.deb"),
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "apt-get",
+        "install",
+        "arm-toolchain-for-linux=23.1.0-12",
+        "Acquire::Retries=5",
+      ]),
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
+    expect(result.version).toBe("ArmFlang 23.1.0");
+  });
+
   it("uses the legacy repository for ArmFlang 21.1", async () => {
     mockedGetExecOutput.mockResolvedValue({
       stdout: " arm-toolchain-for-linux | 21.1-81 | repo\n",
