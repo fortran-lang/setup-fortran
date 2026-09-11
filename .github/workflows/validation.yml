@@ -119,15 +119,15 @@ jobs:
       - name: Verify committed dist matches ubuntu build
         run: |
           if ! diff -r dist /tmp/dist-ubuntu > /tmp/dist-stale.diff; then
-            echo "::error::dist/ is out of date. Please run 'npm run build' on Linux and commit the changes."
+            echo "::error::dist/ is out of date. Please run 'npm run build' and commit the changes. If your dist/ is already up to date, but you are using another operating system, please check for a dependency or bundler change that caused the difference."
             cat /tmp/dist-stale.diff
             exit 1
           fi
 
-      - name: Verify dist is reproducible across OS
+      - name: Verify committed dist matches windows build
         run: |
-          if ! diff -r /tmp/dist-ubuntu /tmp/dist-windows > /tmp/dist-nondeterministic.diff; then
-            echo "::error::dist/ is not reproducible across OS: the windows-latest build differs from the ubuntu-latest build (see #252). dist/ must be built on Linux."
-            cat /tmp/dist-nondeterministic.diff
+          if ! diff -r dist /tmp/dist-windows > /tmp/dist-stale-windows.diff; then
+            echo "::error::dist/ is out of date. Please run 'npm run build' and commit the changes. If your dist/ is already up to date, but you are using another operating system, please check for a dependency or bundler change that caused the difference."
+            cat /tmp/dist-stale-windows.diff
             exit 1
           fi
