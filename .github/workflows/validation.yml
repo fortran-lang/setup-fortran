@@ -46,8 +46,12 @@ jobs:
         run: npm run test
 
   build:
-    name: build
-    runs-on: ubuntu-latest
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     needs: [format-lint, unit-tests]
     steps:
       - uses: actions/checkout@v7
@@ -65,29 +69,70 @@ jobs:
       - name: Smoke test bundled action
         run: npm run test:bundle
 
-      - name: Verify dist is up to date
-        run: |
-          npm run build
-          if ! git diff --exit-code dist/; then
-            echo "::error::dist/ is out of date. Please run 'npm run build' and commit the changes."
-            git diff --stat dist/
-            exit 1
-          fi
+      - name: Save dist
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-${{ matrix.os }}
+          path: dist
 
       - name: Build dist-verify
+        if: matrix.os == 'ubuntu-latest'
         run: npm run build:verify-installation
 
       - name: Save dist-verify
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
         with:
           name: generated-dist-verify
           path: dist-verify
 
       - name: Build dist-tests
+        if: matrix.os == 'ubuntu-latest'
         run: npm run build:integration-test
 
       - name: Save dist-tests
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
         with:
           name: generated-dist-tests
           path: dist-tests
+
+  # Compares the committed dist/ against fresh builds from both OS legs.
+  # Artifacts are the only bridge between the isolated runner VMs; they also
+  # preserve the differing bytes for download, so a failure can be diagnosed
+  # from any machine (see #252). A per-leg `git diff` would be shorter but
+  # misattributes a stale dist/ as nondeterminism and leaves no forensics.
+  verify-dist:
+    name: verify dist
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download ubuntu dist
+        uses: actions/download-artifact@v7
+        with:
+          name: generated-dist-ubuntu-latest
+          path: /tmp/dist-ubuntu
+
+      - name: Download windows dist
+        uses: actions/download-artifact@v7
+        with:
+          name: generated-dist-windows-latest
+          path: /tmp/dist-windows
+
+      - name: Verify committed dist matches ubuntu build
+        run: |
+          if ! diff -r dist /tmp/dist-ubuntu > /tmp/dist-stale.diff; then
+            echo "::error::dist/ is out of date. Please run 'npm run build' on Linux and commit the changes."
+            cat /tmp/dist-stale.diff
+            exit 1
+          fi
+
+      - name: Verify dist is reproducible across OS
+        run: |
+          if ! diff -r /tmp/dist-ubuntu /tmp/dist-windows > /tmp/dist-nondeterministic.diff; then
+            echo "::error::dist/ is not reproducible across OS: the windows-latest build differs from the ubuntu-latest build (see #252). dist/ must be built on Linux."
+            cat /tmp/dist-nondeterministic.diff
+            exit 1
+          fi
