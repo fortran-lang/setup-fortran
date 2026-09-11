@@ -162,7 +162,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-        timeout-minutes: 30
+        timeout-minutes: 45
 
       - name: Verify installation
         shell: bash
