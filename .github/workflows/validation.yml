@@ -97,11 +97,6 @@ jobs:
           name: generated-dist-tests
           path: dist-tests
 
-  # Compares the committed dist/ against fresh builds from both OS legs.
-  # Artifacts are the only bridge between the isolated runner VMs; they also
-  # preserve the differing bytes for download, so a failure can be diagnosed
-  # from any machine (see #252). A per-leg `git diff` would be shorter but
-  # misattributes a stale dist/ as nondeterminism and leaves no forensics.
   verify-dist:
     name: verify dist
     needs: [build]
