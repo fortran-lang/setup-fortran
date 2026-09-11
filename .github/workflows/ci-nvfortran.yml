@@ -108,3 +108,4 @@ jobs:
 
       - name: Run Integration Tests
         run: npm run integration-test
+        timeout-minutes: 5

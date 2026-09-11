@@ -62,3 +62,4 @@ jobs:
 
       - name: Run integration tests
         run: npm run integration-test
+        timeout-minutes: 5

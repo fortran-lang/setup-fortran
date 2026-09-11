@@ -204,6 +204,7 @@ jobs:
           cxx: ${{ steps.setup.outputs.cxx }}
       - name: Run Integration Tests
         run: npm run integration-test
+        timeout-minutes: 5
 
   negative-macos-fallback:
     name: intel on macOS fails (no silent ifort fallback)

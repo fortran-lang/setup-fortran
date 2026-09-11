@@ -239,6 +239,7 @@ jobs:
 
       - name: Run integration tests for final state
         run: npm run integration-test
+        timeout-minutes: 5
 
   canary-report:
     name: Weekly Canary Report
