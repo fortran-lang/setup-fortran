@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as fs from "fs";
+import * as path from "path";
 import {
   addMsvcBinFromPath,
   persistMsvcBinForBash,
@@ -10,9 +11,18 @@ jest.mock("@actions/core");
 jest.mock("fs");
 
 describe("addMsvcBinFromPath", () => {
+  const runnerTemp = "D:\\a\\_temp";
+  // Built the same way persistMsvcBinForBash builds it (plain path.join),
+  // so this matches regardless of whether the test runs on Linux CI or a
+  // native Windows machine: both sides track the same host OS.
+  const msvcBashEnvPath = path.join(
+    runnerTemp,
+    "setup-fortran-msvc-bash-env.sh",
+  );
+
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.RUNNER_TEMP = "D:\\a\\_temp";
+    process.env.RUNNER_TEMP = runnerTemp;
     delete process.env.BASH_ENV;
   });
 
@@ -31,7 +41,7 @@ describe("addMsvcBinFromPath", () => {
     expect(core.addPath).toHaveBeenCalledWith(msvcBin);
     expect(core.exportVariable).toHaveBeenCalledWith(
       "BASH_ENV",
-      "/d/a/_temp/setup-fortran-msvc-bash-env.sh",
+      toMsysPath(msvcBashEnvPath),
     );
   });
 
@@ -47,11 +57,9 @@ describe("addMsvcBinFromPath", () => {
     const msvcBin =
       "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64";
 
-    expect(persistMsvcBinForBash(msvcBin)).toBe(
-      "D:\\a\\_temp/setup-fortran-msvc-bash-env.sh",
-    );
+    expect(persistMsvcBinForBash(msvcBin)).toBe(msvcBashEnvPath);
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      "D:\\a\\_temp/setup-fortran-msvc-bash-env.sh",
+      msvcBashEnvPath,
       `export PATH='/c/Program Files/Microsoft Visual Studio/18/Enterprise/VC/Tools/MSVC/14.51.36231/bin/HostX64/x64':"$PATH"\n`,
       { mode: 0o600 },
     );
@@ -70,7 +78,7 @@ describe("addMsvcBinFromPath", () => {
   });
 
   it("does not source itself when setup runs more than once", () => {
-    process.env.BASH_ENV = "/d/a/_temp/setup-fortran-msvc-bash-env.sh";
+    process.env.BASH_ENV = toMsysPath(msvcBashEnvPath);
 
     persistMsvcBinForBash("C:\\MSVC\\bin");
 

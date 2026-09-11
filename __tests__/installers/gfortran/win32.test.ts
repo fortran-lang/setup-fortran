@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as tc from "@actions/tool-cache";
+import * as path from "path";
 import { installWin32 } from "../../../src/installers/gfortran/win32";
 import { setupMSYS2 } from "../../../src/setup_msys2";
 import { verifySha256 } from "../../../src/verify_download";
@@ -49,19 +50,33 @@ describe("installWin32 (gfortran)", () => {
 
   describe("Native", () => {
     it("downloads and extracts GFortran", async () => {
+      const cacheDir = "C:\\Cache\\gfortran";
+      const downloadedZip = "C:\\Temp\\gcc.zip";
+      const extractedDir = "C:\\Temp\\extracted";
       mockedTc.find.mockReturnValue("");
-      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\gcc.zip");
-      mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
-      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\gfortran");
+      mockedTc.downloadTool.mockResolvedValue(downloadedZip);
+      mockedTc.extractZip.mockResolvedValue(extractedDir);
+      mockedTc.cacheDir.mockResolvedValue(cacheDir);
 
       const result = await installWin32(baseInputs);
 
-      expect(result.fc).toBe("C:\\Cache\\gfortran/bin/gfortran.exe");
-      expect(result.cc).toBe("C:\\Cache\\gfortran/bin/gcc.exe");
-      expect(result.cxx).toBe("C:\\Cache\\gfortran/bin/g++.exe");
+      // Built the same way installWin32 builds it (plain path.join), so
+      // this matches regardless of whether the test runs on Linux CI or a
+      // native Windows machine: both sides track the same host OS.
+      const binDir = path.join(cacheDir, "bin");
+      expect(result.fc).toBe(path.join(binDir, "gfortran.exe"));
+      expect(result.cc).toBe(path.join(binDir, "gcc.exe"));
+      expect(result.cxx).toBe(path.join(binDir, "g++.exe"));
       expect(mockedTc.downloadTool).toHaveBeenCalled();
-      expect(mockedTc.extractZip).toHaveBeenCalledWith("C:\\Temp\\gcc.zip");
-      expect(mockedTc.cacheDir).toHaveBeenCalled();
+      expect(mockedTc.extractZip).toHaveBeenCalledWith(downloadedZip);
+      // Verifies the "mingw64" subdirectory installWin32 appends before
+      // caching, not just that cacheDir was called at all.
+      expect(mockedTc.cacheDir).toHaveBeenCalledWith(
+        path.join(extractedDir, "mingw64"),
+        `gfortran-verified-${baseInputs.msystem}`,
+        baseInputs.version,
+        baseInputs.arch,
+      );
       expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
     });
 
