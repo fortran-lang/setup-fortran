@@ -485,56 +485,56 @@ function comboCoversLeaf(
   );
 }
 
-// describe("supported version tables are exercised by CI (Test B)", () => {
-//   it("every concrete supported version is tested by its ci-<compiler>.yml matrix on a matching runner", () => {
-//     const uncovered: Array<{ where: string; compiler: string; token: string }> =
-//       [];
-//     for (const list of ALL_VERSION_LISTS) {
-//       const compiler = list.label.split("/")[0];
-//       const spec = leafSpec(list.label);
-//       const ci = parseCiMatrix(compiler);
-//       for (const token of list.versions) {
-//         if (token === LATEST) continue;
-//         if (!ci.combos.some((c) => comboCoversLeaf(c, spec, token))) {
-//           uncovered.push({ where: list.label, compiler, token });
-//         }
-//       }
-//     }
-//     if (uncovered.length > 0) {
-//       throw new Error(
-//         "These supported versions have no CI coverage on a matching runner " +
-//           "(OS/arch/msystem of their table leaf):\n" +
-//           uncovered
-//             .map(
-//               (u) => `  - ${u.where}: "${u.token}" (compiler "${u.compiler}")`,
-//             )
-//             .join("\n"),
-//       );
-//     }
-//   });
+describe("supported version tables are exercised by CI (Test B)", () => {
+  it("every concrete supported version is tested by its ci-<compiler>.yml matrix on a matching runner", () => {
+    const uncovered: Array<{ where: string; compiler: string; token: string }> =
+      [];
+    for (const list of ALL_VERSION_LISTS) {
+      const compiler = list.label.split("/")[0];
+      const spec = leafSpec(list.label);
+      const ci = parseCiMatrix(compiler);
+      for (const token of list.versions) {
+        if (token === LATEST) continue;
+        if (!ci.combos.some((c) => comboCoversLeaf(c, spec, token))) {
+          uncovered.push({ where: list.label, compiler, token });
+        }
+      }
+    }
+    if (uncovered.length > 0) {
+      throw new Error(
+        "These supported versions have no CI coverage on a matching runner " +
+          "(OS/arch/msystem of their table leaf):\n" +
+          uncovered
+            .map(
+              (u) => `  - ${u.where}: "${u.token}" (compiler "${u.compiler}")`,
+            )
+            .join("\n"),
+      );
+    }
+  });
 
-//   it("every [LATEST]-only table cell has a latest test in CI", () => {
-//     const onlyLatestLeaves = ALL_VERSION_LISTS.filter(
-//       (l) => l.versions.length === 1 && l.versions[0] === LATEST,
-//     );
-//     const missing: Array<{ where: string; compiler: string }> = [];
-//     for (const list of onlyLatestLeaves) {
-//       const compiler = list.label.split("/")[0];
-//       const ci = parseCiMatrix(compiler);
-//       if (!latestCellCovered(list.label, ci.latestMsystrings, ci.hasLatest)) {
-//         missing.push({ where: list.label, compiler });
-//       }
-//     }
-//     if (missing.length > 0) {
-//       throw new Error(
-//         "These [LATEST]-only cells have no latest test in CI:\n" +
-//           missing
-//             .map((m) => `  - ${m.where} (compiler "${m.compiler}")`)
-//             .join("\n"),
-//       );
-//     }
-//   });
-// });
+  it("every [LATEST]-only table cell has a latest test in CI", () => {
+    const onlyLatestLeaves = ALL_VERSION_LISTS.filter(
+      (l) => l.versions.length === 1 && l.versions[0] === LATEST,
+    );
+    const missing: Array<{ where: string; compiler: string }> = [];
+    for (const list of onlyLatestLeaves) {
+      const compiler = list.label.split("/")[0];
+      const ci = parseCiMatrix(compiler);
+      if (!latestCellCovered(list.label, ci.latestMsystrings, ci.hasLatest)) {
+        missing.push({ where: list.label, compiler });
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        "These [LATEST]-only cells have no latest test in CI:\n" +
+          missing
+            .map((m) => `  - ${m.where} (compiler "${m.compiler}")`)
+            .join("\n"),
+      );
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Test B negative cases: the coverage predicates must *detect* synthetic gaps
