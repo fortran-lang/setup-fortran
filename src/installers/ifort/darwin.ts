@@ -87,6 +87,7 @@ async function downloadInstaller(
   await exec.exec("curl", [
     "-sS",
     "-L",
+    "--fail",
     "--retry",
     "5",
     "--retry-delay",

@@ -106835,6 +106835,7 @@ async function downloadInstaller(url, destPath) {
     await exec_exec("curl", [
         "-sS",
         "-L",
+        "--fail",
         "--retry",
         "5",
         "--retry-delay",
