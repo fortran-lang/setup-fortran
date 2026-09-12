@@ -99,7 +99,7 @@ function parseRepositoryPackageMetadata(
 async function configureCurrentRepository(codename: string): Promise<void> {
   const repositoryBaseUrl =
     "https://developer.arm.com/packages/arm-toolchains/ubuntu";
-  const packagesIndexPath = path.join(
+  const packagesIndexPath = path.posix.join(
     os.tmpdir(),
     `arm-toolchains-${codename}-Packages`,
   );
@@ -117,7 +117,7 @@ async function configureCurrentRepository(codename: string): Promise<void> {
       fs.readFileSync(packagesIndexPath, "utf8"),
     );
 
-    repositoryPackagePath = path.join(
+    repositoryPackagePath = path.posix.join(
       os.tmpdir(),
       path.basename(metadata.filename),
     );
@@ -266,8 +266,8 @@ function findLibraryDirectories(baseDir: string): string[] {
   if (!fs.existsSync(baseDir)) return results;
 
   const candidateDirs = [
-    path.join(baseDir, "lib"),
-    path.join(baseDir, "lib64"),
+    path.posix.join(baseDir, "lib"),
+    path.posix.join(baseDir, "lib64"),
   ];
 
   for (const candidate of candidateDirs) {
@@ -280,8 +280,8 @@ function findLibraryDirectories(baseDir: string): string[] {
     const entries = fs.readdirSync(baseDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const subLib = path.join(baseDir, entry.name, "lib");
-        const subLib64 = path.join(baseDir, entry.name, "lib64");
+        const subLib = path.posix.join(baseDir, entry.name, "lib");
+        const subLib64 = path.posix.join(baseDir, entry.name, "lib64");
         if (fs.existsSync(subLib)) results.push(subLib);
         if (fs.existsSync(subLib64)) results.push(subLib64);
       }
@@ -333,15 +333,15 @@ export async function installDebian(
     `/${repository.codename}`;
   const keyring = "/usr/share/keyrings/obs-oss-arm-com.gpg";
   const sourceList = "/etc/apt/sources.list.d/obs-oss-arm-com.list";
-  const cacheDir = path.join(os.homedir(), ".armflang-cache");
+  const cacheDir = path.posix.join(os.homedir(), ".armflang-cache");
   const cacheKey = `armflang-${version}-${inputs.arch}-${inputs.osVersion}`;
 
   core.info(`Installing ArmFlang ${version} on Linux (${inputs.arch})...`);
 
-  const binDir = path.join(INSTALL_DIR, "bin");
-  const fc = path.join(binDir, "armflang");
-  const cc = path.join(binDir, "armclang");
-  const cxx = path.join(binDir, "armclang++");
+  const binDir = path.posix.join(INSTALL_DIR, "bin");
+  const fc = path.posix.join(binDir, "armflang");
+  const cc = path.posix.join(binDir, "armclang");
+  const cxx = path.posix.join(binDir, "armclang++");
 
   const cacheHit = await cache.restoreCache([cacheDir], cacheKey);
   let isCacheValid = false;
@@ -350,8 +350,8 @@ export async function installDebian(
     const libDirs = findLibraryDirectories(ARM_ROOT);
     const hasArmMath = libDirs.some(
       (dir) =>
-        fs.existsSync(path.join(dir, "libamath.so")) ||
-        fs.existsSync(path.join(dir, "libamath.a")),
+        fs.existsSync(path.posix.join(dir, "libamath.so")) ||
+        fs.existsSync(path.posix.join(dir, "libamath.a")),
     );
     isCacheValid = [fc, cc, cxx].every((binary) => fs.existsSync(binary));
     if (!hasArmMath) {
@@ -385,7 +385,7 @@ export async function installDebian(
     if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
       await configureCurrentRepository(repository.codename);
     } else {
-      const releaseKeyPath = path.join(
+      const releaseKeyPath = path.posix.join(
         os.tmpdir(),
         `arm-toolchains-${repository.codename}-Release.key`,
       );

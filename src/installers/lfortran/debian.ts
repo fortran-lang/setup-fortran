@@ -58,7 +58,7 @@ export async function installDebian(
   } else {
     resetLFortranEnvironment(environment);
     const tempDir = createInstallerTempDir();
-    const miniforgeInstaller = path.join(tempDir, "miniforge.sh");
+    const miniforgeInstaller = path.posix.join(tempDir, "miniforge.sh");
     try {
       core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
       await exec.exec("curl", [
@@ -102,7 +102,7 @@ export async function installDebian(
   core.addPath(environment.binDir);
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join(environment.envPrefix, "lib"),
+    path.posix.join(environment.envPrefix, "lib"),
   );
 
   const resolvedVersion = await resolveInstalledVersion(environment.lfortran);

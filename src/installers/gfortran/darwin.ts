@@ -69,8 +69,8 @@ export async function installDarwin(
 
   const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
 
-  const binDir = path.join(brewPrefix, "bin");
-  const gfortranBinary = path.join(binDir, `gfortran-${version}`);
+  const binDir = path.posix.join(brewPrefix, "bin");
+  const gfortranBinary = path.posix.join(binDir, `gfortran-${version}`);
   const existingDyldPath = process.env.DYLD_FALLBACK_LIBRARY_PATH ?? "";
   core.exportVariable(
     "DYLD_FALLBACK_LIBRARY_PATH",
@@ -97,8 +97,8 @@ export async function installDarwin(
     core.warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
   }
 
-  const gccBinary = path.join(binDir, `gcc-${version}`);
-  const gxxBinary = path.join(binDir, `g++-${version}`);
+  const gccBinary = path.posix.join(binDir, `gcc-${version}`);
+  const gxxBinary = path.posix.join(binDir, `g++-${version}`);
 
   // Homebrew's versioned `gcc@<version>` formulae only expose versioned
   // driver names (e.g. `gfortran-14`, `gcc-14`, `g++-14`). Unlike the
@@ -109,8 +109,8 @@ export async function installDarwin(
   // create unversioned symlinks pointing to the requested version. This
   // mirrors the behavior of the shell-based action (install_gcc_brew).
   for (const driver of ["gfortran", "gcc", "g++"] as const) {
-    const versionedBinary = path.join(binDir, `${driver}-${version}`);
-    const unversionedBinary = path.join(binDir, driver);
+    const versionedBinary = path.posix.join(binDir, `${driver}-${version}`);
+    const unversionedBinary = path.posix.join(binDir, driver);
     await exec.exec("ln", ["-sf", versionedBinary, unversionedBinary]);
   }
 

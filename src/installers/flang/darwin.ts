@@ -86,20 +86,20 @@ async function installBrew(inputs: Inputs): Promise<InstallationResult> {
   await exec.exec("brew", ["install", "flang"]);
 
   const brewPrefix = await getBrewPrefix();
-  const flangOptDir = path.join(brewPrefix, "opt", "flang");
-  const binDir = path.join(flangOptDir, "bin");
+  const flangOptDir = path.posix.join(brewPrefix, "opt", "flang");
+  const binDir = path.posix.join(flangOptDir, "bin");
 
   core.addPath(binDir);
 
   const flangBin = resolveFlangBinary(binDir);
   core.info(`Using flang binary: ${flangBin}`);
 
-  const llvmBinDir = path.join(brewPrefix, "opt", "llvm", "bin");
+  const llvmBinDir = path.posix.join(brewPrefix, "opt", "llvm", "bin");
   core.exportVariable("FLANG_VERSION", LATEST);
 
   // libomp.dylib lives in the llvm formula's lib dir, not a standalone formula.
-  const libDir = path.join(flangOptDir, "lib");
-  const libompDir = path.join(brewPrefix, "opt", "llvm", "lib");
+  const libDir = path.posix.join(flangOptDir, "lib");
+  const libompDir = path.posix.join(brewPrefix, "opt", "llvm", "lib");
   const existingLibPath = process.env.LIBRARY_PATH ?? "";
   const libPaths = [libDir, libompDir].filter(fs.existsSync).join(":");
   core.exportVariable(
@@ -129,8 +129,8 @@ async function installBrew(inputs: Inputs): Promise<InstallationResult> {
   const result = {
     version: resolvedVersion,
     fc: flangBin,
-    cc: path.join(llvmBinDir, "clang"),
-    cxx: path.join(llvmBinDir, "clang++"),
+    cc: path.posix.join(llvmBinDir, "clang"),
+    cxx: path.posix.join(llvmBinDir, "clang++"),
   };
   return result;
 }
@@ -183,7 +183,7 @@ async function installFromGitHub(
     );
   }
 
-  const binDir = path.join(toolRoot, "bin");
+  const binDir = path.posix.join(toolRoot, "bin");
   core.addPath(binDir);
 
   const flangBin = resolveFlangBinary(binDir);
@@ -193,12 +193,15 @@ async function installFromGitHub(
   // became the primary `flang` driver in LLVM 20+). Ensure an unversioned
   // `flang` driver exists so `command -v flang` and downstream workflows
   // resolve regardless of the installed LLVM version.
-  const flangUnversioned = path.join(binDir, "flang");
-  if (path.basename(flangBin) !== "flang" && !fs.existsSync(flangUnversioned)) {
+  const flangUnversioned = path.posix.join(binDir, "flang");
+  if (
+    path.posix.basename(flangBin) !== "flang" &&
+    !fs.existsSync(flangUnversioned)
+  ) {
     fs.symlinkSync(flangBin, flangUnversioned);
   }
 
-  const libDir = path.join(toolRoot, "lib");
+  const libDir = path.posix.join(toolRoot, "lib");
   const existingLibPath = process.env.LIBRARY_PATH ?? "";
   core.exportVariable(
     "LIBRARY_PATH",
@@ -229,8 +232,8 @@ async function installFromGitHub(
   const result = {
     version: resolvedVersion,
     fc: flangBin,
-    cc: path.join(binDir, "clang"),
-    cxx: path.join(binDir, "clang++"),
+    cc: path.posix.join(binDir, "clang"),
+    cxx: path.posix.join(binDir, "clang++"),
   };
   return result;
 }
@@ -239,7 +242,7 @@ async function installFromGitHub(
 // LLVM 20+ uses `flang`; earlier versions used `flang-new`.
 function resolveFlangBinary(binDir: string): string {
   for (const name of ["flang", "flang-new"]) {
-    const candidate = path.join(binDir, name);
+    const candidate = path.posix.join(binDir, name);
     if (fs.existsSync(candidate)) return candidate;
   }
   throw new Error(

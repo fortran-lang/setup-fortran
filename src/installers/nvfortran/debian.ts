@@ -267,7 +267,7 @@ async function installLegacyNcurses(inputs: Inputs): Promise<void> {
 
   for (const [pkgName, metadata] of Object.entries(packages[debArch])) {
     const debFile = path.basename(metadata.url);
-    const dest = path.join(os.tmpdir(), debFile);
+    const dest = path.posix.join(os.tmpdir(), debFile);
 
     core.info(`Downloading ${pkgName}...`);
     await exec.exec("curl", [...CURL_RETRY_ARGS, "-o", dest, metadata.url]);
@@ -293,7 +293,7 @@ async function installTarball(version: string, inputs: Inputs): Promise<void> {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "setup-fortran-nvhpc-"),
   );
-  const archivePath = path.join(tempDir, archiveName);
+  const archivePath = path.posix.join(tempDir, archiveName);
   const url =
     `https://developer.download.nvidia.com/hpc-sdk/${version}/` + archiveName;
 
@@ -314,7 +314,7 @@ async function installTarball(version: string, inputs: Inputs): Promise<void> {
     core.info(`Extracting ${archiveName}...`);
     await exec.exec("tar", ["-xzf", archivePath, "-C", tempDir]);
 
-    const installer = path.join(tempDir, archiveBase, "install");
+    const installer = path.posix.join(tempDir, archiveBase, "install");
     core.info("Installing NVIDIA HPC SDK from the tarball...");
     await exec.exec("sudo", [
       "env",

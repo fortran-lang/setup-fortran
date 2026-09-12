@@ -74,7 +74,7 @@ export async function installDebian(
   core.info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
 
   const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
-  const tempInstallDir = path.join(os.homedir(), ".aocc-cache");
+  const tempInstallDir = path.posix.join(os.homedir(), ".aocc-cache");
   const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
 
   if (cacheHit) {
@@ -83,7 +83,7 @@ export async function installDebian(
     await exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
     await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
   } else if (!fs.existsSync(metadata.installDir)) {
-    const debPath = path.join(os.tmpdir(), metadata.deb);
+    const debPath = path.posix.join(os.tmpdir(), metadata.deb);
 
     core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
     // Use tool-cache for resilient HTTP downloading with headers and retries
@@ -117,7 +117,7 @@ export async function installDebian(
     );
   }
 
-  const setenvScript = path.join(metadata.installDir, "setenv_AOCC.sh");
+  const setenvScript = path.posix.join(metadata.installDir, "setenv_AOCC.sh");
   core.info(`Sourcing ${setenvScript} and exporting environment...`);
 
   let envOutput = "";
@@ -139,7 +139,7 @@ export async function installDebian(
     }
   }
 
-  const binDir = path.join(metadata.installDir, "bin");
+  const binDir = path.posix.join(metadata.installDir, "bin");
   core.addPath(binDir);
 
   // Update process.env.PATH so flang can be called in this process
@@ -157,7 +157,7 @@ export async function installDebian(
 
 async function resolveInstalledVersion(binDir: string): Promise<string> {
   let output = "";
-  const flangBinary = path.join(binDir, "flang");
+  const flangBinary = path.posix.join(binDir, "flang");
   await exec.exec(flangBinary, ["--version"], {
     listeners: {
       stdout: (data: Buffer) => {

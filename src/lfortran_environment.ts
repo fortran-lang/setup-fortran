@@ -19,9 +19,7 @@ export function lfortranEnvironment(
   version: string,
 ): LFortranEnvironment {
   const windows = inputs.os === OS.Windows;
-  // Build toolchain paths with the target OS semantics so Windows-targeted
-  // unit tests assert real Windows paths even when run on Linux.
-  const p = windows ? path.win32 : path;
+  const p = windows ? path.win32 : path.posix;
   const toolRoot =
     process.env.RUNNER_TOOL_CACHE ??
     path.join(os.tmpdir(), "setup-fortran-tool-cache");

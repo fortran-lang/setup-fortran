@@ -96713,8 +96713,8 @@ async function installDarwin(inputs) {
         throw new Error(`Could not find libgfortran in ${cellarPrefix}.`);
     }
     const existingLibraryPath = process.env.LIBRARY_PATH ?? "";
-    const binDir = external_path_.join(brewPrefix, "bin");
-    const gfortranBinary = external_path_.join(binDir, `gfortran-${version}`);
+    const binDir = external_path_.posix.join(brewPrefix, "bin");
+    const gfortranBinary = external_path_.posix.join(binDir, `gfortran-${version}`);
     const existingDyldPath = process.env.DYLD_FALLBACK_LIBRARY_PATH ?? "";
     exportVariable("DYLD_FALLBACK_LIBRARY_PATH", existingDyldPath ? `${actualLibDir}:${existingDyldPath}` : actualLibDir);
     // Help ld find -lSystem on newer macOS versions
@@ -96734,8 +96734,8 @@ async function installDarwin(inputs) {
         const error = e instanceof Error ? e.message : String(e);
         warning(`Could not determine SDKROOT path via xcrun. Err: ${error}`);
     }
-    const gccBinary = external_path_.join(binDir, `gcc-${version}`);
-    const gxxBinary = external_path_.join(binDir, `g++-${version}`);
+    const gccBinary = external_path_.posix.join(binDir, `gcc-${version}`);
+    const gxxBinary = external_path_.posix.join(binDir, `g++-${version}`);
     // Homebrew's versioned `gcc@<version>` formulae only expose versioned
     // driver names (e.g. `gfortran-14`, `gcc-14`, `g++-14`). Unlike the
     // unversioned `gcc` formula, they do not create `gfortran`/`gcc`/`g++`
@@ -96745,8 +96745,8 @@ async function installDarwin(inputs) {
     // create unversioned symlinks pointing to the requested version. This
     // mirrors the behavior of the shell-based action (install_gcc_brew).
     for (const driver of ["gfortran", "gcc", "g++"]) {
-        const versionedBinary = external_path_.join(binDir, `${driver}-${version}`);
-        const unversionedBinary = external_path_.join(binDir, driver);
+        const versionedBinary = external_path_.posix.join(binDir, `${driver}-${version}`);
+        const unversionedBinary = external_path_.posix.join(binDir, driver);
         await exec_exec("ln", ["-sf", versionedBinary, unversionedBinary]);
     }
     const resolvedVersion = await darwin_resolveInstalledVersion(gfortranBinary);
@@ -99432,7 +99432,7 @@ async function installLegacyNcurses(inputs) {
     };
     for (const [pkgName, metadata] of Object.entries(packages[debArch])) {
         const debFile = external_path_.basename(metadata.url);
-        const dest = external_path_.join(external_os_.tmpdir(), debFile);
+        const dest = external_path_.posix.join(external_os_.tmpdir(), debFile);
         info(`Downloading ${pkgName}...`);
         await exec_exec("curl", [...CURL_RETRY_ARGS, "-o", dest, metadata.url]);
         await verifySha256(dest, metadata.sha256);
@@ -99451,7 +99451,7 @@ async function installTarball(version, inputs) {
     const archiveBase = `${archivePrefix}${cudaVersion}`;
     const archiveName = `${archiveBase}.tar.gz`;
     const tempDir = external_fs_namespaceObject.mkdtempSync(external_path_.join(external_os_.tmpdir(), "setup-fortran-nvhpc-"));
-    const archivePath = external_path_.join(tempDir, archiveName);
+    const archivePath = external_path_.posix.join(tempDir, archiveName);
     const url = `https://developer.download.nvidia.com/hpc-sdk/${version}/` + archiveName;
     try {
         info(`Downloading NVIDIA HPC SDK tarball from ${url}...`);
@@ -99468,7 +99468,7 @@ async function installTarball(version, inputs) {
         ]);
         info(`Extracting ${archiveName}...`);
         await exec_exec("tar", ["-xzf", archivePath, "-C", tempDir]);
-        const installer = external_path_.join(tempDir, archiveBase, "install");
+        const installer = external_path_.posix.join(tempDir, archiveBase, "install");
         info("Installing NVIDIA HPC SDK from the tarball...");
         await exec_exec("sudo", [
             "env",
@@ -99714,7 +99714,7 @@ async function aocc_debian_installDebian(inputs) {
     const metadata = getReleaseMetadata(version);
     info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
     const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
-    const tempInstallDir = external_path_.join(external_os_.homedir(), ".aocc-cache");
+    const tempInstallDir = external_path_.posix.join(external_os_.homedir(), ".aocc-cache");
     const cacheHit = await restoreCache([tempInstallDir], cacheKey);
     if (cacheHit) {
         info("Restored from cache, moving to /opt...");
@@ -99723,7 +99723,7 @@ async function aocc_debian_installDebian(inputs) {
         await exec_exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
     }
     else if (!external_fs_namespaceObject.existsSync(metadata.installDir)) {
-        const debPath = external_path_.join(external_os_.tmpdir(), metadata.deb);
+        const debPath = external_path_.posix.join(external_os_.tmpdir(), metadata.deb);
         info(`Downloading AOCC ${version} from ${metadata.url}...`);
         // Use tool-cache for resilient HTTP downloading with headers and retries
         await downloadTool(metadata.url, debPath, undefined, {
@@ -99751,7 +99751,7 @@ async function aocc_debian_installDebian(inputs) {
     else {
         info(`AOCC ${version} already installed at ${metadata.installDir}, skipping download.`);
     }
-    const setenvScript = external_path_.join(metadata.installDir, "setenv_AOCC.sh");
+    const setenvScript = external_path_.posix.join(metadata.installDir, "setenv_AOCC.sh");
     info(`Sourcing ${setenvScript} and exporting environment...`);
     let envOutput = "";
     await exec_exec("bash", ["-c", `source "${setenvScript}" && env`], {
@@ -99771,7 +99771,7 @@ async function aocc_debian_installDebian(inputs) {
             exportVariable(key, val);
         }
     }
-    const binDir = external_path_.join(metadata.installDir, "bin");
+    const binDir = external_path_.posix.join(metadata.installDir, "bin");
     addPath(binDir);
     // Update process.env.PATH so flang can be called in this process
     process.env.PATH = `${binDir}:${process.env.PATH ?? ""}`;
@@ -99786,7 +99786,7 @@ async function aocc_debian_installDebian(inputs) {
 }
 async function aocc_debian_resolveInstalledVersion(binDir) {
     let output = "";
-    const flangBinary = external_path_.join(binDir, "flang");
+    const flangBinary = external_path_.posix.join(binDir, "flang");
     await exec_exec(flangBinary, ["--version"], {
         listeners: {
             stdout: (data) => {
@@ -100118,16 +100118,16 @@ async function installBrew(inputs) {
         `release will be installed regardless of any version input.`);
     await exec_exec("brew", ["install", "flang"]);
     const brewPrefix = await darwin_getBrewPrefix();
-    const flangOptDir = external_path_.join(brewPrefix, "opt", "flang");
-    const binDir = external_path_.join(flangOptDir, "bin");
+    const flangOptDir = external_path_.posix.join(brewPrefix, "opt", "flang");
+    const binDir = external_path_.posix.join(flangOptDir, "bin");
     addPath(binDir);
     const flangBin = resolveFlangBinary(binDir);
     info(`Using flang binary: ${flangBin}`);
-    const llvmBinDir = external_path_.join(brewPrefix, "opt", "llvm", "bin");
+    const llvmBinDir = external_path_.posix.join(brewPrefix, "opt", "llvm", "bin");
     exportVariable("FLANG_VERSION", types_LATEST);
     // libomp.dylib lives in the llvm formula's lib dir, not a standalone formula.
-    const libDir = external_path_.join(flangOptDir, "lib");
-    const libompDir = external_path_.join(brewPrefix, "opt", "llvm", "lib");
+    const libDir = external_path_.posix.join(flangOptDir, "lib");
+    const libompDir = external_path_.posix.join(brewPrefix, "opt", "llvm", "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
     const libPaths = [libDir, libompDir].filter(external_fs_namespaceObject.existsSync).join(":");
     exportVariable("LIBRARY_PATH", existingLibPath ? `${libPaths}:${existingLibPath}` : libPaths);
@@ -100152,8 +100152,8 @@ async function installBrew(inputs) {
     const result = {
         version: resolvedVersion,
         fc: flangBin,
-        cc: external_path_.join(llvmBinDir, "clang"),
-        cxx: external_path_.join(llvmBinDir, "clang++"),
+        cc: external_path_.posix.join(llvmBinDir, "clang"),
+        cxx: external_path_.posix.join(llvmBinDir, "clang++"),
     };
     return result;
 }
@@ -100186,7 +100186,7 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     else {
         info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
     }
-    const binDir = external_path_.join(toolRoot, "bin");
+    const binDir = external_path_.posix.join(toolRoot, "bin");
     addPath(binDir);
     const flangBin = resolveFlangBinary(binDir);
     info(`Using flang binary: ${flangBin}`);
@@ -100194,11 +100194,12 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     // became the primary `flang` driver in LLVM 20+). Ensure an unversioned
     // `flang` driver exists so `command -v flang` and downstream workflows
     // resolve regardless of the installed LLVM version.
-    const flangUnversioned = external_path_.join(binDir, "flang");
-    if (external_path_.basename(flangBin) !== "flang" && !external_fs_namespaceObject.existsSync(flangUnversioned)) {
+    const flangUnversioned = external_path_.posix.join(binDir, "flang");
+    if (external_path_.posix.basename(flangBin) !== "flang" &&
+        !external_fs_namespaceObject.existsSync(flangUnversioned)) {
         external_fs_namespaceObject.symlinkSync(flangBin, flangUnversioned);
     }
-    const libDir = external_path_.join(toolRoot, "lib");
+    const libDir = external_path_.posix.join(toolRoot, "lib");
     const existingLibPath = process.env.LIBRARY_PATH ?? "";
     exportVariable("LIBRARY_PATH", existingLibPath ? `${libDir}:${existingLibPath}` : libDir);
     exportVariable("FLANG_VERSION", major);
@@ -100223,8 +100224,8 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     const result = {
         version: resolvedVersion,
         fc: flangBin,
-        cc: external_path_.join(binDir, "clang"),
-        cxx: external_path_.join(binDir, "clang++"),
+        cc: external_path_.posix.join(binDir, "clang"),
+        cxx: external_path_.posix.join(binDir, "clang++"),
     };
     return result;
 }
@@ -100232,7 +100233,7 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
 // LLVM 20+ uses `flang`; earlier versions used `flang-new`.
 function resolveFlangBinary(binDir) {
     for (const name of ["flang", "flang-new"]) {
-        const candidate = external_path_.join(binDir, name);
+        const candidate = external_path_.posix.join(binDir, name);
         if (external_fs_namespaceObject.existsSync(candidate))
             return candidate;
     }
@@ -100583,9 +100584,7 @@ function miniforgeInstaller(os, arch) {
 
 function lfortranEnvironment(inputs, version) {
     const windows = inputs.os === OS.Windows;
-    // Build toolchain paths with the target OS semantics so Windows-targeted
-    // unit tests assert real Windows paths even when run on Linux.
-    const p = windows ? external_path_.win32 : external_path_;
+    const p = windows ? external_path_.win32 : external_path_.posix;
     const toolRoot = process.env.RUNNER_TOOL_CACHE ??
         external_path_.join(external_os_.tmpdir(), "setup-fortran-tool-cache");
     const root = p.join(toolRoot, "setup-fortran", "lfortran", inputs.os, inputs.arch, version);
@@ -100710,7 +100709,7 @@ async function lfortran_debian_installDebian(inputs) {
     else {
         resetLFortranEnvironment(environment);
         const tempDir = createInstallerTempDir();
-        const miniforgeInstaller = external_path_.join(tempDir, "miniforge.sh");
+        const miniforgeInstaller = external_path_.posix.join(tempDir, "miniforge.sh");
         try {
             info(`Downloading pinned Miniforge from ${miniforge.url}...`);
             await exec_exec("curl", [
@@ -100749,7 +100748,7 @@ async function lfortran_debian_installDebian(inputs) {
         throw new Error(`lfortran binary not found at expected path: ${environment.lfortran}`);
     }
     addPath(environment.binDir);
-    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "lib"));
+    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.posix.join(environment.envPrefix, "lib"));
     const resolvedVersion = await lfortran_debian_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully.`);
     const result = {
@@ -101214,7 +101213,7 @@ function parseRepositoryPackageMetadata(packagesIndex) {
 }
 async function configureCurrentRepository(codename) {
     const repositoryBaseUrl = "https://developer.arm.com/packages/arm-toolchains/ubuntu";
-    const packagesIndexPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${codename}-Packages`);
+    const packagesIndexPath = external_path_.posix.join(external_os_.tmpdir(), `arm-toolchains-${codename}-Packages`);
     let repositoryPackagePath;
     try {
         await exec_exec("curl", [
@@ -101224,7 +101223,7 @@ async function configureCurrentRepository(codename) {
             `${repositoryBaseUrl}/dists/${codename}/main/binary-arm64/Packages`,
         ]);
         const metadata = parseRepositoryPackageMetadata(external_fs_namespaceObject.readFileSync(packagesIndexPath, "utf8"));
-        repositoryPackagePath = external_path_.join(external_os_.tmpdir(), external_path_.basename(metadata.filename));
+        repositoryPackagePath = external_path_.posix.join(external_os_.tmpdir(), external_path_.basename(metadata.filename));
         await exec_exec("curl", [
             ...debian_CURL_RETRY_ARGS,
             "-o",
@@ -101329,8 +101328,8 @@ function findLibraryDirectories(baseDir) {
     if (!external_fs_namespaceObject.existsSync(baseDir))
         return results;
     const candidateDirs = [
-        external_path_.join(baseDir, "lib"),
-        external_path_.join(baseDir, "lib64"),
+        external_path_.posix.join(baseDir, "lib"),
+        external_path_.posix.join(baseDir, "lib64"),
     ];
     for (const candidate of candidateDirs) {
         if (external_fs_namespaceObject.existsSync(candidate)) {
@@ -101341,8 +101340,8 @@ function findLibraryDirectories(baseDir) {
         const entries = external_fs_namespaceObject.readdirSync(baseDir, { withFileTypes: true });
         for (const entry of entries) {
             if (entry.isDirectory()) {
-                const subLib = external_path_.join(baseDir, entry.name, "lib");
-                const subLib64 = external_path_.join(baseDir, entry.name, "lib64");
+                const subLib = external_path_.posix.join(baseDir, entry.name, "lib");
+                const subLib64 = external_path_.posix.join(baseDir, entry.name, "lib64");
                 if (external_fs_namespaceObject.existsSync(subLib))
                     results.push(subLib);
                 if (external_fs_namespaceObject.existsSync(subLib64))
@@ -101387,20 +101386,20 @@ async function armflang_debian_installDebian(inputs) {
         `/${repository.codename}`;
     const keyring = "/usr/share/keyrings/obs-oss-arm-com.gpg";
     const sourceList = "/etc/apt/sources.list.d/obs-oss-arm-com.list";
-    const cacheDir = external_path_.join(external_os_.homedir(), ".armflang-cache");
+    const cacheDir = external_path_.posix.join(external_os_.homedir(), ".armflang-cache");
     const cacheKey = `armflang-${version}-${inputs.arch}-${inputs.osVersion}`;
     info(`Installing ArmFlang ${version} on Linux (${inputs.arch})...`);
-    const binDir = external_path_.join(INSTALL_DIR, "bin");
-    const fc = external_path_.join(binDir, "armflang");
-    const cc = external_path_.join(binDir, "armclang");
-    const cxx = external_path_.join(binDir, "armclang++");
+    const binDir = external_path_.posix.join(INSTALL_DIR, "bin");
+    const fc = external_path_.posix.join(binDir, "armflang");
+    const cc = external_path_.posix.join(binDir, "armclang");
+    const cxx = external_path_.posix.join(binDir, "armclang++");
     const cacheHit = await restoreCache([cacheDir], cacheKey);
     let isCacheValid = false;
     if (cacheHit) {
         await restoreInstallationFromCache(cacheDir);
         const libDirs = findLibraryDirectories(ARM_ROOT);
-        const hasArmMath = libDirs.some((dir) => external_fs_namespaceObject.existsSync(external_path_.join(dir, "libamath.so")) ||
-            external_fs_namespaceObject.existsSync(external_path_.join(dir, "libamath.a")));
+        const hasArmMath = libDirs.some((dir) => external_fs_namespaceObject.existsSync(external_path_.posix.join(dir, "libamath.so")) ||
+            external_fs_namespaceObject.existsSync(external_path_.posix.join(dir, "libamath.a")));
         isCacheValid = [fc, cc, cxx].every((binary) => external_fs_namespaceObject.existsSync(binary));
         if (!hasArmMath) {
             warning("Cached ArmPL installation does not contain libamath.");
@@ -101430,7 +101429,7 @@ async function armflang_debian_installDebian(inputs) {
             await configureCurrentRepository(repository.codename);
         }
         else {
-            const releaseKeyPath = external_path_.join(external_os_.tmpdir(), `arm-toolchains-${repository.codename}-Release.key`);
+            const releaseKeyPath = external_path_.posix.join(external_os_.tmpdir(), `arm-toolchains-${repository.codename}-Release.key`);
             try {
                 await exec_exec("curl", [
                     ...debian_CURL_RETRY_ARGS,
