@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
+import { lookup } from "node:dns/promises";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
@@ -59,10 +60,39 @@ export const SUPPORTED_VERSIONS = {
 const ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${ONEAPI_ROOT}/setvars.sh`;
 
+async function waitForDnsResolution(
+  url: string,
+  maxAttempts = 25,
+  delayMs = 15_000,
+): Promise<void> {
+  const host = new URL(url).hostname;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await lookup(host);
+      return;
+    } catch {
+      if (attempt === maxAttempts) {
+        throw new Error(
+          `Could not resolve ${host} after ${maxAttempts.toString()} attempts.`,
+        );
+      }
+      core.info(
+        `Could not resolve ${host} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(delayMs / 1000).toString()}s...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function downloadInstaller(
   url: string,
   destPath: string,
 ): Promise<string> {
+  // Runner DNS can blip (ENOTFOUND) while the endpoint itself is healthy, and
+  // the retry loops below burn through in about a minute. Wait for the
+  // download host to resolve first so a short blip does not fail the install.
+  await waitForDnsResolution(url);
+
   const maxTcAttempts = 3;
 
   for (let attempt = 1; attempt <= maxTcAttempts; attempt++) {

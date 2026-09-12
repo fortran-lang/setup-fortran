@@ -98720,7 +98720,10 @@ async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
     }
 }
 
+;// CONCATENATED MODULE: external "node:dns/promises"
+const promises_namespaceObject = require("node:dns/promises");
 ;// CONCATENATED MODULE: ./src/installers/ifort/darwin.ts
+
 
 
 
@@ -98775,7 +98778,27 @@ const ifort_darwin_SUPPORTED_VERSIONS = {
 };
 const darwin_ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${darwin_ONEAPI_ROOT}/setvars.sh`;
+async function waitForDnsResolution(url, maxAttempts = 25, delayMs = 15_000) {
+    const host = new URL(url).hostname;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await (0,promises_namespaceObject.lookup)(host);
+            return;
+        }
+        catch {
+            if (attempt === maxAttempts) {
+                throw new Error(`Could not resolve ${host} after ${maxAttempts.toString()} attempts.`);
+            }
+            info(`Could not resolve ${host} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(delayMs / 1000).toString()}s...`);
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+    }
+}
 async function downloadInstaller(url, destPath) {
+    // Runner DNS can blip (ENOTFOUND) while the endpoint itself is healthy, and
+    // the retry loops below burn through in about a minute. Wait for the
+    // download host to resolve first so a short blip does not fail the install.
+    await waitForDnsResolution(url);
     const maxTcAttempts = 3;
     for (let attempt = 1; attempt <= maxTcAttempts; attempt++) {
         try {

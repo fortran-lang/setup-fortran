@@ -3,6 +3,7 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
+import { lookup } from "node:dns/promises";
 import { installDarwin } from "../../../src/installers/ifort/darwin";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
@@ -11,6 +12,9 @@ jest.mock("@actions/exec");
 jest.mock("@actions/cache");
 jest.mock("@actions/tool-cache");
 jest.mock("../../../src/verify_download");
+jest.mock("node:dns/promises", () => ({
+  lookup: jest.fn(),
+}));
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
@@ -22,6 +26,7 @@ describe("installDarwin (ifort)", () => {
   const mockedCache = cache as jest.Mocked<typeof cache>;
   const mockedTc = tc as jest.Mocked<typeof tc>;
   const mockedFs = fs as jest.Mocked<typeof fs>;
+  const mockedLookup = lookup as jest.MockedFunction<typeof lookup>;
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
@@ -39,6 +44,7 @@ describe("installDarwin (ifort)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedLookup.mockResolvedValue({ address: "93.184.216.34", family: 4 });
     // installDarwin appends -arch flags to these and mutates process.env
     for (const name of ["CFLAGS", "CXXFLAGS", "LDFLAGS"]) {
       delete process.env[name];
@@ -147,6 +153,54 @@ describe("installDarwin (ifort)", () => {
 
     expect(installerAttempts).toBe(2);
     expect(mockedCache.saveCache).toHaveBeenCalled();
+  });
+
+  it("waits for DNS to recover before downloading", async () => {
+    mockedCache.restoreCache.mockResolvedValue(undefined);
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+    mockedLookup
+      .mockRejectedValueOnce(new Error("getaddrinfo ENOTFOUND"))
+      .mockResolvedValue({ address: "93.184.216.34", family: 4 });
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback: Parameters<typeof setTimeout>[0]) => {
+        callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+
+    try {
+      await installDarwin(baseInputs);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+
+    expect(mockedLookup).toHaveBeenCalledWith(
+      "registrationcenter-download.intel.com",
+    );
+    expect(mockedTc.downloadTool).toHaveBeenCalled();
+    expect(mockedCache.saveCache).toHaveBeenCalled();
+  });
+
+  it("fails when DNS stays unreachable", async () => {
+    mockedCache.restoreCache.mockResolvedValue(undefined);
+    mockedLookup.mockRejectedValue(new Error("getaddrinfo ENOTFOUND"));
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback: Parameters<typeof setTimeout>[0]) => {
+        callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+
+    try {
+      await expect(installDarwin(baseInputs)).rejects.toThrow(
+        /Could not resolve registrationcenter-download\.intel\.com after 25 attempts/,
+      );
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+
+    expect(mockedLookup).toHaveBeenCalledTimes(25);
+    expect(mockedTc.downloadTool).not.toHaveBeenCalled();
   });
 
   it("installs on ARM64 under Rosetta 2", async () => {
