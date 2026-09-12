@@ -3,7 +3,7 @@ import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { persistMsvcBinForBash } from "../src/setup_msvc";
+import { persistMsvcBinForBash, toMsysPath } from "../src/setup_msvc";
 
 jest.mock("@actions/core");
 
@@ -45,7 +45,14 @@ describe("persistMsvcBinForBash shell integration", () => {
     );
 
     expect(firstPathEntry).toBe(msvcBin);
-    expect(core.exportVariable).toHaveBeenCalledWith("BASH_ENV", bashEnv);
+    // The exported BASH_ENV is msys-converted (toMsysPath) so Git Bash can
+    // source it; the returned bashEnv is the native path used internally
+    // (e.g. by fs.writeFileSync) and only equals the exported value on
+    // POSIX, where toMsysPath is a no-op.
+    expect(core.exportVariable).toHaveBeenCalledWith(
+      "BASH_ENV",
+      toMsysPath(bashEnv),
+    );
   });
 
   it("sources a pre-existing Bash environment before adding the tool path", () => {
