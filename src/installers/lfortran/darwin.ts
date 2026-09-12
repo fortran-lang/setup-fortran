@@ -21,8 +21,9 @@ import {
 // Notes:
 //   - lfortran is installed via conda-forge on macOS; there is no Homebrew
 //     formula and GitHub releases only ship source tarballs.
-//   - Both ARM64 (macos-14+) and X64 (macos-13 and earlier) are supported via
-//     conda-forge. The conda arch strings are `osx-arm64` and `osx-64`.
+//   - Both ARM64 (Apple Silicon runners) and X64 (Intel runners) are
+//     supported via conda-forge. The conda arch strings are `osx-arm64`
+//     and `osx-64`.
 //   - LATEST resolves to the first entry in the list.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
