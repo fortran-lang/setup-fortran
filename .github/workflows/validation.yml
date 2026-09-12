@@ -46,7 +46,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Debian/darwin installer suites assume a POSIX host in their mocks
+      # (separator-sensitive matches, POSIX tmpdir fixtures, unmocked
+      # readdirSync) and cannot run on Windows; see #254. Drop these
+      # patterns there once the suites are host-independent. ubuntu runs all.
+      - name: Run unit tests (excluding POSIX-installer suites)
+        if: matrix.os == 'windows-latest'
+        run: npm test -- --testPathIgnorePatterns "/node_modules/" "installers/aocc/debian" "installers/armflang/debian" "installers/flang/darwin" "installers/gfortran/darwin" "installers/lfortran/debian" "installers/nvfortran/debian"
+
       - name: Run unit tests
+        if: matrix.os != 'windows-latest'
         run: npm run test
 
   build:
