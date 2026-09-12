@@ -181,10 +181,30 @@ export async function installWin32(
         // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
         // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
         // we no longer need the secondary TypeScript vswhere lookup.
-        const filteredPath = val
+        // Dedupe entries (case-insensitive, first occurrence wins) before the
+        // full-overwrite export, so a redundant downstream
+        // setvars.bat/vcvarsall.bat call re-prepending an already-set PATH
+        // doesn't blow past cmd.exe's line-length limit (fortran-lang/setup-fortran#250).
+        const nonEmptyEntries = val
           .split(";")
           .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+          .filter((p) => p !== "");
+        const seenPathEntries = new Set<string>();
+        const filteredPath = nonEmptyEntries
+          .filter((p) => {
+            const key = p.toLowerCase();
+            if (seenPathEntries.has(key)) return false;
+            seenPathEntries.add(key);
+            return true;
+          })
           .join(";");
+        if (seenPathEntries.size < nonEmptyEntries.length) {
+          core.warning(
+            "Duplicate PATH entries were detected and removed. If your " +
+              "workflow has a leftover setvars.bat/vcvarsall.bat step after " +
+              "this action, it's no longer needed and can be removed.",
+          );
+        }
         core.exportVariable("PATH", filteredPath);
         addMsvcBinFromPath(filteredPath);
       } else {
