@@ -18,10 +18,14 @@ export function lfortranEnvironment(
   inputs: Inputs,
   version: string,
 ): LFortranEnvironment {
+  const windows = inputs.os === OS.Windows;
+  // Build toolchain paths with the target OS semantics so Windows-targeted
+  // unit tests assert real Windows paths even when run on Linux.
+  const p = windows ? path.win32 : path;
   const toolRoot =
     process.env.RUNNER_TOOL_CACHE ??
     path.join(os.tmpdir(), "setup-fortran-tool-cache");
-  const root = path.join(
+  const root = p.join(
     toolRoot,
     "setup-fortran",
     "lfortran",
@@ -29,21 +33,20 @@ export function lfortranEnvironment(
     inputs.arch,
     version,
   );
-  const miniforgePrefix = path.join(root, "miniforge");
-  const envPrefix = path.join(root, "env");
-  const windows = inputs.os === OS.Windows;
+  const miniforgePrefix = p.join(root, "miniforge");
+  const envPrefix = p.join(root, "env");
   const binDir = windows
-    ? path.join(envPrefix, "Library", "bin")
-    : path.join(envPrefix, "bin");
+    ? p.join(envPrefix, "Library", "bin")
+    : p.join(envPrefix, "bin");
   return {
     root,
     miniforgePrefix,
     conda: windows
-      ? path.join(miniforgePrefix, "Scripts", "conda.exe")
-      : path.join(miniforgePrefix, "bin", "conda"),
+      ? p.join(miniforgePrefix, "Scripts", "conda.exe")
+      : p.join(miniforgePrefix, "bin", "conda"),
     envPrefix,
     binDir,
-    lfortran: path.join(binDir, windows ? "lfortran.exe" : "lfortran"),
+    lfortran: p.join(binDir, windows ? "lfortran.exe" : "lfortran"),
   };
 }
 

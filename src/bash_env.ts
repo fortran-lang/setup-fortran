@@ -21,6 +21,12 @@ function quoteForBash(value: string): string {
 // Non-interactive Bash sources $BASH_ENV on startup, which is the only hook
 // that restores the expected PATH order for those steps.
 export function persistBinDirForBash(binDir: string, name: string): string {
+  // NOTE: native path.join is intentional here. bashEnv is a real filesystem
+  // path under RUNNER_TEMP/os.tmpdir(), so it must use the host OS semantics
+  // (the shell-integration test exercises this with a real temp dir on any
+  // OS). The BASH_ENV value exported to Bash is normalized via toMsysPath
+  // below, which is deterministic across OS. Unit tests must therefore build
+  // their expected filesystem paths with path.join, not hardcoded separators.
   const bashEnv = path.join(
     process.env.RUNNER_TEMP ?? os.tmpdir(),
     `setup-fortran-${name}-bash-env.sh`,

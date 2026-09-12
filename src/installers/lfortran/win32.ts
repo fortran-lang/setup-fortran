@@ -94,7 +94,10 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   } else {
     resetLFortranEnvironment(environment);
     const tempDir = createInstallerTempDir();
-    const miniforgeInstaller = path.join(tempDir, "miniforge-install.exe");
+    const miniforgeInstaller = path.win32.join(
+      tempDir,
+      "miniforge-install.exe",
+    );
     try {
       await exec.exec("curl", [
         "-fsSL",
@@ -134,11 +137,11 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   }
 
   core.addPath(environment.envPrefix);
-  core.addPath(path.join(environment.envPrefix, "Scripts"));
+  core.addPath(path.win32.join(environment.envPrefix, "Scripts"));
   core.addPath(environment.binDir);
 
-  const lldLink = path.join(environment.binDir, "lld-link.exe");
-  const proxyLink = path.join(environment.binDir, "link.exe");
+  const lldLink = path.win32.join(environment.binDir, "lld-link.exe");
+  const proxyLink = path.win32.join(environment.binDir, "link.exe");
 
   if (fs.existsSync(lldLink)) {
     if (!fs.existsSync(proxyLink)) {
@@ -168,7 +171,7 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join(environment.envPrefix, "Library", "lib"),
+    path.win32.join(environment.envPrefix, "Library", "lib"),
   );
 
   const resolvedVersion = await resolveInstalledVersion(environment.lfortran);
@@ -197,8 +200,8 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     `Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
-  const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
-  const lfortranExe = path.join(msysBin, "lfortran.exe");
+  const msysBin = path.win32.join("C:\\msys64", inputs.msystem, "bin");
+  const lfortranExe = path.win32.join(msysBin, "lfortran.exe");
   let resolvedVersion: string | undefined;
   if (fs.existsSync(lfortranExe)) {
     try {
@@ -227,7 +230,7 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
 
   core.exportVariable(
     "LFORTRAN_OMP_LIB_DIR",
-    path.join("C:\\msys64", inputs.msystem, "lib"),
+    path.win32.join("C:\\msys64", inputs.msystem, "lib"),
   );
   core.exportVariable("WINDOWS_ENV", inputs.msystem);
 
@@ -237,8 +240,8 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   const result = {
     version: resolvedVersion,
     fc: lfortranExe,
-    cc: path.join(msysBin, "clang.exe"),
-    cxx: path.join(msysBin, "clang++.exe"),
+    cc: path.win32.join(msysBin, "clang.exe"),
+    cxx: path.win32.join(msysBin, "clang++.exe"),
   };
   return result;
 }

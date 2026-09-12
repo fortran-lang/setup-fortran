@@ -22,14 +22,17 @@ export async function setupMSYS2(
 
   await pacmanInstallWithRetry(pkgList);
 
-  const msysRoot = path.join(MSYS2_ROOT, msystem);
-  const msysBin = path.join(msysRoot, "bin");
-  const msysLib = path.join(msysRoot, "lib");
+  // This module only runs on Windows runners, so build Windows paths
+  // explicitly. Bare path.join would produce mixed separators when these
+  // code paths are exercised on Linux (unit tests).
+  const msysRoot = path.win32.join(MSYS2_ROOT, msystem);
+  const msysBin = path.win32.join(msysRoot, "bin");
+  const msysLib = path.win32.join(msysRoot, "lib");
 
   core.addPath(msysBin);
   core.exportVariable("MSYSTEM", msystem.toUpperCase());
   core.exportVariable("MSYS2_PATH_TYPE", "inherit");
-  core.exportVariable("PKG_CONFIG_PATH", path.join(msysLib, "pkgconfig"));
+  core.exportVariable("PKG_CONFIG_PATH", path.win32.join(msysLib, "pkgconfig"));
 }
 
 // pacman's default mirror list occasionally hands out a slow/dead mirror
