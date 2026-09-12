@@ -26,6 +26,9 @@ describe("installWin32 (ifort)", () => {
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
+  const mockedWarning = core.warning as jest.MockedFunction<
+    typeof core.warning
+  >;
 
   const baseInputs: Inputs = {
     compiler: Compiler.IFort,
@@ -116,6 +119,45 @@ describe("installWin32 (ifort)", () => {
     });
     expect(result.version).toContain(
       "Intel(R) Fortran Intel(R) 64 Compiler Classic",
+    );
+  });
+
+  it("dedupes PATH entries case-insensitively before exporting", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (
+        commandLine === "cmd" &&
+        args?.[1]?.includes("setvars_ifort_dump.bat")
+      ) {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=C:\\Intel\\bin;C:\\MSVC\\bin;C:\\intel\\BIN;;C:\\MSVC\\bin",
+            ),
+          );
+        }
+      }
+      return 0;
+    });
+
+    await installWin32(baseInputs);
+
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "PATH",
+      "C:\\Intel\\bin;C:\\MSVC\\bin",
+    );
+    expect(mockedWarning).toHaveBeenCalledWith(
+      expect.stringContaining("Duplicate PATH entries"),
+    );
+  });
+
+  it("does not warn about duplicates when the PATH has none", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+
+    await installWin32(baseInputs);
+
+    expect(mockedWarning).not.toHaveBeenCalledWith(
+      expect.stringContaining("Duplicate PATH entries"),
     );
   });
 });
