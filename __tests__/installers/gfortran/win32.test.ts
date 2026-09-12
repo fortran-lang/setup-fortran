@@ -60,19 +60,17 @@ describe("installWin32 (gfortran)", () => {
 
       const result = await installWin32(baseInputs);
 
-      // Built the same way installWin32 builds it (plain path.join), so
-      // this matches regardless of whether the test runs on Linux CI or a
-      // native Windows machine: both sides track the same host OS.
-      const binDir = path.join(cacheDir, "bin");
-      expect(result.fc).toBe(path.join(binDir, "gfortran.exe"));
-      expect(result.cc).toBe(path.join(binDir, "gcc.exe"));
-      expect(result.cxx).toBe(path.join(binDir, "g++.exe"));
+      // src uses path.win32.join so these are real Windows paths on any host OS.
+      const binDir = path.win32.join(cacheDir, "bin");
+      expect(result.fc).toBe(path.win32.join(binDir, "gfortran.exe"));
+      expect(result.cc).toBe(path.win32.join(binDir, "gcc.exe"));
+      expect(result.cxx).toBe(path.win32.join(binDir, "g++.exe"));
       expect(mockedTc.downloadTool).toHaveBeenCalled();
       expect(mockedTc.extractZip).toHaveBeenCalledWith(downloadedZip);
       // Verifies the "mingw64" subdirectory installWin32 appends before
       // caching, not just that cacheDir was called at all.
       expect(mockedTc.cacheDir).toHaveBeenCalledWith(
-        path.join(extractedDir, "mingw64"),
+        path.win32.join(extractedDir, "mingw64"),
         `gfortran-verified-${baseInputs.msystem}`,
         baseInputs.version,
         baseInputs.arch,

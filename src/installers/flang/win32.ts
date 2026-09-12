@@ -94,11 +94,11 @@ async function extractInstaller(
       `TARGETDIR=${destDir}`,
     ]);
 
-    const installDir = path.join(destDir, "LLVM");
-    if (!fs.existsSync(path.join(installDir, "bin"))) {
+    const installDir = path.win32.join(destDir, "LLVM");
+    if (!fs.existsSync(path.win32.join(installDir, "bin"))) {
       throw new Error(
         `msiexec administrative install did not produce the expected layout ` +
-          `(missing ${path.join(installDir, "bin")}).`,
+          `(missing ${path.win32.join(installDir, "bin")}).`,
       );
     }
     return installDir;
@@ -147,7 +147,7 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
   core.info(`Found Visual Studio at: ${vsInstallPath}`);
 
   // Find the latest MSVC tools version (e.g. 14.38.33130).
-  const vcToolsRoot = path.join(vsInstallPath, "VC", "Tools", "MSVC");
+  const vcToolsRoot = path.win32.join(vsInstallPath, "VC", "Tools", "MSVC");
   const vcVersion = fs
     .readdirSync(vcToolsRoot)
     .filter((d) => /^\d+\.\d+\.\d+$/.test(d))
@@ -159,11 +159,11 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
     return;
   }
 
-  const msvcLibDir = path.join(vcToolsRoot, vcVersion, "lib", arch);
+  const msvcLibDir = path.win32.join(vcToolsRoot, vcVersion, "lib", arch);
   core.info(`MSVC lib dir: ${msvcLibDir}`);
 
   const hostArch = arch === Arch.ARM64 ? "arm64" : "x64";
-  const msvcBinDir = path.join(
+  const msvcBinDir = path.win32.join(
     vcToolsRoot,
     vcVersion,
     "bin",
@@ -186,8 +186,8 @@ async function setupMsvcLibs(arch: Arch): Promise<void> {
     return;
   }
 
-  const winsdkUmDir = path.join(winsdk10Root, sdkVersion, "um", arch);
-  const winsdkUcrtDir = path.join(winsdk10Root, sdkVersion, "ucrt", arch);
+  const winsdkUmDir = path.win32.join(winsdk10Root, sdkVersion, "um", arch);
+  const winsdkUcrtDir = path.win32.join(winsdk10Root, sdkVersion, "ucrt", arch);
   core.info(`Windows SDK um dir:   ${winsdkUmDir}`);
   core.info(`Windows SDK ucrt dir: ${winsdkUcrtDir}`);
 
@@ -250,11 +250,11 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     // tc.downloadTool would otherwise return an extensionless GUID path, and
     // the extraction directory must not contain the installer itself because
     // for the .exe path that whole directory is what gets tool-cached.
-    const tempDownloadDir = path.join(
+    const tempDownloadDir = path.win32.join(
       process.env.RUNNER_TEMP ?? "C:\\Temp",
       `flang-download-${patch}`,
     );
-    const tempExtractDir = path.join(
+    const tempExtractDir = path.win32.join(
       process.env.RUNNER_TEMP ?? "C:\\Temp",
       `flang-extract-${patch}`,
     );
@@ -264,7 +264,7 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     core.info(`Downloading ${filename}...`);
     const downloadPath = await tc.downloadTool(
       downloadUrl,
-      path.join(tempDownloadDir, filename),
+      path.win32.join(tempDownloadDir, filename),
     );
     if (expectedSha256) {
       await verifySha256(downloadPath, expectedSha256);
@@ -289,16 +289,16 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     );
   }
 
-  const binDir = path.join(toolRoot, "bin");
+  const binDir = path.win32.join(toolRoot, "bin");
   core.addPath(binDir);
 
-  const flangExe = path.join(binDir, "flang.exe");
-  const clangExe = path.join(binDir, "clang.exe");
-  const clangPPExe = path.join(binDir, "clang++.exe");
+  const flangExe = path.win32.join(binDir, "flang.exe");
+  const clangExe = path.win32.join(binDir, "clang.exe");
+  const clangPPExe = path.win32.join(binDir, "clang++.exe");
 
   // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
   // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
-  const flangLibDir = path.join(toolRoot, "lib");
+  const flangLibDir = path.win32.join(toolRoot, "lib");
   const existingLib = process.env.LIB ?? "";
   core.exportVariable(
     "LIB",
@@ -328,11 +328,11 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   // without it -fopenmp fails to link (omp_lib modules and libomp are missing).
   await setupMSYS2(inputs.msystem, ["flang", "llvm-openmp"]);
 
-  const msysRoot = path.join("C:\\msys64", inputs.msystem);
-  const msysBin = path.join(msysRoot, "bin");
-  const flangExe = path.join(msysBin, "flang.exe");
-  const clangExe = path.join(msysBin, "clang.exe");
-  const clangPPExe = path.join(msysBin, "clang++.exe");
+  const msysRoot = path.win32.join("C:\\msys64", inputs.msystem);
+  const msysBin = path.win32.join(msysRoot, "bin");
+  const flangExe = path.win32.join(msysBin, "flang.exe");
+  const clangExe = path.win32.join(msysBin, "clang.exe");
+  const clangPPExe = path.win32.join(msysBin, "clang++.exe");
 
   core.addPath(msysBin);
 

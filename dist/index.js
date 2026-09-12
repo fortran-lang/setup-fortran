@@ -97608,13 +97608,16 @@ async function setupMSYS2(msystem, packages) {
     const pkgList = packages.map((pkg) => msys2PkgName(msystem, pkg)).join(" ");
     info(`Installing MSYS2 packages (${msystem}): ${pkgList}`);
     await pacmanInstallWithRetry(pkgList);
-    const msysRoot = external_path_.join(MSYS2_ROOT, msystem);
-    const msysBin = external_path_.join(msysRoot, "bin");
-    const msysLib = external_path_.join(msysRoot, "lib");
+    // This module only runs on Windows runners, so build Windows paths
+    // explicitly. Bare path.join would produce mixed separators when these
+    // code paths are exercised on Linux (unit tests).
+    const msysRoot = external_path_.win32.join(MSYS2_ROOT, msystem);
+    const msysBin = external_path_.win32.join(msysRoot, "bin");
+    const msysLib = external_path_.win32.join(msysRoot, "lib");
     addPath(msysBin);
     exportVariable("MSYSTEM", msystem.toUpperCase());
     exportVariable("MSYS2_PATH_TYPE", "inherit");
-    exportVariable("PKG_CONFIG_PATH", external_path_.join(msysLib, "pkgconfig"));
+    exportVariable("PKG_CONFIG_PATH", external_path_.win32.join(msysLib, "pkgconfig"));
 }
 // pacman's default mirror list occasionally hands out a slow/dead mirror
 // (e.g. ftp2.osuosl.org stalling mid-download), which aborts the whole
@@ -97765,15 +97768,15 @@ async function installNative(inputs, version) {
         await verifySha256(downloadPath, release.sha256);
         info(`Extracting GFortran ${version} from ${downloadPath}...`);
         const extractPath = await extractZip(downloadPath);
-        const actualToolDir = external_path_.join(extractPath, "mingw64");
+        const actualToolDir = external_path_.win32.join(extractPath, "mingw64");
         info(`Caching GFortran ${version} in ${actualToolDir}...`);
         toolRoot = await cacheDir(actualToolDir, `gfortran-verified-${inputs.msystem}`, version, inputs.arch);
     }
-    const binPath = external_path_.join(toolRoot, "bin");
+    const binPath = external_path_.win32.join(toolRoot, "bin");
     addPath(binPath);
-    const gfortranPath = external_path_.join(binPath, "gfortran.exe");
-    const gccPath = external_path_.join(binPath, "gcc.exe");
-    const gxxPath = external_path_.join(binPath, "g++.exe");
+    const gfortranPath = external_path_.win32.join(binPath, "gfortran.exe");
+    const gccPath = external_path_.win32.join(binPath, "gcc.exe");
+    const gxxPath = external_path_.win32.join(binPath, "g++.exe");
     const resolvedVersion = await win32_resolveInstalledVersion();
     const result = {
         version: resolvedVersion,
@@ -97785,10 +97788,10 @@ async function installNative(inputs, version) {
 }
 async function installMSYS2(inputs) {
     await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
-    const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
-    const gfortranPath = external_path_.join(msysBin, "gfortran.exe");
-    const gccPath = external_path_.join(msysBin, "gcc.exe");
-    const gxxPath = external_path_.join(msysBin, "g++.exe");
+    const msysBin = external_path_.win32.join("C:\\msys64", inputs.msystem, "bin");
+    const gfortranPath = external_path_.win32.join(msysBin, "gfortran.exe");
+    const gccPath = external_path_.win32.join(msysBin, "gcc.exe");
+    const gxxPath = external_path_.win32.join(msysBin, "g++.exe");
     const resolvedVersion = await win32_resolveInstalledVersion();
     const result = {
         version: resolvedVersion,
@@ -98101,6 +98104,12 @@ function quoteForBash(value) {
 // Non-interactive Bash sources $BASH_ENV on startup, which is the only hook
 // that restores the expected PATH order for those steps.
 function persistBinDirForBash(binDir, name) {
+    // NOTE: native path.join is intentional here. bashEnv is a real filesystem
+    // path under RUNNER_TEMP/os.tmpdir(), so it must use the host OS semantics
+    // (the shell-integration test exercises this with a real temp dir on any
+    // OS). The BASH_ENV value exported to Bash is normalized via toMsysPath
+    // below, which is deterministic across OS. Unit tests must therefore build
+    // their expected filesystem paths with path.join, not hardcoded separators.
     const bashEnv = external_path_.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), `setup-fortran-${name}-bash-env.sh`);
     const bashEnvForBash = toMsysPath(bashEnv);
     const previousBashEnv = process.env.BASH_ENV;
@@ -98316,7 +98325,7 @@ async function win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_namespaceObject.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading installer...`);
-        const installerPath = await downloadToolWithRetry(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        const installerPath = await downloadToolWithRetry(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
         info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
@@ -98332,7 +98341,7 @@ async function win32_installWin32(inputs) {
         await saveCompilerCache(cachePaths, cacheKey);
     }
     // Create a temporary batch file to capture the environment variables
-    const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_and_dump.bat");
+    const batFile = external_path_default().win32.join(external_os_.tmpdir(), "setvars_and_dump.bat");
     external_fs_namespaceObject.writeFileSync(batFile, [
         `@echo off`,
         `:: 1. Find MSVC Installation Path via vswhere`,
@@ -99089,7 +99098,7 @@ async function ifort_win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_namespaceObject.rmSync(win32_ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading ifort installer...`);
-        const installerPath = await downloadTool(release.url, external_path_default().join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
+        const installerPath = await downloadTool(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install (this may take several minutes)...");
         await exec_exec(`"${installerPath}"`, [
@@ -99105,7 +99114,7 @@ async function ifort_win32_installWin32(inputs) {
         await saveCompilerCache(cachePaths, cacheKey);
     }
     // Create a temporary batch file to capture the environment variables
-    const batFile = external_path_default().join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
+    const batFile = external_path_default().win32.join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
     external_fs_namespaceObject.writeFileSync(batFile, [
         `@echo off`,
         `:: 1. Find MSVC Installation Path via vswhere`,
@@ -100326,10 +100335,10 @@ async function extractInstaller(installerPath, destDir, isMsi) {
             "/qn",
             `TARGETDIR=${destDir}`,
         ]);
-        const installDir = external_path_.join(destDir, "LLVM");
-        if (!external_fs_namespaceObject.existsSync(external_path_.join(installDir, "bin"))) {
+        const installDir = external_path_.win32.join(destDir, "LLVM");
+        if (!external_fs_namespaceObject.existsSync(external_path_.win32.join(installDir, "bin"))) {
             throw new Error(`msiexec administrative install did not produce the expected layout ` +
-                `(missing ${external_path_.join(installDir, "bin")}).`);
+                `(missing ${external_path_.win32.join(installDir, "bin")}).`);
         }
         return installDir;
     }
@@ -100363,7 +100372,7 @@ async function setupMsvcLibs(arch) {
     }
     info(`Found Visual Studio at: ${vsInstallPath}`);
     // Find the latest MSVC tools version (e.g. 14.38.33130).
-    const vcToolsRoot = external_path_.join(vsInstallPath, "VC", "Tools", "MSVC");
+    const vcToolsRoot = external_path_.win32.join(vsInstallPath, "VC", "Tools", "MSVC");
     const vcVersion = external_fs_namespaceObject.readdirSync(vcToolsRoot)
         .filter((d) => /^\d+\.\d+\.\d+$/.test(d))
         .sort()
@@ -100372,10 +100381,10 @@ async function setupMsvcLibs(arch) {
         warning("Could not find MSVC tools version directory.");
         return;
     }
-    const msvcLibDir = external_path_.join(vcToolsRoot, vcVersion, "lib", arch);
+    const msvcLibDir = external_path_.win32.join(vcToolsRoot, vcVersion, "lib", arch);
     info(`MSVC lib dir: ${msvcLibDir}`);
     const hostArch = arch === Arch.ARM64 ? "arm64" : "x64";
-    const msvcBinDir = external_path_.join(vcToolsRoot, vcVersion, "bin", `Host${hostArch}`, arch);
+    const msvcBinDir = external_path_.win32.join(vcToolsRoot, vcVersion, "bin", `Host${hostArch}`, arch);
     addMsvcBinFromPath(msvcBinDir);
     // Find the latest Windows SDK version under
     // C:\Program Files (x86)\Windows Kits\10\Lib\<version>\{um,ucrt}\<arch>.
@@ -100388,8 +100397,8 @@ async function setupMsvcLibs(arch) {
         warning("Could not find Windows SDK version directory.");
         return;
     }
-    const winsdkUmDir = external_path_.join(winsdk10Root, sdkVersion, "um", arch);
-    const winsdkUcrtDir = external_path_.join(winsdk10Root, sdkVersion, "ucrt", arch);
+    const winsdkUmDir = external_path_.win32.join(winsdk10Root, sdkVersion, "um", arch);
+    const winsdkUcrtDir = external_path_.win32.join(winsdk10Root, sdkVersion, "ucrt", arch);
     info(`Windows SDK um dir:   ${winsdkUmDir}`);
     info(`Windows SDK ucrt dir: ${winsdkUcrtDir}`);
     const existing = process.env.LIB ?? "";
@@ -100435,12 +100444,12 @@ async function win32_installNative(inputs) {
         // tc.downloadTool would otherwise return an extensionless GUID path, and
         // the extraction directory must not contain the installer itself because
         // for the .exe path that whole directory is what gets tool-cached.
-        const tempDownloadDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-download-${patch}`);
-        const tempExtractDir = external_path_.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
+        const tempDownloadDir = external_path_.win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-download-${patch}`);
+        const tempExtractDir = external_path_.win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `flang-extract-${patch}`);
         external_fs_namespaceObject.mkdirSync(tempDownloadDir, { recursive: true });
         external_fs_namespaceObject.mkdirSync(tempExtractDir, { recursive: true });
         info(`Downloading ${filename}...`);
-        const downloadPath = await downloadTool(downloadUrl, external_path_.join(tempDownloadDir, filename));
+        const downloadPath = await downloadTool(downloadUrl, external_path_.win32.join(tempDownloadDir, filename));
         if (expectedSha256) {
             await verifySha256(downloadPath, expectedSha256);
         }
@@ -100451,14 +100460,14 @@ async function win32_installNative(inputs) {
     else {
         info(`Flang ${patch} found in tool cache at ${toolRoot}, skipping download.`);
     }
-    const binDir = external_path_.join(toolRoot, "bin");
+    const binDir = external_path_.win32.join(toolRoot, "bin");
     addPath(binDir);
-    const flangExe = external_path_.join(binDir, "flang.exe");
-    const clangExe = external_path_.join(binDir, "clang.exe");
-    const clangPPExe = external_path_.join(binDir, "clang++.exe");
+    const flangExe = external_path_.win32.join(binDir, "flang.exe");
+    const clangExe = external_path_.win32.join(binDir, "clang.exe");
+    const clangPPExe = external_path_.win32.join(binDir, "clang++.exe");
     // Add flang's own lib dir to LIB for Fortran runtime libs, then add MSVC
     // and Windows SDK dirs so lld-link can find the CRT (libcmt, oldnames, etc.)
-    const flangLibDir = external_path_.join(toolRoot, "lib");
+    const flangLibDir = external_path_.win32.join(toolRoot, "lib");
     const existingLib = process.env.LIB ?? "";
     exportVariable("LIB", existingLib ? `${flangLibDir};${existingLib}` : flangLibDir);
     await setupMsvcLibs(inputs.arch);
@@ -100478,11 +100487,11 @@ async function win32_installMSYS2(inputs) {
     // The MSYS2 flang package only lists llvm-openmp as an optional dependency;
     // without it -fopenmp fails to link (omp_lib modules and libomp are missing).
     await setupMSYS2(inputs.msystem, ["flang", "llvm-openmp"]);
-    const msysRoot = external_path_.join("C:\\msys64", inputs.msystem);
-    const msysBin = external_path_.join(msysRoot, "bin");
-    const flangExe = external_path_.join(msysBin, "flang.exe");
-    const clangExe = external_path_.join(msysBin, "clang.exe");
-    const clangPPExe = external_path_.join(msysBin, "clang++.exe");
+    const msysRoot = external_path_.win32.join("C:\\msys64", inputs.msystem);
+    const msysBin = external_path_.win32.join(msysRoot, "bin");
+    const flangExe = external_path_.win32.join(msysBin, "flang.exe");
+    const clangExe = external_path_.win32.join(msysBin, "clang.exe");
+    const clangPPExe = external_path_.win32.join(msysBin, "clang++.exe");
     addPath(msysBin);
     exportVariable("WINDOWS_ENV", inputs.msystem);
     const resolvedVersion = await flang_win32_resolveInstalledVersion(flangExe);
@@ -100573,24 +100582,27 @@ function miniforgeInstaller(os, arch) {
 
 
 function lfortranEnvironment(inputs, version) {
+    const windows = inputs.os === OS.Windows;
+    // Build toolchain paths with the target OS semantics so Windows-targeted
+    // unit tests assert real Windows paths even when run on Linux.
+    const p = windows ? external_path_.win32 : external_path_;
     const toolRoot = process.env.RUNNER_TOOL_CACHE ??
         external_path_.join(external_os_.tmpdir(), "setup-fortran-tool-cache");
-    const root = external_path_.join(toolRoot, "setup-fortran", "lfortran", inputs.os, inputs.arch, version);
-    const miniforgePrefix = external_path_.join(root, "miniforge");
-    const envPrefix = external_path_.join(root, "env");
-    const windows = inputs.os === OS.Windows;
+    const root = p.join(toolRoot, "setup-fortran", "lfortran", inputs.os, inputs.arch, version);
+    const miniforgePrefix = p.join(root, "miniforge");
+    const envPrefix = p.join(root, "env");
     const binDir = windows
-        ? external_path_.join(envPrefix, "Library", "bin")
-        : external_path_.join(envPrefix, "bin");
+        ? p.join(envPrefix, "Library", "bin")
+        : p.join(envPrefix, "bin");
     return {
         root,
         miniforgePrefix,
         conda: windows
-            ? external_path_.join(miniforgePrefix, "Scripts", "conda.exe")
-            : external_path_.join(miniforgePrefix, "bin", "conda"),
+            ? p.join(miniforgePrefix, "Scripts", "conda.exe")
+            : p.join(miniforgePrefix, "bin", "conda"),
         envPrefix,
         binDir,
-        lfortran: external_path_.join(binDir, windows ? "lfortran.exe" : "lfortran"),
+        lfortran: p.join(binDir, windows ? "lfortran.exe" : "lfortran"),
     };
 }
 async function isReusableLFortranEnvironment(environment, version) {
@@ -100984,7 +100996,7 @@ async function installConda(inputs) {
     else {
         resetLFortranEnvironment(environment);
         const tempDir = createInstallerTempDir();
-        const miniforgeInstaller = external_path_.join(tempDir, "miniforge-install.exe");
+        const miniforgeInstaller = external_path_.win32.join(tempDir, "miniforge-install.exe");
         try {
             await exec_exec("curl", [
                 "-fsSL",
@@ -101021,10 +101033,10 @@ async function installConda(inputs) {
         throw new Error(`lfortran.exe not found at expected path: ${environment.lfortran}`);
     }
     addPath(environment.envPrefix);
-    addPath(external_path_.join(environment.envPrefix, "Scripts"));
+    addPath(external_path_.win32.join(environment.envPrefix, "Scripts"));
     addPath(environment.binDir);
-    const lldLink = external_path_.join(environment.binDir, "lld-link.exe");
-    const proxyLink = external_path_.join(environment.binDir, "link.exe");
+    const lldLink = external_path_.win32.join(environment.binDir, "lld-link.exe");
+    const proxyLink = external_path_.win32.join(environment.binDir, "link.exe");
     if (external_fs_namespaceObject.existsSync(lldLink)) {
         if (!external_fs_namespaceObject.existsSync(proxyLink)) {
             info("Creating link.exe proxy for lld-link.exe...");
@@ -101049,7 +101061,7 @@ async function installConda(inputs) {
     // GITHUB_PATH entry, so coreutils' link would shadow the proxy above. Reuse
     // the MSVC installers' BASH_ENV mechanism to prepend the proxy's directory.
     persistBinDirForBash(environment.binDir, "lfortran");
-    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join(environment.envPrefix, "Library", "lib"));
+    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.win32.join(environment.envPrefix, "Library", "lib"));
     const resolvedVersion = await lfortran_win32_resolveInstalledVersion(environment.lfortran);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (conda).`);
     // The companion C/C++ compiler is the system `clang`/`clang++` on PATH,
@@ -101070,8 +101082,8 @@ async function installConda(inputs) {
 async function lfortran_win32_installMSYS2(inputs) {
     const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
     info(`Installing LFortran ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`);
-    const msysBin = external_path_.join("C:\\msys64", inputs.msystem, "bin");
-    const lfortranExe = external_path_.join(msysBin, "lfortran.exe");
+    const msysBin = external_path_.win32.join("C:\\msys64", inputs.msystem, "bin");
+    const lfortranExe = external_path_.win32.join(msysBin, "lfortran.exe");
     let resolvedVersion;
     if (external_fs_namespaceObject.existsSync(lfortranExe)) {
         try {
@@ -101090,14 +101102,14 @@ async function lfortran_win32_installMSYS2(inputs) {
         resolvedVersion = await lfortran_win32_resolveInstalledVersion(lfortranExe);
     }
     addPath(msysBin);
-    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.join("C:\\msys64", inputs.msystem, "lib"));
+    exportVariable("LFORTRAN_OMP_LIB_DIR", external_path_.win32.join("C:\\msys64", inputs.msystem, "lib"));
     exportVariable("WINDOWS_ENV", inputs.msystem);
     info(`LFortran ${resolvedVersion} installed successfully on Windows (MSYS2/${inputs.msystem}).`);
     const result = {
         version: resolvedVersion,
         fc: lfortranExe,
-        cc: external_path_.join(msysBin, "clang.exe"),
-        cxx: external_path_.join(msysBin, "clang++.exe"),
+        cc: external_path_.win32.join(msysBin, "clang.exe"),
+        cxx: external_path_.win32.join(msysBin, "clang++.exe"),
     };
     return result;
 }

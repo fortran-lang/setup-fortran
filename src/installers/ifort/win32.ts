@@ -114,7 +114,10 @@ export async function installWin32(
     core.info(`Downloading ifort installer...`);
     const installerPath = await tc.downloadTool(
       release.url,
-      path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`),
+      path.win32.join(
+        process.env.RUNNER_TEMP ?? "C:\\Temp",
+        `ifort-${version}.exe`,
+      ),
     );
     await verifyIntelAuthenticode(installerPath);
 
@@ -134,7 +137,7 @@ export async function installWin32(
   }
 
   // Create a temporary batch file to capture the environment variables
-  const batFile = path.join(os.tmpdir(), "setvars_ifort_dump.bat");
+  const batFile = path.win32.join(os.tmpdir(), "setvars_ifort_dump.bat");
 
   fs.writeFileSync(
     batFile,

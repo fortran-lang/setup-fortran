@@ -209,7 +209,10 @@ export async function installWin32(
     core.info(`Downloading installer...`);
     const installerPath = await downloadToolWithRetry(
       release.url,
-      path.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`),
+      path.win32.join(
+        process.env.RUNNER_TEMP ?? "C:\\Temp",
+        `ifx-${version}.exe`,
+      ),
     );
 
     core.info("Verifying installer...");
@@ -230,7 +233,7 @@ export async function installWin32(
   }
 
   // Create a temporary batch file to capture the environment variables
-  const batFile = path.join(os.tmpdir(), "setvars_and_dump.bat");
+  const batFile = path.win32.join(os.tmpdir(), "setvars_and_dump.bat");
 
   fs.writeFileSync(
     batFile,

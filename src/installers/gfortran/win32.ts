@@ -107,7 +107,7 @@ async function installNative(
     core.info(`Extracting GFortran ${version} from ${downloadPath}...`);
     const extractPath = await tc.extractZip(downloadPath);
 
-    const actualToolDir = path.join(extractPath, "mingw64");
+    const actualToolDir = path.win32.join(extractPath, "mingw64");
 
     core.info(`Caching GFortran ${version} in ${actualToolDir}...`);
     toolRoot = await tc.cacheDir(
@@ -118,12 +118,12 @@ async function installNative(
     );
   }
 
-  const binPath = path.join(toolRoot, "bin");
+  const binPath = path.win32.join(toolRoot, "bin");
   core.addPath(binPath);
 
-  const gfortranPath = path.join(binPath, "gfortran.exe");
-  const gccPath = path.join(binPath, "gcc.exe");
-  const gxxPath = path.join(binPath, "g++.exe");
+  const gfortranPath = path.win32.join(binPath, "gfortran.exe");
+  const gccPath = path.win32.join(binPath, "gcc.exe");
+  const gxxPath = path.win32.join(binPath, "g++.exe");
 
   const resolvedVersion = await resolveInstalledVersion();
   const result = {
@@ -138,10 +138,10 @@ async function installNative(
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
 
-  const msysBin = path.join("C:\\msys64", inputs.msystem, "bin");
-  const gfortranPath = path.join(msysBin, "gfortran.exe");
-  const gccPath = path.join(msysBin, "gcc.exe");
-  const gxxPath = path.join(msysBin, "g++.exe");
+  const msysBin = path.win32.join("C:\\msys64", inputs.msystem, "bin");
+  const gfortranPath = path.win32.join(msysBin, "gfortran.exe");
+  const gccPath = path.win32.join(msysBin, "gcc.exe");
+  const gxxPath = path.win32.join(msysBin, "g++.exe");
 
   const resolvedVersion = await resolveInstalledVersion();
   const result = {
