@@ -12,7 +12,10 @@ import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
-import { addMsvcBinFromPath } from "../../setup_msvc";
+import {
+  addIntelCompilerBinFromPath,
+  addMsvcBinFromPath,
+} from "../../setup_msvc";
 import { verifyIntelAuthenticode } from "../../verify_download";
 import {
   saveCompilerCache,
@@ -283,6 +286,7 @@ export async function installWin32(
           .join(";");
         core.exportVariable("PATH", filteredPath);
         addMsvcBinFromPath(filteredPath);
+        addIntelCompilerBinFromPath(filteredPath);
       } else {
         core.exportVariable(key, val);
       }

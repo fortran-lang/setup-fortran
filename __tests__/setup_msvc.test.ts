@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  addIntelCompilerBinFromPath,
   addMsvcBinFromPath,
   persistMsvcBinForBash,
   toMsysPath,
@@ -86,6 +87,40 @@ describe("addMsvcBinFromPath", () => {
       expect.any(String),
       `export PATH='/c/MSVC/bin':"$PATH"\n`,
       { mode: 0o600 },
+    );
+  });
+});
+
+describe("addIntelCompilerBinFromPath", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("registers ifx's compiler bin directory", () => {
+    const ifxBin =
+      "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\bin";
+
+    expect(addIntelCompilerBinFromPath(`C:\\tools;${ifxBin};C:\\Windows`)).toBe(
+      ifxBin,
+    );
+    expect(core.addPath).toHaveBeenCalledWith(ifxBin);
+  });
+
+  it("registers classic ifort's compiler bin directory", () => {
+    const ifortBin =
+      "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\windows\\bin";
+
+    expect(addIntelCompilerBinFromPath(`C:\\tools;${ifortBin}`)).toBe(ifortBin);
+    expect(core.addPath).toHaveBeenCalledWith(ifortBin);
+  });
+
+  it("warns when the Intel compiler executable directory is absent", () => {
+    expect(
+      addIntelCompilerBinFromPath("C:\\tools;C:\\Windows"),
+    ).toBeUndefined();
+    expect(core.addPath).not.toHaveBeenCalled();
+    expect(core.warning).toHaveBeenCalledWith(
+      "Could not find the Intel compiler executable directory in PATH.",
     );
   });
 });
