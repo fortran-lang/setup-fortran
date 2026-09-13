@@ -203,7 +203,7 @@ describe("installDebian (Flang)", () => {
     }
 
     expect(updateAttempts).toBe(2); // failed once, succeeded on retry
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("apt-get update failed (attempt 1/3)"),
     );
     expect(mockedExec).toHaveBeenCalledWith(

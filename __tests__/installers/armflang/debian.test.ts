@@ -236,7 +236,7 @@ describe("installDebian (ArmFlang)", () => {
 
     await installDebian(inputs);
 
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("binaries were incomplete"),
     );
     expect(mockedExec).toHaveBeenCalledWith(
@@ -296,7 +296,7 @@ describe("installDebian (ArmFlang)", () => {
 
     // 1 tolerated best-effort attempt + 1 failed Arm attempt + 1 successful retry.
     expect(updateAttempts).toBe(3);
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("Retrying in 10 seconds"),
     );
   });

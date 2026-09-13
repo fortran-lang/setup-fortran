@@ -210,7 +210,7 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
         `Reusing existing LFortran ${resolvedVersion} from ${lfortranExe}.`,
       );
     } catch (error) {
-      core.warning(
+      core.info(
         `Existing MSYS2 LFortran is unusable; reinstalling it: ${String(error)}`,
       );
     }

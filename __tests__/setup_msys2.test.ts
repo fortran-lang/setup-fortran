@@ -11,7 +11,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 
 const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
-const mockedWarning = core.warning as jest.MockedFunction<typeof core.warning>;
+const mockedInfo = core.info as jest.MockedFunction<typeof core.info>;
 
 const PACMAN_CMD = "C:\\msys64\\usr\\bin\\bash.exe";
 
@@ -106,7 +106,7 @@ describe("pacmanInstallWithRetry", () => {
 
     expect(mockedExec).toHaveBeenCalledTimes(1);
     expectPacmanCall("mingw-w64-ucrt-x86_64-gcc");
-    expect(mockedWarning).not.toHaveBeenCalled();
+    expect(mockedInfo).not.toHaveBeenCalled();
   });
 
   it("retries once and succeeds after a transient failure", async () => {
@@ -120,8 +120,8 @@ describe("pacmanInstallWithRetry", () => {
     await install;
 
     expect(mockedExec).toHaveBeenCalledTimes(2);
-    expect(mockedWarning).toHaveBeenCalledTimes(1);
-    expect(mockedWarning).toHaveBeenCalledWith(
+    expect(mockedInfo).toHaveBeenCalledTimes(1);
+    expect(mockedInfo).toHaveBeenCalledWith(
       "pacman install failed (attempt 1/3), retrying in 15s...",
     );
   });
@@ -136,7 +136,7 @@ describe("pacmanInstallWithRetry", () => {
 
     await jest.advanceTimersByTimeAsync(15_000);
     expect(mockedExec).toHaveBeenCalledTimes(2);
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       1,
       "pacman install failed (attempt 1/3), retrying in 15s...",
     );
@@ -145,7 +145,7 @@ describe("pacmanInstallWithRetry", () => {
     await install;
 
     expect(mockedExec).toHaveBeenCalledTimes(3);
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       2,
       "pacman install failed (attempt 2/3), retrying in 30s...",
     );
@@ -162,11 +162,11 @@ describe("pacmanInstallWithRetry", () => {
     await expectation;
 
     expect(mockedExec).toHaveBeenCalledTimes(3);
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       1,
       "pacman install failed (attempt 1/3), retrying in 15s...",
     );
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       2,
       "pacman install failed (attempt 2/3), retrying in 30s...",
     );
@@ -180,6 +180,6 @@ describe("pacmanInstallWithRetry", () => {
     ).rejects.toThrow("mirror stalled");
 
     expect(mockedExec).toHaveBeenCalledTimes(1);
-    expect(mockedWarning).not.toHaveBeenCalled();
+    expect(mockedInfo).not.toHaveBeenCalled();
   });
 });

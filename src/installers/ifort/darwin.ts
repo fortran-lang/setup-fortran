@@ -102,7 +102,7 @@ async function downloadInstaller(
       );
       return await tc.downloadTool(url, destPath);
     } catch (error) {
-      core.warning(
+      core.info(
         `tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`,
       );
       if (attempt < maxTcAttempts) {
@@ -111,7 +111,7 @@ async function downloadInstaller(
     }
   }
 
-  core.warning(
+  core.info(
     "tc.downloadTool failed after all attempts. Falling back to curl...",
   );
   await exec.exec("curl", [
@@ -175,7 +175,7 @@ async function runInstaller(installScript: string): Promise<void> {
         throw error;
       }
       const delaySeconds = attempt * 10;
-      core.warning(
+      core.info(
         `ifort installer failed (attempt ${attempt.toString()}/${maxAttempts.toString()}): ${String(error)}. ` +
           `Retrying in ${delaySeconds.toString()} seconds...`,
       );

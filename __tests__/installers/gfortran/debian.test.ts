@@ -210,7 +210,7 @@ describe("GFortran Debian Installer", () => {
       const result = await installDebian(baseInputs);
 
       expect(result.fc).toBe("gfortran-14");
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("continuing with cached/stale package index"),
       );
     });
@@ -255,7 +255,7 @@ describe("GFortran Debian Installer", () => {
       }
 
       expect(updateAttempts).toBe(2); // failed once, succeeded on retry
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("apt-get update failed (attempt 1/3)"),
       );
     });
@@ -326,7 +326,7 @@ describe("GFortran Debian Installer", () => {
 
       await installDebian(baseInputs);
 
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("falling back to an online installation"),
       );
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
@@ -377,7 +377,7 @@ describe("GFortran Debian Installer", () => {
       await installDebian(baseInputs);
 
       expect(validationAttempts).toBe(2);
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("incomplete or invalid"),
       );
     });
@@ -389,7 +389,7 @@ describe("GFortran Debian Installer", () => {
 
       await installDebian(baseInputs);
 
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("proceeding without it"),
       );
       expect(mockedCache.saveCache).toHaveBeenCalled();
@@ -426,7 +426,7 @@ describe("GFortran Debian Installer", () => {
       jest.useRealTimers();
 
       expect(attempts).toBe(2);
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("apt-get install failed (attempt 1/3)"),
       );
     });
@@ -458,7 +458,7 @@ describe("GFortran Debian Installer", () => {
       jest.useRealTimers();
 
       expect(attempts).toBe(2);
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("add-apt-repository failed (attempt 1/3)"),
       );
     });

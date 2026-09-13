@@ -41,6 +41,6 @@ export async function saveCompilerCache(
   try {
     await cache.saveCache(paths, key);
   } catch (error) {
-    core.warning(`Could not save compiler cache ${key}: ${String(error)}`);
+    core.info(`Could not save compiler cache ${key}: ${String(error)}`);
   }
 }

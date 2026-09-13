@@ -200,7 +200,7 @@ async function aptInstallWithRetry(
       );
     }
 
-    core.warning(
+    core.info(
       `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`,
     );
 
@@ -249,7 +249,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));

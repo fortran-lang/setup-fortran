@@ -285,7 +285,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
 
     const delaySeconds = attempt * 10;
 
-    core.warning(
+    core.info(
       `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
     );
 

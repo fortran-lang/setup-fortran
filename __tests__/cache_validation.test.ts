@@ -67,7 +67,7 @@ describe("compiler cache validation", () => {
     await expect(
       saveCompilerCache(["/compiler"], "key"),
     ).resolves.toBeUndefined();
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("immutable cache already exists"),
     );
   });

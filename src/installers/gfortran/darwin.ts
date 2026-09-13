@@ -151,7 +151,7 @@ async function brewInstallWithRetry(
     }
 
     const delaySeconds = attempt * 15;
-    core.warning(
+    core.info(
       `brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
     );
 

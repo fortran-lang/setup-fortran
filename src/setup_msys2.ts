@@ -52,7 +52,7 @@ export async function pacmanInstallWithRetry(
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `pacman install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${String(attempt * 15)}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 15_000));

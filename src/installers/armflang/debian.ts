@@ -194,7 +194,7 @@ async function aptGetWithRetry(args: string[], maxAttempts = 3): Promise<void> {
     }
 
     const delayMs = attempt * 10_000;
-    core.warning(
+    core.info(
       `apt-get ${args[0] ?? "command"} failed ` +
         `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
         `Retrying in ${(delayMs / 1000).toString()} seconds...`,
@@ -238,7 +238,7 @@ async function aptGetUpdateWithRetry(
     const requiredFetchFailed =
       requiredHost !== undefined && indexFetchFailed(output, requiredHost);
     if (!requiredFetchFailed) {
-      core.warning(
+      core.info(
         "apt-get update did not complete cleanly; continuing with the existing package lists.",
       );
       return;
@@ -252,7 +252,7 @@ async function aptGetUpdateWithRetry(
     }
 
     const delayMs = attempt * 10_000;
-    core.warning(
+    core.info(
       `apt-get update failed ` +
         `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
         `Retrying in ${(delayMs / 1000).toString()} seconds...`,
@@ -355,7 +355,7 @@ export async function installDebian(
     );
     isCacheValid = [fc, cc, cxx].every((binary) => fs.existsSync(binary));
     if (!hasArmMath) {
-      core.warning("Cached ArmPL installation does not contain libamath.");
+      core.info("Cached ArmPL installation does not contain libamath.");
       isCacheValid = false;
     }
   }
@@ -364,7 +364,7 @@ export async function installDebian(
     core.info(`Cache hit for ${cacheKey}; skipping package download.`);
   } else {
     if (cacheHit) {
-      core.warning(
+      core.info(
         `Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`,
       );
     }
@@ -429,7 +429,7 @@ export async function installDebian(
     try {
       await cache.saveCache([cacheDir], cacheKey);
     } catch (err) {
-      core.warning(
+      core.info(
         `Failed to save ArmFlang installation to cache: ${(err as Error).message}`,
       );
     }

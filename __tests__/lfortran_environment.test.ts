@@ -6,7 +6,7 @@ jest.mock("@actions/core");
 jest.mock("@actions/exec");
 
 const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
-const mockedWarning = core.warning as jest.MockedFunction<typeof core.warning>;
+const mockedInfo = core.info as jest.MockedFunction<typeof core.info>;
 
 const CONDA_BIN = "/tool-cache/miniforge/bin/conda";
 const CREATE_ARGS = [
@@ -37,7 +37,7 @@ describe("condaCreateWithRetry", () => {
     await condaCreateWithRetry(CONDA_BIN, CREATE_ARGS);
 
     expect(mockedExec).toHaveBeenCalledTimes(1);
-    expect(mockedWarning).not.toHaveBeenCalled();
+    expect(mockedInfo).not.toHaveBeenCalled();
   });
 
   it("runs conda with ignoreReturnCode so a non-zero exit is retryable", async () => {
@@ -61,8 +61,8 @@ describe("condaCreateWithRetry", () => {
     await install;
 
     expect(mockedExec).toHaveBeenCalledTimes(2);
-    expect(mockedWarning).toHaveBeenCalledTimes(1);
-    expect(mockedWarning).toHaveBeenCalledWith(
+    expect(mockedInfo).toHaveBeenCalledTimes(1);
+    expect(mockedInfo).toHaveBeenCalledWith(
       "conda create failed (attempt 1/3), retrying in 15s...",
     );
   });
@@ -77,7 +77,7 @@ describe("condaCreateWithRetry", () => {
 
     await jest.advanceTimersByTimeAsync(15_000);
     expect(mockedExec).toHaveBeenCalledTimes(2);
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       1,
       "conda create failed (attempt 1/3), retrying in 15s...",
     );
@@ -86,7 +86,7 @@ describe("condaCreateWithRetry", () => {
     await install;
 
     expect(mockedExec).toHaveBeenCalledTimes(3);
-    expect(mockedWarning).toHaveBeenNthCalledWith(
+    expect(mockedInfo).toHaveBeenNthCalledWith(
       2,
       "conda create failed (attempt 2/3), retrying in 30s...",
     );
@@ -105,7 +105,7 @@ describe("condaCreateWithRetry", () => {
     await expectation;
 
     expect(mockedExec).toHaveBeenCalledTimes(3);
-    expect(mockedWarning).toHaveBeenCalledTimes(2);
+    expect(mockedInfo).toHaveBeenCalledTimes(2);
   });
 
   it("does not warn or retry when only one attempt is allowed", async () => {
@@ -116,6 +116,6 @@ describe("condaCreateWithRetry", () => {
     ).rejects.toThrow("conda create failed after 1 attempts.");
 
     expect(mockedExec).toHaveBeenCalledTimes(1);
-    expect(mockedWarning).not.toHaveBeenCalled();
+    expect(mockedInfo).not.toHaveBeenCalled();
   });
 });

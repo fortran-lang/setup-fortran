@@ -174,12 +174,12 @@ export async function installWin32(
       break;
     } catch (err) {
       if (attempt === 3) {
-        core.warning(
+        core.info(
           `Cache restore failed after 3 attempts, proceeding with fresh install: ${String(err)}`,
         );
         break;
       }
-      core.warning(
+      core.info(
         `Cache restore failed (attempt ${attempt.toString()}/3), retrying in ${(attempt * 15).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
@@ -325,7 +325,7 @@ async function downloadToolWithRetry(
 
       const delaySeconds = attempt * 20;
 
-      core.warning(
+      core.info(
         `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
           `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
       );
@@ -406,7 +406,7 @@ async function runInstallerWithRetry(
       throw new Error(`Installer failed with exit code ${exitCode.toString()}`);
     }
 
-    core.warning(
+    core.info(
       `Installer crashed with exit code ${exitCode.toString()} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`,
     );
     await new Promise((res) => setTimeout(res, attempt * 15_000));

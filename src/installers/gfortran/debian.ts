@@ -74,7 +74,7 @@ export async function installDebian(
   try {
     cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   } catch (err) {
-    core.warning(
+    core.info(
       `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
     );
   }
@@ -93,7 +93,7 @@ export async function installDebian(
       await aptGetInstallFromCache(packages, cacheDir);
       await verifyInstalledToolchain(version);
     } catch (err) {
-      core.warning(
+      core.info(
         `Cached GFortran packages were incomplete or invalid; ` +
           `falling back to an online installation: ${String(err)}`,
       );
@@ -107,7 +107,7 @@ export async function installDebian(
       await prepareCacheForSave(cacheDir);
       await cache.saveCache(cachePaths, cacheKey);
     } catch (err) {
-      core.warning(`Could not save the GFortran package cache: ${String(err)}`);
+      core.info(`Could not save the GFortran package cache: ${String(err)}`);
     }
   }
 
@@ -157,7 +157,7 @@ async function aptGetInstallWithRetry(
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
@@ -217,7 +217,7 @@ async function aptGetUpdateWithRetry(
     const ppaFetchFailed =
       ppaAdded && indexFetchFailed(output, "ppa.launchpad");
     if (cacheHit || !ppaFetchFailed) {
-      core.warning(
+      core.info(
         "apt-get update did not complete cleanly; continuing with cached/stale package index.",
       );
       return;
@@ -228,7 +228,7 @@ async function aptGetUpdateWithRetry(
         `apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
       );
     }
-    core.warning(
+    core.info(
       `apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
     );
     await new Promise((res) => setTimeout(res, attempt * 10_000));
@@ -280,7 +280,7 @@ async function addAptRepositoryWithRetry(
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `add-apt-repository failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 5_000));

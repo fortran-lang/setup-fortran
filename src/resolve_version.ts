@@ -79,7 +79,7 @@ async function fetchJsonWithRetry<T>(
             );
           }
 
-          core.warning(
+          core.info(
             `GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
               `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`,
           );
@@ -124,7 +124,7 @@ async function fetchJsonWithRetry<T>(
       }
 
       const backoffMs = 1000 * Math.pow(2, attempt + 1);
-      core.warning(
+      core.info(
         `Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
           `(Attempt ${attempt.toString()}/${maxRetries.toString()})...`,
       );

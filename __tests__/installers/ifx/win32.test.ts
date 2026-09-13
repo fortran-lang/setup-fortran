@@ -270,7 +270,7 @@ describe("installWin32 (ifx)", () => {
     jest.useRealTimers();
 
     expect(attempts).toBe(2);
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining(
         "Installer crashed with exit code 1 (attempt 1/3)",
       ),
@@ -301,7 +301,7 @@ describe("installWin32 (ifx)", () => {
       await installPromise;
 
       expect(mockedDownloadTool).toHaveBeenCalledTimes(2);
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("Download failed (attempt 1/3)"),
       );
       // The partial download must not be treated as a complete installer.
@@ -330,10 +330,10 @@ describe("installWin32 (ifx)", () => {
 
       expect(mockedDownloadTool).toHaveBeenCalledTimes(3);
       expect(mockedFs.rmSync).toHaveBeenCalledTimes(3);
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("Download failed (attempt 1/3)"),
       );
-      expect(core.warning).toHaveBeenCalledWith(
+      expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("Download failed (attempt 2/3)"),
       );
       expect(core.info).not.toHaveBeenCalledWith("Verifying installer...");

@@ -96117,7 +96117,7 @@ async function fetchJsonWithRetry(url, options = {}) {
                         throw new GitHubRateLimitError(`GitHub API rate limit remained active after ${maxRetries.toString()} attempts for ${url}. ` +
                             `Retry after ${new Date(resetTimeMs).toISOString()} or provide a GITHUB_TOKEN with available API quota.`);
                     }
-                    warning(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
+                    info(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
                         `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`);
                     clearTimeout(timeoutId);
                     await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
@@ -96147,7 +96147,7 @@ async function fetchJsonWithRetry(url, options = {}) {
                 throw new Error(`Request failed after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`, { cause: e });
             }
             const backoffMs = 1000 * Math.pow(2, attempt + 1);
-            warning(`Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
+            info(`Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
                 `(Attempt ${attempt.toString()}/${maxRetries.toString()})...`);
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
@@ -96471,7 +96471,7 @@ async function installDebian(inputs) {
         cacheHit = await restoreCache(cachePaths, cacheKey);
     }
     catch (err) {
-        warning(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
+        info(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
     }
     const ppaAdded = needsPpa(version, inputs.osVersion);
     if (ppaAdded) {
@@ -96486,7 +96486,7 @@ async function installDebian(inputs) {
             await verifyInstalledToolchain(version);
         }
         catch (err) {
-            warning(`Cached GFortran packages were incomplete or invalid; ` +
+            info(`Cached GFortran packages were incomplete or invalid; ` +
                 `falling back to an online installation: ${String(err)}`);
             await aptGetInstallWithRetry(packages, cacheDir);
             await verifyInstalledToolchain(version);
@@ -96500,7 +96500,7 @@ async function installDebian(inputs) {
             await cache_saveCache(cachePaths, cacheKey);
         }
         catch (err) {
-            warning(`Could not save the GFortran package cache: ${String(err)}`);
+            info(`Could not save the GFortran package cache: ${String(err)}`);
         }
     }
     await exec_exec("sudo", [
@@ -96545,7 +96545,7 @@ async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -96592,13 +96592,13 @@ async function aptGetUpdateWithRetry(cacheHit, ppaAdded, maxAttempts = 3) {
         // PPA — whose index is required to resolve the gcc packages — is fatal.
         const ppaFetchFailed = ppaAdded && indexFetchFailed(output, "ppa.launchpad");
         if (cacheHit || !ppaFetchFailed) {
-            warning("apt-get update did not complete cleanly; continuing with cached/stale package index.");
+            info("apt-get update did not complete cleanly; continuing with cached/stale package index.");
             return;
         }
         if (attempt === maxAttempts) {
             throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
-        warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+        info(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
         await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
 }
@@ -96642,7 +96642,7 @@ async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`add-apt-repository failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`add-apt-repository failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 5_000));
         }
     }
@@ -96774,7 +96774,7 @@ async function brewInstallWithRetry(formula, maxAttempts = 3) {
             throw new Error(`brew install ${formula} failed after ${maxAttempts.toString()} attempts.`);
         }
         const delaySeconds = attempt * 15;
-        warning(`brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        info(`brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
         await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
     }
 }
@@ -97635,7 +97635,7 @@ async function pacmanInstallWithRetry(pkgList, maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`pacman install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${String(attempt * 15)}s...`);
+            info(`pacman install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${String(attempt * 15)}s...`);
             await new Promise((res) => setTimeout(res, attempt * 15_000));
         }
     }
@@ -97862,7 +97862,7 @@ async function saveCompilerCache(paths, key) {
         await cache_saveCache(paths, key);
     }
     catch (error) {
-        warning(`Could not save compiler cache ${key}: ${String(error)}`);
+        info(`Could not save compiler cache ${key}: ${String(error)}`);
     }
 }
 
@@ -98024,7 +98024,7 @@ async function aptInstallWithRetry(args, maxAttempts = 3) {
         if (attempt === maxAttempts) {
             throw new Error(`apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
-        warning(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`);
+        info(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`);
         await exec_exec("sudo", [
             "timeout",
             "--signal=TERM",
@@ -98066,7 +98066,7 @@ async function debian_aptGetUpdateWithRetry(maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -98303,10 +98303,10 @@ async function win32_installWin32(inputs) {
         }
         catch (err) {
             if (attempt === 3) {
-                warning(`Cache restore failed after 3 attempts, proceeding with fresh install: ${String(err)}`);
+                info(`Cache restore failed after 3 attempts, proceeding with fresh install: ${String(err)}`);
                 break;
             }
-            warning(`Cache restore failed (attempt ${attempt.toString()}/3), retrying in ${(attempt * 15).toString()}s...`);
+            info(`Cache restore failed (attempt ${attempt.toString()}/3), retrying in ${(attempt * 15).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -98412,7 +98412,7 @@ async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
             if (attempt === maxAttempts)
                 break;
             const delaySeconds = attempt * 20;
-            warning(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
                 `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
             await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
         }
@@ -98468,7 +98468,7 @@ async function runInstallerWithRetry(installerPath, extraArgs = [], maxAttempts 
         if (attempt === maxAttempts) {
             throw new Error(`Installer failed with exit code ${exitCode.toString()}`);
         }
-        warning(`Installer crashed with exit code ${exitCode.toString()} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`);
+        info(`Installer crashed with exit code ${exitCode.toString()} (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 15).toString()}s...`);
         await new Promise((res) => setTimeout(res, attempt * 15_000));
     }
 }
@@ -98658,7 +98658,7 @@ async function addOneApiAptRepo(maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -98698,7 +98698,7 @@ async function ifort_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`Intel oneAPI apt repository update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`Intel oneAPI apt repository update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -98723,7 +98723,7 @@ async function debian_aptGetInstallWithRetry(packages, maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
@@ -98815,13 +98815,13 @@ async function downloadInstaller(url, destPath) {
             return await downloadTool(url, destPath);
         }
         catch (error) {
-            warning(`tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`);
+            info(`tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`);
             if (attempt < maxTcAttempts) {
                 await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
             }
         }
     }
-    warning("tc.downloadTool failed after all attempts. Falling back to curl...");
+    info("tc.downloadTool failed after all attempts. Falling back to curl...");
     await exec_exec("curl", [
         "-sS",
         "-L",
@@ -98879,7 +98879,7 @@ async function runInstaller(installScript) {
                 throw error;
             }
             const delaySeconds = attempt * 10;
-            warning(`ifort installer failed (attempt ${attempt.toString()}/${maxAttempts.toString()}): ${String(error)}. ` +
+            info(`ifort installer failed (attempt ${attempt.toString()}/${maxAttempts.toString()}): ${String(error)}. ` +
                 `Retrying in ${delaySeconds.toString()} seconds...`);
             await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
         }
@@ -99378,7 +99378,7 @@ async function execWithRetry(command, args, maxRetries = 5, delayMs = 5000) {
             if (attempt === maxRetries) {
                 throw error;
             }
-            warning(`Command "${command} ${args.join(" ")}" failed (attempt ${String(attempt)}/${String(maxRetries)}). Retrying in ${String(delayMs / 1000)}s...`);
+            info(`Command "${command} ${args.join(" ")}" failed (attempt ${String(attempt)}/${String(maxRetries)}). Retrying in ${String(delayMs / 1000)}s...`);
             await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
     }
@@ -99393,7 +99393,7 @@ async function runWithRetry(description, fn, maxAttempts = 2, delayMs = 15_000) 
             lastError = error;
             if (attempt === maxAttempts)
                 break;
-            warning(`${description} failed (attempt ${String(attempt)}/${String(maxAttempts)}): ${String(error)}. Retrying in ${String(delayMs / 1000)}s...`);
+            info(`${description} failed (attempt ${String(attempt)}/${String(maxAttempts)}): ${String(error)}. Retrying in ${String(delayMs / 1000)}s...`);
             await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
     }
@@ -99573,7 +99573,7 @@ async function nvfortran_debian_installDebian(inputs) {
                 ]);
             }
             catch (aptErr) {
-                warning(`APT installation failed for ${pkgName} (${String(aptErr)}). Falling back to NVIDIA's versioned tarball installer...`);
+                info(`APT installation failed for ${pkgName} (${String(aptErr)}). Falling back to NVIDIA's versioned tarball installer...`);
                 await runWithRetry(`Tarball install of nvhpc ${version} (after APT failure)`, () => installTarball(version, inputs));
             }
         }
@@ -100037,7 +100037,7 @@ async function flang_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
             throw new Error(`apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
         }
         const delaySeconds = attempt * 10;
-        warning(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        info(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
         await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
     }
 }
@@ -100623,13 +100623,13 @@ async function isReusableLFortranEnvironment(environment, version) {
         return exitCode === 0 && output.includes(version);
     }
     catch (error) {
-        warning(`Could not validate existing LFortran ${version} environment: ${String(error)}`);
+        info(`Could not validate existing LFortran ${version} environment: ${String(error)}`);
         return false;
     }
 }
 function resetLFortranEnvironment(environment) {
     if (external_fs_namespaceObject.existsSync(environment.root)) {
-        warning(`Removing stale or incomplete LFortran environment at ${environment.root}.`);
+        info(`Removing stale or incomplete LFortran environment at ${environment.root}.`);
         external_fs_namespaceObject.rmSync(environment.root, { recursive: true, force: true });
     }
     external_fs_namespaceObject.mkdirSync(external_path_.dirname(environment.root), { recursive: true });
@@ -100654,7 +100654,7 @@ async function condaCreateWithRetry(condaBin, args, maxAttempts = 3) {
             throw new Error(`conda create failed after ${maxAttempts.toString()} attempts.`);
         }
         const delaySeconds = attempt * 15;
-        warning(`conda create failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        info(`conda create failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
         await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
     }
 }
@@ -101090,7 +101090,7 @@ async function lfortran_win32_installMSYS2(inputs) {
             info(`Reusing existing LFortran ${resolvedVersion} from ${lfortranExe}.`);
         }
         catch (error) {
-            warning(`Existing MSYS2 LFortran is unusable; reinstalling it: ${String(error)}`);
+            info(`Existing MSYS2 LFortran is unusable; reinstalling it: ${String(error)}`);
         }
     }
     if (!resolvedVersion) {
@@ -101276,7 +101276,7 @@ async function aptGetWithRetry(args, maxAttempts = 3) {
                 `with exit code ${exitCode.toString()}.`);
         }
         const delayMs = attempt * 10_000;
-        warning(`apt-get ${args[0] ?? "command"} failed ` +
+        info(`apt-get ${args[0] ?? "command"} failed ` +
             `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
             `Retrying in ${(delayMs / 1000).toString()} seconds...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -101309,7 +101309,7 @@ async function armflang_debian_aptGetUpdateWithRetry(requiredHost, maxAttempts =
             return;
         const requiredFetchFailed = requiredHost !== undefined && indexFetchFailed(output, requiredHost);
         if (!requiredFetchFailed) {
-            warning("apt-get update did not complete cleanly; continuing with the existing package lists.");
+            info("apt-get update did not complete cleanly; continuing with the existing package lists.");
             return;
         }
         if (attempt === maxAttempts) {
@@ -101317,7 +101317,7 @@ async function armflang_debian_aptGetUpdateWithRetry(requiredHost, maxAttempts =
                 `with exit code ${exitCode.toString()}.`);
         }
         const delayMs = attempt * 10_000;
-        warning(`apt-get update failed ` +
+        info(`apt-get update failed ` +
             `(attempt ${attempt.toString()}/${maxAttempts.toString()}). ` +
             `Retrying in ${(delayMs / 1000).toString()} seconds...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -101402,7 +101402,7 @@ async function armflang_debian_installDebian(inputs) {
             external_fs_namespaceObject.existsSync(external_path_.posix.join(dir, "libamath.a")));
         isCacheValid = [fc, cc, cxx].every((binary) => external_fs_namespaceObject.existsSync(binary));
         if (!hasArmMath) {
-            warning("Cached ArmPL installation does not contain libamath.");
+            info("Cached ArmPL installation does not contain libamath.");
             isCacheValid = false;
         }
     }
@@ -101411,7 +101411,7 @@ async function armflang_debian_installDebian(inputs) {
     }
     else {
         if (cacheHit) {
-            warning(`Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`);
+            info(`Cache hit occurred for ${cacheKey}, but binaries were incomplete. Re-installing...`);
         }
         // Best effort: curl and gpg ship with the runner images, so a broken
         // unrelated repository must not block this step.
@@ -101469,7 +101469,7 @@ async function armflang_debian_installDebian(inputs) {
             await cache_saveCache([cacheDir], cacheKey);
         }
         catch (err) {
-            warning(`Failed to save ArmFlang installation to cache: ${err.message}`);
+            info(`Failed to save ArmFlang installation to cache: ${err.message}`);
         }
     }
     for (const binary of [fc, cc, cxx]) {

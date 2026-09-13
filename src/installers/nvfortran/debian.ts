@@ -188,7 +188,7 @@ async function execWithRetry(
       if (attempt === maxRetries) {
         throw error;
       }
-      core.warning(
+      core.info(
         `Command "${command} ${args.join(" ")}" failed (attempt ${String(attempt)}/${String(maxRetries)}). Retrying in ${String(delayMs / 1000)}s...`,
       );
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -209,7 +209,7 @@ async function runWithRetry<T>(
     } catch (error) {
       lastError = error;
       if (attempt === maxAttempts) break;
-      core.warning(
+      core.info(
         `${description} failed (attempt ${String(attempt)}/${String(maxAttempts)}): ${String(error)}. Retrying in ${String(delayMs / 1000)}s...`,
       );
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -456,7 +456,7 @@ export async function installDebian(
           pkgName,
         ]);
       } catch (aptErr) {
-        core.warning(
+        core.info(
           `APT installation failed for ${pkgName} (${String(aptErr)}). Falling back to NVIDIA's versioned tarball installer...`,
         );
         await runWithRetry(

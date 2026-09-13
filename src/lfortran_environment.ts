@@ -76,7 +76,7 @@ export async function isReusableLFortranEnvironment(
     );
     return exitCode === 0 && output.includes(version);
   } catch (error) {
-    core.warning(
+    core.info(
       `Could not validate existing LFortran ${version} environment: ${String(error)}`,
     );
     return false;
@@ -87,7 +87,7 @@ export function resetLFortranEnvironment(
   environment: LFortranEnvironment,
 ): void {
   if (fs.existsSync(environment.root)) {
-    core.warning(
+    core.info(
       `Removing stale or incomplete LFortran environment at ${environment.root}.`,
     );
     fs.rmSync(environment.root, { recursive: true, force: true });
@@ -124,7 +124,7 @@ export async function condaCreateWithRetry(
     }
 
     const delaySeconds = attempt * 15;
-    core.warning(
+    core.info(
       `conda create failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
     );
 

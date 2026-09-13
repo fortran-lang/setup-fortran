@@ -184,7 +184,7 @@ async function addOneApiAptRepo(maxAttempts = 3): Promise<void> {
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `Fetching Intel oneAPI GPG key failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
@@ -226,7 +226,7 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `Intel oneAPI apt repository update failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
@@ -255,7 +255,7 @@ async function aptGetInstallWithRetry(
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
-      core.warning(
+      core.info(
         `apt-get install failed (attempt ${String(attempt)}/${String(maxAttempts)}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
