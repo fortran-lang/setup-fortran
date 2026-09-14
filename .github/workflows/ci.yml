@@ -11,10 +11,16 @@ on:
 # Cancels a PR's or branch's in-progress run when a new commit supersedes it,
 # instead of leaving both competing for the same runner pool. Grouping by PR
 # number (rather than the head ref) keeps the group stable across force-pushes
-# and rebases; push/schedule/workflow_dispatch runs group by ref instead,
-# since they have no PR number.
+# and rebases; push/workflow_dispatch runs group by ref instead, since they
+# have no PR number. The weekly schedule run gets its own unique group (keyed
+# on run_id, which is never reused) so an unrelated push/PR run can never
+# cancel the canary report before it finishes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{
+    (github.event_name == 'schedule' && github.run_id) ||
+    github.event.pull_request.number ||
+    github.ref }}
   cancel-in-progress: true
 
 permissions:

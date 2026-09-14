@@ -125,6 +125,21 @@ describe("ci.yml canary structure", () => {
     expect(weekday).toBe("5");
   });
 
+  it("protects the weekly schedule run from being canceled by an unrelated push/PR", () => {
+    // The concurrency group must route schedule-triggered runs to their own
+    // unique group (keyed on run_id, which is never reused) *before* falling
+    // back to the PR number or ref that push/PR runs share — otherwise an
+    // unrelated push landing on the same branch could silently cancel the
+    // canary report before it finishes.
+    const concurrency = ciYml.concurrency as { group: string } | undefined;
+    expect(concurrency?.group).toBeTruthy();
+    const group = concurrency!.group;
+    const scheduleGuardIndex = group.indexOf("github.event_name == 'schedule'");
+    const runIdIndex = group.indexOf("github.run_id");
+    expect(scheduleGuardIndex).toBeGreaterThan(-1);
+    expect(runIdIndex).toBeGreaterThan(scheduleGuardIndex);
+  });
+
   it("has a canary-report job", () => {
     expect(ciYml.jobs).toHaveProperty("canary-report");
   });
