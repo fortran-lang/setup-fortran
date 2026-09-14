@@ -63,6 +63,7 @@ describe("installDarwin (LFortran)", () => {
       "-fsSL",
       "--retry",
       "3",
+      "--retry-all-errors",
       "--retry-delay",
       "15",
       "-o",

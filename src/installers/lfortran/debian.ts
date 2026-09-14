@@ -66,6 +66,7 @@ export async function installDebian(
         "-fsSL",
         "--retry",
         "3",
+        "--retry-all-errors",
         "--retry-delay",
         "15",
         "-o",
