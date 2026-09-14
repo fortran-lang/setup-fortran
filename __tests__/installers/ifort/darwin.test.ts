@@ -125,7 +125,8 @@ describe("installDarwin (ifort)", () => {
     );
     const verifyOrder = mockedVerifySha256.mock.invocationCallOrder[0];
     const hdiutilVerifyCall = mockedExec.mock.calls.findIndex(
-      ([commandLine, args]) => commandLine === "hdiutil" && args?.[0] === "verify",
+      ([commandLine, args]) =>
+        commandLine === "hdiutil" && args?.[0] === "verify",
     );
     expect(
       mockedExec.mock.invocationCallOrder[hdiutilVerifyCall],
