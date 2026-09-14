@@ -9,16 +9,13 @@ const CAPTURED_ENV_KEY_PATTERN =
   /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
 
 /**
- * Initializes MSVC (via vcvars64.bat) and Intel's oneAPI environment (via
- * setvarsBat), then exports the combined environment. Shared by ifx and
- * ifort on Windows, which both need MSVC active before setvars.bat runs so
- * ifx/ifort can link against cl.
+ * Runs vcvars64.bat, then Intel's setvars.bat, and exports the combined
+ * environment so ifx/ifort can link against MSVC. Shared by both installers.
  */
 export async function captureIntelWindowsEnvironment(
   setvarsBat: string,
   batchFileName: string,
 ): Promise<void> {
-  // Create a temporary batch file to capture the environment variables
   const batFile = path.win32.join(os.tmpdir(), batchFileName);
 
   fs.writeFileSync(
@@ -57,13 +54,9 @@ export async function captureIntelWindowsEnvironment(
     if (!CAPTURED_ENV_KEY_PATTERN.test(key)) continue;
 
     if (key.toUpperCase() === "PATH") {
-      // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
-      // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
-      // we no longer need the secondary TypeScript vswhere lookup.
-      // Dedupe entries (case-insensitive, first occurrence wins) before the
-      // full-overwrite export, so a redundant downstream
-      // setvars.bat/vcvarsall.bat call re-prepending an already-set PATH
-      // doesn't blow past cmd.exe's line-length limit (fortran-lang/setup-fortran#250).
+      // Drop Git's link.exe (it breaks MSVC's linker with "extra operand"
+      // errors) and dedupe entries, so a redundant setvars/vcvarsall call
+      // can't push PATH past cmd.exe's line-length limit (#250).
       const seenPathEntries = new Set<string>();
       const filteredPath = val
         .split(";")
