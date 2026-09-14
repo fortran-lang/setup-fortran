@@ -100681,6 +100681,7 @@ async function condaCreateWithRetry(condaBin, args, maxAttempts = 3) {
 //   - The binary is always named `lfortran` regardless of version.
 const lfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "0.66.0",
         "0.65.0",
         "0.64.0",
         "0.63.0",
@@ -100691,7 +100692,7 @@ const lfortran_debian_SUPPORTED_VERSIONS = {
         "0.58.0",
         "0.57.0",
     ],
-    [Arch.ARM64]: ["0.65.0", "0.64.0"],
+    [Arch.ARM64]: ["0.66.0", "0.65.0", "0.64.0"],
 };
 // Downloads and installs a self-contained Miniforge installer into a temporary
 // prefix, then uses it to create a conda env with lfortran from conda-forge.
@@ -100793,6 +100794,7 @@ async function lfortran_debian_resolveInstalledVersion(binaryPath) {
 //   - LATEST resolves to the first entry in the list.
 const lfortran_darwin_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "0.66.0",
         "0.65.0",
         "0.64.0",
         "0.63.0",
@@ -100804,6 +100806,7 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
         "0.57.0",
     ],
     [Arch.ARM64]: [
+        "0.66.0",
         "0.65.0",
         "0.64.0",
         "0.63.0",
@@ -100949,6 +100952,7 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 const lfortran_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [Msystem.Native]: [
+            "0.66.0",
             "0.65.0",
             "0.64.0",
             "0.63.0",
