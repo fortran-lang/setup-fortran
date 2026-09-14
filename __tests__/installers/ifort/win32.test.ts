@@ -118,4 +118,30 @@ describe("installWin32 (ifort)", () => {
       "Intel(R) Fortran Intel(R) 64 Compiler Classic",
     );
   });
+
+  it("dedupes PATH entries case-insensitively before exporting", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (
+        commandLine === "cmd" &&
+        args?.[1]?.includes("setvars_ifort_dump.bat")
+      ) {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=C:\\Intel\\bin;C:\\MSVC\\bin;C:\\intel\\BIN;;C:\\MSVC\\bin",
+            ),
+          );
+        }
+      }
+      return 0;
+    });
+
+    await installWin32(baseInputs);
+
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "PATH",
+      "C:\\Intel\\bin;C:\\MSVC\\bin",
+    );
+  });
 });
