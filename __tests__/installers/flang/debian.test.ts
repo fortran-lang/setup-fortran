@@ -81,27 +81,31 @@ describe("installDebian (Flang)", () => {
   it("installs the correct flang package", async () => {
     await installDebian(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "timeout",
-      "--signal=TERM",
-      "--kill-after=30s",
-      "15m",
-      "apt-get",
-      "install",
-      "-y",
-      "-o",
-      "Acquire::ForceIPv4=true",
-      "-o",
-      "Acquire::Retries=0",
-      "-o",
-      "Acquire::http::Timeout=10",
-      "-o",
-      "Acquire::https::Timeout=10",
-      "clang-18",
-      "flang-18",
-      "libomp-18-dev",
-      "libclang-rt-18-dev",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
+        "apt-get",
+        "install",
+        "-y",
+        "-o",
+        "Acquire::ForceIPv4=true",
+        "-o",
+        "Acquire::Retries=0",
+        "-o",
+        "Acquire::http::Timeout=10",
+        "-o",
+        "Acquire::https::Timeout=10",
+        "clang-18",
+        "flang-18",
+        "libomp-18-dev",
+        "libclang-rt-18-dev",
+      ],
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
   });
 
   it("installs flang-23 from the noble repository with the flang binary name", async () => {
@@ -119,27 +123,31 @@ describe("installDebian (Flang)", () => {
 
     const result = await installDebian(inputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("sudo", [
-      "timeout",
-      "--signal=TERM",
-      "--kill-after=30s",
-      "15m",
-      "apt-get",
-      "install",
-      "-y",
-      "-o",
-      "Acquire::ForceIPv4=true",
-      "-o",
-      "Acquire::Retries=0",
-      "-o",
-      "Acquire::http::Timeout=10",
-      "-o",
-      "Acquire::https::Timeout=10",
-      "clang-23",
-      "flang-23",
-      "libomp-23-dev",
-      "libclang-rt-23-dev",
-    ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
+        "apt-get",
+        "install",
+        "-y",
+        "-o",
+        "Acquire::ForceIPv4=true",
+        "-o",
+        "Acquire::Retries=0",
+        "-o",
+        "Acquire::http::Timeout=10",
+        "-o",
+        "Acquire::https::Timeout=10",
+        "clang-23",
+        "flang-23",
+        "libomp-23-dev",
+        "libclang-rt-23-dev",
+      ],
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "update-alternatives",
       "--install",
@@ -149,6 +157,52 @@ describe("installDebian (Flang)", () => {
       "100",
     ]);
     expect(result.fc).toBe("flang-23");
+  });
+
+  it("retries apt-get install after a transient failure", async () => {
+    // Avoid the real backoff sleep inside aptGetInstallWithRetry.
+    const timeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((callback) => {
+        if (typeof callback === "function") callback();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+
+    let installAttempts = 0;
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (
+        (commandLine.startsWith("flang-new") ||
+          commandLine.startsWith("flang")) &&
+        args?.[0] === "--version"
+      ) {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(Buffer.from("flang version 18.1.0"));
+        }
+      }
+      if (
+        commandLine === "sudo" &&
+        args?.includes("apt-get") &&
+        args?.includes("install") &&
+        !args?.includes("--fix-broken")
+      ) {
+        installAttempts++;
+        // Fail the first install attempt like a dropped mirror connection.
+        if (installAttempts === 1) return 100;
+      }
+      return 0;
+    });
+
+    try {
+      const result = await installDebian(baseInputs);
+      expect(result.fc).toBe("flang-new-18");
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+
+    expect(installAttempts).toBe(2); // failed once, succeeded on retry
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining("apt-get install failed (attempt 1/3)"),
+    );
   });
 
   it("rejects LLVM 23+ on Ubuntu 22.04 with an actionable error", async () => {

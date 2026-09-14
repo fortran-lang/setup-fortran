@@ -185,12 +185,7 @@ export async function installDebian(
   core.info(
     `Installing apt package ${pkgName} with LLVM runtime dependencies...`,
   );
-  await exec.exec("sudo", [
-    "timeout",
-    "--signal=TERM",
-    "--kill-after=30s",
-    "15m",
-    "apt-get",
+  await aptGetInstallWithRetry([
     "install",
     "-y",
     ...APT_NETWORK_OPTIONS,
@@ -255,6 +250,65 @@ export async function installDebian(
   const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);
   return result;
+}
+
+// The install itself hits live mirrors (a single failed package aborts the
+// whole transaction), so it gets the same bounded retries as the update.
+// apt re-downloads any incomplete .deb but reuses fully cached archives,
+// making a re-run cheap. Mirrors src/installers/ifx/debian.ts: repair broken
+// deps between attempts, throw after exhaustion.
+async function aptGetInstallWithRetry(
+  args: string[],
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "15m",
+        "apt-get",
+        ...args,
+      ],
+      {
+        ignoreReturnCode: true,
+      },
+    );
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
+      );
+    }
+
+    core.info(
+      `apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`,
+    );
+
+    await exec.exec(
+      "sudo",
+      [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=30s",
+        "10m",
+        "apt-get",
+        "--fix-broken",
+        "install",
+        "-y",
+        ...APT_NETWORK_OPTIONS,
+      ],
+      {
+        ignoreReturnCode: true,
+      },
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
 }
 
 async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {

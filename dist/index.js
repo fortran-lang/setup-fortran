@@ -99960,12 +99960,7 @@ async function flang_debian_installDebian(inputs) {
     await flang_debian_aptGetUpdateWithRetry();
     const pkgName = `flang-${version}`;
     info(`Installing apt package ${pkgName} with LLVM runtime dependencies...`);
-    await exec_exec("sudo", [
-        "timeout",
-        "--signal=TERM",
-        "--kill-after=30s",
-        "15m",
-        "apt-get",
+    await flang_debian_aptGetInstallWithRetry([
         "install",
         "-y",
         ...debian_APT_NETWORK_OPTIONS,
@@ -100017,6 +100012,45 @@ async function flang_debian_installDebian(inputs) {
     const resolvedVersion = result.version;
     info(`Flang ${resolvedVersion} installed successfully.`);
     return result;
+}
+// The install itself hits live mirrors (a single failed package aborts the
+// whole transaction), so it gets the same bounded retries as the update.
+// apt re-downloads any incomplete .deb but reuses fully cached archives,
+// making a re-run cheap. Mirrors src/installers/ifx/debian.ts: repair broken
+// deps between attempts, throw after exhaustion.
+async function flang_debian_aptGetInstallWithRetry(args, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "15m",
+            "apt-get",
+            ...args,
+        ], {
+            ignoreReturnCode: true,
+        });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`apt-get install failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`);
+        }
+        info(`apt-get install failed (attempt ${attempt.toString()}/${maxAttempts.toString()}). Attempting to repair dependencies...`);
+        await exec_exec("sudo", [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=30s",
+            "10m",
+            "apt-get",
+            "--fix-broken",
+            "install",
+            "-y",
+            ...debian_APT_NETWORK_OPTIONS,
+        ], {
+            ignoreReturnCode: true,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 15_000));
+    }
 }
 async function flang_debian_aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
