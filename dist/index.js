@@ -97696,6 +97696,7 @@ async function verifyIntelAuthenticode(installerPath) {
 
 
 
+
 // Make sure the versions are in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const GCC_RELEASES = [
@@ -97764,7 +97765,7 @@ async function installNative(inputs, version) {
     let toolRoot = find(`gfortran-verified-${inputs.msystem}`, version, inputs.arch);
     if (!toolRoot) {
         info(`Downloading GFortran ${version} from ${downloadUrl}`);
-        const downloadPath = await downloadTool(downloadUrl);
+        const downloadPath = await downloadToolWithRetry(downloadUrl);
         await verifySha256(downloadPath, release.sha256);
         info(`Extracting GFortran ${version} from ${downloadPath}...`);
         const extractPath = await extractZip(downloadPath);
@@ -97814,6 +97815,29 @@ async function win32_resolveInstalledVersion() {
         throw new Error(`Failed to verify ${tool} installation`, { cause: err });
     }
     return stdout.trim();
+}
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            if (destination) {
+                external_fs_namespaceObject.rmSync(destination, { force: true });
+            }
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 
 ;// CONCATENATED MODULE: ./src/installers/gfortran/index.ts
@@ -98325,7 +98349,7 @@ async function win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_namespaceObject.rmSync(ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading installer...`);
-        const installerPath = await downloadToolWithRetry(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
+        const installerPath = await win32_downloadToolWithRetry(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifx-${version}.exe`));
         info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
@@ -98400,7 +98424,7 @@ async function win32_installWin32(inputs) {
     };
     return result;
 }
-async function downloadToolWithRetry(url, destination, maxAttempts = 3) {
+async function win32_downloadToolWithRetry(url, destination, maxAttempts = 3) {
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
@@ -100484,7 +100508,7 @@ async function win32_installNative(inputs) {
         external_fs_namespaceObject.mkdirSync(tempDownloadDir, { recursive: true });
         external_fs_namespaceObject.mkdirSync(tempExtractDir, { recursive: true });
         info(`Downloading ${filename}...`);
-        const downloadPath = await downloadTool(downloadUrl, external_path_.win32.join(tempDownloadDir, filename));
+        const downloadPath = await flang_win32_downloadToolWithRetry(downloadUrl, external_path_.win32.join(tempDownloadDir, filename));
         if (expectedSha256) {
             await verifySha256(downloadPath, expectedSha256);
         }
@@ -100549,6 +100573,27 @@ async function flang_win32_resolveInstalledVersion(flangExe) {
         },
     });
     return output.trim();
+}
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function flang_win32_downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            external_fs_namespaceObject.rmSync(destination, { force: true });
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 
 ;// CONCATENATED MODULE: ./src/installers/flang/index.ts

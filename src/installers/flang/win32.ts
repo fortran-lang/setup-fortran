@@ -262,7 +262,7 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     fs.mkdirSync(tempExtractDir, { recursive: true });
 
     core.info(`Downloading ${filename}...`);
-    const downloadPath = await tc.downloadTool(
+    const downloadPath = await downloadToolWithRetry(
       downloadUrl,
       path.win32.join(tempDownloadDir, filename),
     );
@@ -359,4 +359,37 @@ async function resolveInstalledVersion(flangExe: string): Promise<string> {
     },
   });
   return output.trim();
+}
+
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function downloadToolWithRetry(
+  url: string,
+  destination: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination);
+    } catch (error) {
+      lastError = error;
+
+      fs.rmSync(destination, { force: true });
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.info(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
 }

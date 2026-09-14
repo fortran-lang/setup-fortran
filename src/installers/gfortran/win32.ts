@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
+import * as fs from "fs";
 import * as path from "path";
 import * as tc from "@actions/tool-cache";
 import {
@@ -101,7 +102,7 @@ async function installNative(
 
   if (!toolRoot) {
     core.info(`Downloading GFortran ${version} from ${downloadUrl}`);
-    const downloadPath = await tc.downloadTool(downloadUrl);
+    const downloadPath = await downloadToolWithRetry(downloadUrl);
     await verifySha256(downloadPath, release.sha256);
 
     core.info(`Extracting GFortran ${version} from ${downloadPath}...`);
@@ -167,4 +168,39 @@ async function resolveInstalledVersion(): Promise<string> {
   }
 
   return stdout.trim();
+}
+
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function downloadToolWithRetry(
+  url: string,
+  destination?: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination);
+    } catch (error) {
+      lastError = error;
+
+      if (destination) {
+        fs.rmSync(destination, { force: true });
+      }
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.info(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
 }

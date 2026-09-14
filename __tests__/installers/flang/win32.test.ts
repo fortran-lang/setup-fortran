@@ -119,6 +119,36 @@ describe("installWin32 (Flang)", () => {
       expect(mockedTc.cacheDir).toHaveBeenCalled();
     });
 
+    it("retries a failed download and succeeds", async () => {
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool
+        .mockRejectedValueOnce(new Error("Unexpected HTTP response: 504"))
+        .mockResolvedValue("C:\\Temp\\llvm.exe");
+      mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
+      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang");
+
+      jest.useFakeTimers();
+      try {
+        const installPromise = installWin32(baseInputs);
+
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+        expect(mockedTc.downloadTool).toHaveBeenCalledTimes(1);
+
+        // Advance past the 20s backoff after the first failure.
+        jest.advanceTimersByTime(20_000);
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+
+        await installPromise;
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+    });
+
     it("extracts the LLVM 23 MSI with an msiexec administrative install", async () => {
       const inputs = { ...baseInputs, version: "23" };
       mockedTc.find.mockReturnValue("");

@@ -93,6 +93,36 @@ describe("installWin32 (gfortran)", () => {
       expect(mockedTc.cacheDir).not.toHaveBeenCalled();
     });
 
+    it("retries a failed download and succeeds", async () => {
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool
+        .mockRejectedValueOnce(new Error("Unexpected HTTP response: 504"))
+        .mockResolvedValue("C:\\Temp\\gcc.zip");
+      mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
+      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\gfortran");
+
+      jest.useFakeTimers();
+      try {
+        const installPromise = installWin32(baseInputs);
+
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+        expect(mockedTc.downloadTool).toHaveBeenCalledTimes(1);
+
+        // Advance past the 20s backoff after the first failure.
+        jest.advanceTimersByTime(20_000);
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+
+        await installPromise;
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+    });
+
     it("exports environment variables", async () => {
       mockedTc.find.mockReturnValue("C:\\Cache\\gfortran");
 
