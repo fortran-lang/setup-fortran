@@ -166,5 +166,23 @@ describe("installWin32 (LFortran)", () => {
 
       expect(mockedSetupMSYS2).toHaveBeenCalledTimes(1);
     });
+
+    it("calls setupMSYS2 with Clang64 and exports variables", async () => {
+      const inputs = {
+        ...baseInputs,
+        msystem: Msystem.Clang64,
+        version: "latest",
+      };
+      const result = await installWin32(inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.Clang64, [
+        "lfortran",
+      ]);
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "WINDOWS_ENV",
+        Msystem.Clang64,
+      );
+      expect(result.fc).toEqual(expect.stringContaining("clang64"));
+    });
   });
 });

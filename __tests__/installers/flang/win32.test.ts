@@ -38,12 +38,20 @@ describe("installWin32 (Flang)", () => {
                         name: "LLVM-23.1.0-win64.msi",
                         digest: `sha256:${"a".repeat(64)}`,
                       },
+                      {
+                        name: "LLVM-23.1.0-woa64.msi",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
                     ],
                   }
                 : {
                     assets: [
                       {
                         name: "LLVM-22.1.0-win64.exe",
+                        digest: `sha256:${"a".repeat(64)}`,
+                      },
+                      {
+                        name: "LLVM-22.1.0-woa64.exe",
                         digest: `sha256:${"a".repeat(64)}`,
                       },
                     ],
@@ -205,6 +213,27 @@ describe("installWin32 (Flang)", () => {
         expect.stringContaining("Cache"),
       );
     });
+
+    it("resolves the woa64 asset suffix and Arch.ARM64 tool-cache key on Windows on Arm", async () => {
+      const inputs = { ...baseInputs, arch: Arch.ARM64, version: "22" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm-woa64.exe");
+      mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang-arm64");
+
+      const result = await installWin32(inputs);
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledWith(
+        expect.stringContaining("LLVM-22.1.0-woa64.exe"),
+        expect.stringContaining("LLVM-22.1.0-woa64.exe"),
+      );
+      expect(mockedTc.cacheDir).toHaveBeenCalledWith(
+        expect.any(String),
+        "flang-verified",
+        "22.1.0",
+        Arch.ARM64,
+      );
+      expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+    });
   });
 
   describe("MSYS2", () => {
@@ -222,6 +251,24 @@ describe("installWin32 (Flang)", () => {
         "flang",
         "llvm-openmp",
       ]);
+    });
+
+    it("calls setupMSYS2 with Clang64 and exports variables", async () => {
+      const inputs = {
+        ...baseInputs,
+        version: "latest",
+        msystem: Msystem.Clang64,
+      };
+      await installWin32(inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.Clang64, [
+        "flang",
+        "llvm-openmp",
+      ]);
+      expect(core.exportVariable).toHaveBeenCalledWith(
+        "WINDOWS_ENV",
+        Msystem.Clang64,
+      );
     });
   });
 });
