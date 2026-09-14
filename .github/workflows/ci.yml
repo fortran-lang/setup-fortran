@@ -8,6 +8,15 @@ on:
     - cron: "0 0 * * 5"
   workflow_dispatch:
 
+# Cancels a PR's or branch's in-progress run when a new commit supersedes it,
+# instead of leaving both competing for the same runner pool. Grouping by PR
+# number (rather than the head ref) keeps the group stable across force-pushes
+# and rebases; push/schedule/workflow_dispatch runs group by ref instead,
+# since they have no PR number.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   actions: read
   contents: read
