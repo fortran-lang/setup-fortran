@@ -98171,8 +98171,67 @@ function addMsvcBinFromPath(pathValue) {
     return msvcBin;
 }
 
-;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+;// CONCATENATED MODULE: ./src/intel_windows_env.ts
 
+
+
+
+
+
+const CAPTURED_ENV_KEY_PATTERN = /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
+/**
+ * Initializes MSVC (via vcvars64.bat) and Intel's oneAPI environment (via
+ * setvarsBat), then exports the combined environment. Shared by ifx and
+ * ifort on Windows, which both need MSVC active before setvars.bat runs so
+ * ifx/ifort can link against cl.
+ */
+async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
+    const batFile = external_path_default().win32.join(external_os_.tmpdir(), batchFileName);
+    external_fs_namespaceObject.writeFileSync(batFile, [
+        `@echo off`,
+        `:: 1. Find MSVC Installation Path via vswhere`,
+        `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
+        `:: 2. Initialize MSVC Environment Natively`,
+        `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
+        `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
+        `call "${setvarsBat}" --force`,
+        `:: 4. Dump the fully combined environment`,
+        `set`,
+    ].join("\r\n"));
+    let envOutput = "";
+    await exec_exec("cmd", ["/C", batFile], {
+        listeners: {
+            stdout: (data) => {
+                envOutput += data.toString();
+            },
+        },
+    });
+    for (const line of envOutput.split("\n")) {
+        const eqIdx = line.indexOf("=");
+        if (eqIdx === -1)
+            continue;
+        const key = line.substring(0, eqIdx).trim();
+        const val = line.substring(eqIdx + 1).trimEnd();
+        if (!CAPTURED_ENV_KEY_PATTERN.test(key))
+            continue;
+        if (key.toUpperCase() === "PATH") {
+            // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
+            // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
+            // we no longer need the secondary TypeScript vswhere lookup.
+            const filteredPath = val
+                .split(";")
+                .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
+                .join(";");
+            exportVariable("PATH", filteredPath);
+            addMsvcBinFromPath(filteredPath);
+        }
+        else {
+            exportVariable(key, val);
+        }
+    }
+}
+
+;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
 
 
 
@@ -98364,50 +98423,7 @@ async function win32_installWin32(inputs) {
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);
     }
-    // Create a temporary batch file to capture the environment variables
-    const batFile = external_path_default().win32.join(external_os_.tmpdir(), "setvars_and_dump.bat");
-    external_fs_namespaceObject.writeFileSync(batFile, [
-        `@echo off`,
-        `:: 1. Find MSVC Installation Path via vswhere`,
-        `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
-        `:: 2. Initialize MSVC Environment Natively`,
-        `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
-        `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
-        `call "${SETVARS_BAT}" --force`,
-        `:: 4. Dump the fully combined environment`,
-        `set`,
-    ].join("\r\n"));
-    let envOutput = "";
-    await exec_exec("cmd", ["/C", batFile], {
-        listeners: {
-            stdout: (data) => {
-                envOutput += data.toString();
-            },
-        },
-    });
-    for (const line of envOutput.split("\n")) {
-        const eqIdx = line.indexOf("=");
-        if (eqIdx === -1)
-            continue;
-        const key = line.substring(0, eqIdx).trim();
-        const val = line.substring(eqIdx + 1).trimEnd();
-        if (/^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-            if (key.toUpperCase() === "PATH") {
-                // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
-                // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
-                // we no longer need the secondary TypeScript vswhere lookup.
-                const filteredPath = val
-                    .split(";")
-                    .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
-                    .join(";");
-                exportVariable("PATH", filteredPath);
-                addMsvcBinFromPath(filteredPath);
-            }
-            else {
-                exportVariable(key, val);
-            }
-        }
-    }
+    await captureIntelWindowsEnvironment(SETVARS_BAT, "setvars_and_dump.bat");
     const resolvedVersion = await ifx_win32_resolveInstalledVersion();
     info(`ifx ${resolvedVersion} installed successfully.`);
     // The LLVM C/C++ drivers (icx/icpx) are only shipped by the HPC Kit
@@ -99045,7 +99061,6 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 
 
-
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry
@@ -99137,50 +99152,7 @@ async function ifort_win32_installWin32(inputs) {
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);
     }
-    // Create a temporary batch file to capture the environment variables
-    const batFile = external_path_default().win32.join(external_os_.tmpdir(), "setvars_ifort_dump.bat");
-    external_fs_namespaceObject.writeFileSync(batFile, [
-        `@echo off`,
-        `:: 1. Find MSVC Installation Path via vswhere`,
-        `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
-        `:: 2. Initialize MSVC Environment Natively`,
-        `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
-        `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
-        `call "${win32_SETVARS_BAT}" --force`,
-        `:: 4. Dump the fully combined environment`,
-        `set`,
-    ].join("\r\n"));
-    let envOutput = "";
-    await exec_exec("cmd", ["/C", batFile], {
-        listeners: {
-            stdout: (data) => {
-                envOutput += data.toString();
-            },
-        },
-    });
-    for (const line of envOutput.split("\n")) {
-        const eqIdx = line.indexOf("=");
-        if (eqIdx === -1)
-            continue;
-        const key = line.substring(0, eqIdx).trim();
-        const val = line.substring(eqIdx + 1).trimEnd();
-        if (/^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i.test(key)) {
-            if (key.toUpperCase() === "PATH") {
-                // Keep the filter to remove Git's link.exe to prevent "extra operand" errors.
-                // Since vcvars64.bat already prepended MSVC's link.exe to the PATH,
-                // we no longer need the secondary TypeScript vswhere lookup.
-                const filteredPath = val
-                    .split(";")
-                    .filter((p) => !p.toLowerCase().includes("git\\usr\\bin"))
-                    .join(";");
-                exportVariable("PATH", filteredPath);
-                addMsvcBinFromPath(filteredPath);
-            }
-            else {
-                exportVariable(key, val);
-            }
-        }
-    }
+    await captureIntelWindowsEnvironment(win32_SETVARS_BAT, "setvars_ifort_dump.bat");
     const resolvedVersion = await ifort_win32_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
     // Intel's classic C++ driver (icl) was discontinued in oneAPI 2024+ and is
