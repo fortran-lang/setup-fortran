@@ -98186,7 +98186,6 @@ const CAPTURED_ENV_KEY_PATTERN = /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.
  * ifx/ifort can link against cl.
  */
 async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
-    // Create a temporary batch file to capture the environment variables
     const batFile = external_path_default().win32.join(external_os_.tmpdir(), batchFileName);
     external_fs_namespaceObject.writeFileSync(batFile, [
         `@echo off`,

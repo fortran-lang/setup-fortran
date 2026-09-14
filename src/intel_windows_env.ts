@@ -18,7 +18,6 @@ export async function captureIntelWindowsEnvironment(
   setvarsBat: string,
   batchFileName: string,
 ): Promise<void> {
-  // Create a temporary batch file to capture the environment variables
   const batFile = path.win32.join(os.tmpdir(), batchFileName);
 
   fs.writeFileSync(
