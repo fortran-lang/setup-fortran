@@ -99,6 +99,10 @@ describe("installDebian (AOCC)", () => {
       expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
     ]);
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=30s",
+      "15m",
       "apt-get",
       "install",
       "-f",

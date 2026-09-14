@@ -99852,6 +99852,10 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
                 "apt-get",
                 "install",
                 "-f",
