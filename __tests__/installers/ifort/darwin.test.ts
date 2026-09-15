@@ -4,6 +4,7 @@ import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import * as fs from "fs";
 import { installDarwin } from "../../../src/installers/ifort/darwin";
+import { verifySha256 } from "../../../src/verify_download";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -22,6 +23,9 @@ describe("installDarwin (ifort)", () => {
   const mockedCache = cache as jest.Mocked<typeof cache>;
   const mockedTc = tc as jest.Mocked<typeof tc>;
   const mockedFs = fs as jest.Mocked<typeof fs>;
+  const mockedVerifySha256 = verifySha256 as jest.MockedFunction<
+    typeof verifySha256
+  >;
   const mockedExportVariable = core.exportVariable as jest.MockedFunction<
     typeof core.exportVariable
   >;
@@ -101,6 +105,48 @@ describe("installDarwin (ifort)", () => {
       "intel.oneapi.mac.ifort-compiler",
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalled();
+  });
+
+  it("verifies the downloaded DMG's checksum before mounting it", async () => {
+    mockedCache.restoreCache.mockResolvedValue(undefined);
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+
+    await installDarwin(baseInputs);
+
+    expect(mockedVerifySha256).toHaveBeenCalledWith(
+      "/tmp/ifort.dmg",
+      "a17790161712632605f50c37fc8462112ec9947993f9124d0aad53bc055d8fb2",
+    );
+    const verifyOrder = mockedVerifySha256.mock.invocationCallOrder[0];
+    const hdiutilVerifyCall = mockedExec.mock.calls.findIndex(
+      ([commandLine, args]) =>
+        commandLine === "hdiutil" && args?.[0] === "verify",
+    );
+    expect(
+      mockedExec.mock.invocationCallOrder[hdiutilVerifyCall],
+    ).toBeGreaterThan(verifyOrder);
+  });
+
+  it("does not verify or mount the DMG when its checksum is rejected", async () => {
+    mockedCache.restoreCache.mockResolvedValue(undefined);
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+    mockedVerifySha256.mockRejectedValueOnce(
+      new Error("SHA-256 verification failed for /tmp/ifort.dmg."),
+    );
+
+    await expect(installDarwin(baseInputs)).rejects.toThrow(
+      /SHA-256 verification failed/,
+    );
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "hdiutil",
+      expect.arrayContaining(["verify"]),
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "hdiutil",
+      expect.arrayContaining(["attach"]),
+    );
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
 
   it("retries a transient bootstrapper failure", async () => {
