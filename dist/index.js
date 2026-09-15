@@ -99709,6 +99709,23 @@ async function installNVFortran(inputs) {
 
 
 
+// Matches the timeout options every other Debian-based installer sets on its
+// apt-get calls (e.g. gfortran/debian.ts's APT_TIMEOUT_OPTS): fail fast on a
+// hung mirror instead of relying on apt's own (much longer) defaults, and
+// disable apt's built-in retry (Acquire::Retries=0) since the TS-level retry
+// loop below already retries the whole command with backoff.
+const aocc_debian_APT_TIMEOUT_OPTS = [
+    "-o",
+    "Acquire::http::Timeout=30",
+    "-o",
+    "Acquire::http::ConnectTimeout=20",
+    "-o",
+    "Acquire::https::Timeout=30",
+    "-o",
+    "Acquire::https::ConnectTimeout=20",
+    "-o",
+    "Acquire::Retries=0",
+];
 const AOCC_RELEASES = [
     {
         version: "5.2",
@@ -99779,7 +99796,7 @@ async function aocc_debian_installDebian(inputs) {
         ]);
         info(`Installing AOCC ${version}...`);
         await exec_exec("sudo", ["dpkg", "-i", debPath]);
-        await exec_exec("sudo", ["apt-get", "install", "-f", "-y"]);
+        await aptGetFixInstallWithRetry();
         info(`Saving AOCC ${version} to cache...`);
         await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
         await exec_exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
@@ -99826,6 +99843,34 @@ async function aocc_debian_installDebian(inputs) {
         cxx: "clang++",
     };
     return result;
+}
+// dpkg -i commonly leaves AOCC's declared dependencies unconfigured; this
+// fixup step fetches them over apt, so it is exposed to the same transient
+// mirror/network failures as any other apt-get call and needs the same
+// retry-with-backoff handling.
+async function aptGetFixInstallWithRetry(maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await exec_exec("sudo", [
+                "timeout",
+                "--signal=TERM",
+                "--kill-after=30s",
+                "15m",
+                "apt-get",
+                "install",
+                "-f",
+                "-y",
+                ...aocc_debian_APT_TIMEOUT_OPTS,
+            ]);
+            return;
+        }
+        catch (err) {
+            if (attempt === maxAttempts)
+                throw err;
+            info(`apt-get install -f failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            await new Promise((res) => setTimeout(res, attempt * 10_000));
+        }
+    }
 }
 async function aocc_debian_resolveInstalledVersion(binDir) {
     let output = "";
