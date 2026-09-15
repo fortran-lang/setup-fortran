@@ -125,6 +125,22 @@ describe("ci.yml canary structure", () => {
     expect(weekday).toBe("5");
   });
 
+  it("protects the weekly schedule run from being canceled by an unrelated push/PR", () => {
+    const concurrency = ciYml.concurrency as { group: string } | undefined;
+    expect(concurrency?.group).toBeTruthy();
+    const group = concurrency!.group;
+    const scheduleGuardIndex = group.indexOf("github.event_name == 'schedule'");
+    const runIdIndex = group.indexOf("github.run_id");
+    expect(scheduleGuardIndex).toBeGreaterThan(-1);
+    expect(runIdIndex).toBeGreaterThan(scheduleGuardIndex);
+  });
+
+  it("cancels in-progress runs on new pushes", () => {
+    const concurrency = ciYml.concurrency as
+      { "cancel-in-progress": boolean } | undefined;
+    expect(concurrency?.["cancel-in-progress"]).toBe(true);
+  });
+
   it("has a canary-report job", () => {
     expect(ciYml.jobs).toHaveProperty("canary-report");
   });
