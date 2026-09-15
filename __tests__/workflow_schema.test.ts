@@ -140,6 +140,11 @@ describe("ci.yml canary structure", () => {
     expect(runIdIndex).toBeGreaterThan(scheduleGuardIndex);
   });
 
+  it("cancels in-progress runs on new pushes", () => {
+    const concurrency = ciYml.concurrency as { "cancel-in-progress": boolean } | undefined;
+    expect(concurrency?.["cancel-in-progress"]).toBe(true);
+  });
+
   it("has a canary-report job", () => {
     expect(ciYml.jobs).toHaveProperty("canary-report");
   });
