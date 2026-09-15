@@ -392,4 +392,27 @@ describe("installWin32 (ifx)", () => {
     expect(core.exportVariable).toHaveBeenCalledWith("PATH", "C:\\bin");
     expect(core.exportVariable).toHaveBeenCalledWith("INTEL_VAR", "foo");
   });
+
+  it("dedupes PATH entries case-insensitively before exporting", async () => {
+    mockedRestoreCache.mockResolvedValue("cache-hit");
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "cmd" && args?.[0] === "/C") {
+        if (options?.listeners?.stdout) {
+          options.listeners.stdout(
+            Buffer.from(
+              "PATH=C:\\Intel\\bin;C:\\MSVC\\bin;C:\\intel\\BIN;;C:\\MSVC\\bin",
+            ),
+          );
+        }
+      }
+      return 0;
+    });
+
+    await installWin32(baseInputs);
+
+    expect(core.exportVariable).toHaveBeenCalledWith(
+      "PATH",
+      "C:\\Intel\\bin;C:\\MSVC\\bin",
+    );
+  });
 });
