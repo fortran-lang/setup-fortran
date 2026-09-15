@@ -136,7 +136,8 @@ describe("ci.yml canary structure", () => {
   });
 
   it("cancels in-progress runs on new pushes", () => {
-    const concurrency = ciYml.concurrency as { "cancel-in-progress": boolean } | undefined;
+    const concurrency = ciYml.concurrency as
+      { "cancel-in-progress": boolean } | undefined;
     expect(concurrency?.["cancel-in-progress"]).toBe(true);
   });
 
