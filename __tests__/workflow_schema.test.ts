@@ -126,11 +126,6 @@ describe("ci.yml canary structure", () => {
   });
 
   it("protects the weekly schedule run from being canceled by an unrelated push/PR", () => {
-    // The concurrency group must route schedule-triggered runs to their own
-    // unique group (keyed on run_id, which is never reused) *before* falling
-    // back to the PR number or ref that push/PR runs share — otherwise an
-    // unrelated push landing on the same branch could silently cancel the
-    // canary report before it finishes.
     const concurrency = ciYml.concurrency as { group: string } | undefined;
     expect(concurrency?.group).toBeTruthy();
     const group = concurrency!.group;
