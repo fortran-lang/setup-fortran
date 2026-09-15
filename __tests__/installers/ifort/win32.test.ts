@@ -104,6 +104,10 @@ describe("installWin32 (ifort)", () => {
       "ONEAPI_ROOT",
       "C:\\Program Files (x86)\\Intel\\oneAPI",
     );
+    expect(mockedExportVariable).toHaveBeenCalledWith(
+      "PATH",
+      "C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\latest\\windows\\bin",
+    );
   });
 
   it("resolves and returns the installed version", async () => {
