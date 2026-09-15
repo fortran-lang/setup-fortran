@@ -99867,7 +99867,7 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            warning(`apt-get install -f failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`apt-get install -f failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }

@@ -169,7 +169,7 @@ describe("installDebian (AOCC)", () => {
     jest.useRealTimers();
 
     expect(attempts).toBe(2);
-    expect(core.warning).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("apt-get install -f failed (attempt 1/3)"),
     );
   });
