@@ -103,7 +103,14 @@ describe("installDarwin (Flang)", () => {
   it("installs via Homebrew when version is LATEST", async () => {
     await installDarwin(baseInputs);
 
-    expect(mockedExec).toHaveBeenCalledWith("brew", ["install", "flang"]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "brew",
+      ["install", "flang"],
+      expect.objectContaining({
+        ignoreReturnCode: true,
+        env: expect.objectContaining({ HOMEBREW_NO_AUTO_UPDATE: "1" }),
+      }),
+    );
   });
 
   it("rejects concrete LLVM 23 on macOS (upstream publishes no macOS release binaries)", async () => {
@@ -125,6 +132,7 @@ describe("installDarwin (Flang)", () => {
 
     expect(mockedTc.downloadTool).toHaveBeenCalledWith(
       expect.stringContaining("github.com/llvm/llvm-project/releases/download"),
+      undefined,
     );
     expect(mockedTc.extractTar).toHaveBeenCalled();
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
@@ -166,6 +174,123 @@ describe("installDarwin (Flang)", () => {
       fc: "/usr/local/opt/flang/bin/flang",
       cc: "/usr/local/opt/llvm/bin/clang",
       cxx: "/usr/local/opt/llvm/bin/clang++",
+    });
+  });
+
+  describe("GitHub download retry", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("retries a failed download and succeeds", async () => {
+      const inputs = { ...baseInputs, version: "19" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool
+        .mockRejectedValueOnce(new Error("connection reset"))
+        .mockResolvedValue("/tmp/llvm.tar.xz");
+      mockedTc.extractTar.mockResolvedValue("/tmp/llvm-extracted");
+      mockedTc.cacheDir.mockResolvedValue("/cache/llvm");
+
+      jest.useFakeTimers();
+      const installPromise = installDarwin(inputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(1);
+
+      // Advance past the 20s backoff after the first failure.
+      jest.advanceTimersByTime(20_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      expect(mockedTc.extractTar).toHaveBeenCalled();
+    });
+
+    it("gives up after three attempts and propagates the last error", async () => {
+      const inputs = { ...baseInputs, version: "19" };
+      mockedTc.find.mockReturnValue("");
+      mockedTc.downloadTool.mockRejectedValue(new Error("network down"));
+
+      jest.useFakeTimers();
+      const installPromise = installDarwin(inputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(20_000); // backoff after attempt 1
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(40_000); // backoff after attempt 2
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(installPromise).rejects.toThrow("network down");
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(3);
+      expect(mockedTc.extractTar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("brew install retry", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("retries a failed brew install and succeeds", async () => {
+      let brewAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "brew" && args?.[0] === "install") {
+          brewAttempts++;
+          return brewAttempts === 1 ? 1 : 0;
+        }
+        if (commandLine.includes("flang") && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(Buffer.from("flang version 18.1.0"));
+        }
+        if (commandLine === "brew" && args?.[0] === "--prefix") {
+          options?.listeners?.stdout?.(Buffer.from("/usr/local"));
+        }
+        if (commandLine === "xcrun" && args?.[0] === "--show-sdk-path") {
+          options?.listeners?.stdout?.(Buffer.from("/path/to/SDK"));
+        }
+        return 0;
+      });
+
+      jest.useFakeTimers();
+      const installPromise = installDarwin(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(brewAttempts).toBe(1);
+
+      // Advance past the 15s backoff after the first failure.
+      jest.advanceTimersByTime(15_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+
+      expect(brewAttempts).toBe(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("brew install flang failed (attempt 1/3)"),
+      );
+    });
+
+    it("gives up after three failed brew install attempts", async () => {
+      mockedExec.mockImplementation(async (commandLine) => {
+        if (commandLine === "brew") return 1;
+        return 0;
+      });
+
+      jest.useFakeTimers();
+      const installPromise = installDarwin(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(15_000); // backoff after attempt 1
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(30_000); // backoff after attempt 2
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(installPromise).rejects.toThrow(
+        "brew install flang failed after 3 attempts.",
+      );
     });
   });
 });

@@ -83,7 +83,7 @@ async function installBrew(inputs: Inputs): Promise<InstallationResult> {
       `release will be installed regardless of any version input.`,
   );
 
-  await exec.exec("brew", ["install", "flang"]);
+  await brewInstallWithRetry("flang");
 
   const brewPrefix = await getBrewPrefix();
   const flangOptDir = path.posix.join(brewPrefix, "opt", "flang");
@@ -157,7 +157,7 @@ async function installFromGitHub(
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
-    const downloadPath = await tc.downloadTool(downloadUrl);
+    const downloadPath = await downloadToolWithRetry(downloadUrl);
     if (expectedSha256) {
       await verifySha256(downloadPath, expectedSha256);
     }
@@ -248,6 +248,72 @@ function resolveFlangBinary(binDir: string): string {
   throw new Error(
     `Could not find flang binary in ${binDir}. Checked: flang, flang-new.`,
   );
+}
+
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function downloadToolWithRetry(
+  url: string,
+  destination?: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination);
+    } catch (error) {
+      lastError = error;
+
+      if (destination) {
+        fs.rmSync(destination, { force: true });
+      }
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.info(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
+}
+
+// Mirrors src/installers/gfortran/darwin.ts's brewInstallWithRetry.
+async function brewInstallWithRetry(
+  formula: string,
+  maxAttempts = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const exitCode = await exec.exec("brew", ["install", formula], {
+      ignoreReturnCode: true,
+      env: {
+        ...process.env,
+        HOMEBREW_NO_AUTO_UPDATE: "1",
+      },
+    });
+
+    if (exitCode === 0) return;
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `brew install ${formula} failed after ${maxAttempts.toString()} attempts.`,
+      );
+    }
+
+    const delaySeconds = attempt * 15;
+    core.info(
+      `brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+  }
 }
 
 async function getBrewPrefix(): Promise<string> {

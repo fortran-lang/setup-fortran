@@ -84,6 +84,7 @@ describe("installDebian (LFortran)", () => {
         expect.stringContaining("0.63.0"),
         "lfortran==0.63.0",
       ]),
+      expect.objectContaining({ ignoreReturnCode: true }),
     );
   });
 
@@ -141,6 +142,7 @@ describe("installDebian (LFortran)", () => {
         expect.stringContaining("0.64.0"),
         "lfortran==0.64.0",
       ]),
+      expect.objectContaining({ ignoreReturnCode: true }),
     );
   });
 

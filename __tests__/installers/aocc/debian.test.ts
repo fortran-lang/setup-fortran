@@ -21,6 +21,7 @@ jest.mock("os", () => ({
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 
 describe("installDebian (AOCC)", () => {
@@ -245,5 +246,62 @@ describe("installDebian (AOCC)", () => {
     await expect(installDebian(inputs)).rejects.toThrow(
       "aocc 5.1.1 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
     );
+  });
+
+  describe("download retry", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("retries a failed .deb download, removes the partial file, and succeeds", async () => {
+      mockedDownloadTool
+        .mockRejectedValueOnce(new Error("connection reset"))
+        .mockResolvedValue("/tmp/aocc-compiler-5.1.0_1_amd64.deb");
+
+      jest.useFakeTimers();
+      const installPromise = installDebian(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(1);
+
+      // Advance past the 20s backoff after the first failure.
+      jest.advanceTimersByTime(20_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      expect(mockedFs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+        { force: true },
+      );
+      expect(mockedCache.saveCache).toHaveBeenCalled();
+    });
+
+    it("gives up after three attempts and propagates the last error", async () => {
+      mockedDownloadTool.mockRejectedValue(new Error("network down"));
+
+      jest.useFakeTimers();
+      const installPromise = installDebian(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(20_000); // backoff after attempt 1
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(40_000); // backoff after attempt 2
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(installPromise).rejects.toThrow("network down");
+
+      expect(mockedDownloadTool).toHaveBeenCalledTimes(3);
+      expect(mockedFs.rmSync).toHaveBeenCalledTimes(3);
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        "sudo",
+        expect.arrayContaining(["dpkg"]),
+      );
+      expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    });
   });
 });

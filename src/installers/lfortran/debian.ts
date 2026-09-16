@@ -8,6 +8,7 @@ import type { Inputs } from "../../types";
 import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
 import { verifySha256 } from "../../verify_download";
 import {
+  condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
   lfortranEnvironment,
@@ -80,7 +81,7 @@ export async function installDebian(
         "-p",
         environment.miniforgePrefix,
       ]);
-      await exec.exec(environment.conda, [
+      await condaCreateWithRetry(environment.conda, [
         "create",
         "-y",
         "-p",

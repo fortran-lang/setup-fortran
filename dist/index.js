@@ -99127,7 +99127,7 @@ async function ifort_win32_installWin32(inputs) {
         if (cacheHit)
             external_fs_namespaceObject.rmSync(win32_ONEAPI_ROOT, { recursive: true, force: true });
         info(`Downloading ifort installer...`);
-        const installerPath = await downloadTool(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
+        const installerPath = await ifort_win32_downloadToolWithRetry(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install (this may take several minutes)...");
         await exec_exec(`"${installerPath}"`, [
@@ -99214,6 +99214,27 @@ async function ifort_win32_installWin32(inputs) {
         cxx: "cl",
     };
     return result;
+}
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function ifort_win32_downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            external_fs_namespaceObject.rmSync(destination, { force: true });
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 async function ifort_win32_resolveInstalledVersion() {
     let output = "";
@@ -99785,10 +99806,7 @@ async function aocc_debian_installDebian(inputs) {
     else if (!external_fs_namespaceObject.existsSync(metadata.installDir)) {
         const debPath = external_path_.posix.join(external_os_.tmpdir(), metadata.deb);
         info(`Downloading AOCC ${version} from ${metadata.url}...`);
-        // Use tool-cache for resilient HTTP downloading with headers and retries
-        await downloadTool(metadata.url, debPath, undefined, {
-            "User-Agent": "Mozilla/5.0",
-        });
+        await debian_downloadToolWithRetry(metadata.url, debPath);
         info(`Verifying checksum...`);
         await exec_exec("bash", [
             "-c",
@@ -99871,6 +99889,29 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3) {
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
+}
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function debian_downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination, undefined, {
+                "User-Agent": "Mozilla/5.0",
+            });
+        }
+        catch (error) {
+            lastError = error;
+            external_fs_namespaceObject.rmSync(destination, { force: true });
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
 }
 async function aocc_debian_resolveInstalledVersion(binDir) {
     let output = "";
@@ -100238,7 +100279,7 @@ async function installBrew(inputs) {
     info(`Installing Flang on macOS (${inputs.arch}) via Homebrew...`);
     info(`Note: the Homebrew flang formula is unversioned — the latest available ` +
         `release will be installed regardless of any version input.`);
-    await exec_exec("brew", ["install", "flang"]);
+    await darwin_brewInstallWithRetry("flang");
     const brewPrefix = await darwin_getBrewPrefix();
     const flangOptDir = external_path_.posix.join(brewPrefix, "opt", "flang");
     const binDir = external_path_.posix.join(flangOptDir, "bin");
@@ -100291,7 +100332,7 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     let toolRoot = find("flang-verified", patch, inputs.arch);
     if (!toolRoot) {
         info(`Downloading ${filename}...`);
-        const downloadPath = await downloadTool(downloadUrl);
+        const downloadPath = await darwin_downloadToolWithRetry(downloadUrl);
         if (expectedSha256) {
             await verifySha256(downloadPath, expectedSha256);
         }
@@ -100360,6 +100401,49 @@ function resolveFlangBinary(binDir) {
             return candidate;
     }
     throw new Error(`Could not find flang binary in ${binDir}. Checked: flang, flang-new.`);
+}
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function darwin_downloadToolWithRetry(url, destination, maxAttempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await downloadTool(url, destination);
+        }
+        catch (error) {
+            lastError = error;
+            if (destination) {
+                external_fs_namespaceObject.rmSync(destination, { force: true });
+            }
+            if (attempt === maxAttempts)
+                break;
+            const delaySeconds = attempt * 20;
+            info(`Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+                `retrying in ${delaySeconds.toString()}s: ${String(error)}`);
+            await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
+    }
+    throw lastError;
+}
+// Mirrors src/installers/gfortran/darwin.ts's brewInstallWithRetry.
+async function darwin_brewInstallWithRetry(formula, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const exitCode = await exec_exec("brew", ["install", formula], {
+            ignoreReturnCode: true,
+            env: {
+                ...process.env,
+                HOMEBREW_NO_AUTO_UPDATE: "1",
+            },
+        });
+        if (exitCode === 0)
+            return;
+        if (attempt === maxAttempts) {
+            throw new Error(`brew install ${formula} failed after ${maxAttempts.toString()} attempts.`);
+        }
+        const delaySeconds = attempt * 15;
+        info(`brew install ${formula} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${delaySeconds.toString()}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
 }
 async function darwin_getBrewPrefix() {
     let output = "";
@@ -100874,7 +100958,7 @@ async function lfortran_debian_installDebian(inputs) {
                 "-p",
                 environment.miniforgePrefix,
             ]);
-            await exec_exec(environment.conda, [
+            await condaCreateWithRetry(environment.conda, [
                 "create",
                 "-y",
                 "-p",

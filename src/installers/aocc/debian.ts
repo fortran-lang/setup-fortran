@@ -104,10 +104,7 @@ export async function installDebian(
     const debPath = path.posix.join(os.tmpdir(), metadata.deb);
 
     core.info(`Downloading AOCC ${version} from ${metadata.url}...`);
-    // Use tool-cache for resilient HTTP downloading with headers and retries
-    await tc.downloadTool(metadata.url, debPath, undefined, {
-      "User-Agent": "Mozilla/5.0",
-    });
+    await downloadToolWithRetry(metadata.url, debPath);
 
     core.info(`Verifying checksum...`);
     await exec.exec("bash", [
@@ -200,6 +197,41 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3): Promise<void> {
       await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
   }
+}
+
+// tc.downloadTool's built-in retries are seconds apart; a CDN wobble lasting
+// minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
+async function downloadToolWithRetry(
+  url: string,
+  destination: string,
+  maxAttempts = 3,
+): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await tc.downloadTool(url, destination, undefined, {
+        "User-Agent": "Mozilla/5.0",
+      });
+    } catch (error) {
+      lastError = error;
+
+      fs.rmSync(destination, { force: true });
+
+      if (attempt === maxAttempts) break;
+
+      const delaySeconds = attempt * 20;
+
+      core.info(
+        `Download failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), ` +
+          `retrying in ${delaySeconds.toString()}s: ${String(error)}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    }
+  }
+
+  throw lastError;
 }
 
 async function resolveInstalledVersion(binDir: string): Promise<string> {
