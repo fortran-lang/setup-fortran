@@ -1,7 +1,6 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
-import * as tc from "@actions/tool-cache";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
@@ -11,6 +10,7 @@ import {
   validateRestoredCompilerCache,
 } from "../../cache_validation";
 import { verifySha256 } from "../../verify_download";
+import { downloadInstaller } from "../../download_installer";
 
 // Intel dropped ifort support starting with the 2024 oneAPI release.
 // NOTE: Intel's macOS download GUIDs change frequently. These are the standard
@@ -70,51 +70,6 @@ export const SUPPORTED_VERSIONS = {
 
 const ONEAPI_ROOT = "/opt/intel/oneapi";
 const SETVARS_SH = `${ONEAPI_ROOT}/setvars.sh`;
-
-async function downloadInstaller(
-  url: string,
-  destPath: string,
-): Promise<string> {
-  const maxTcAttempts = 3;
-
-  for (let attempt = 1; attempt <= maxTcAttempts; attempt++) {
-    try {
-      core.info(
-        `Downloading via tool-cache (attempt ${attempt.toString()}/${maxTcAttempts.toString()})...`,
-      );
-      return await tc.downloadTool(url, destPath);
-    } catch (error) {
-      core.info(
-        `tc.downloadTool failed (attempt ${attempt.toString()}/${maxTcAttempts.toString()}): ${String(error)}`,
-      );
-      if (attempt < maxTcAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
-      }
-    }
-  }
-
-  core.info(
-    "tc.downloadTool failed after all attempts. Falling back to curl...",
-  );
-  await exec.exec("curl", [
-    "-sS",
-    "-L",
-    "--fail",
-    "--retry",
-    "5",
-    "--retry-delay",
-    "5",
-    "--connect-timeout",
-    "30",
-    "--max-time",
-    "600",
-    "-o",
-    destPath,
-    url,
-  ]);
-
-  return destPath;
-}
 
 async function ensureRosetta(): Promise<void> {
   const probe = await exec.exec("arch", ["-x86_64", "/usr/bin/true"], {
