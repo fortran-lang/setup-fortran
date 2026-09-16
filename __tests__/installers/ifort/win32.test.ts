@@ -16,6 +16,7 @@ jest.mock("fs", () => ({
   writeFileSync: jest.fn(),
   existsSync: jest.fn(),
   mkdirSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 
 describe("installWin32 (ifort)", () => {
@@ -147,5 +148,66 @@ describe("installWin32 (ifort)", () => {
       "PATH",
       "C:\\Intel\\bin;C:\\MSVC\\bin",
     );
+  });
+
+  describe("download retry", () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("retries a failed download, removes the partial file, and succeeds", async () => {
+      mockedCache.restoreCache.mockResolvedValue(undefined);
+      mockedTc.downloadTool
+        .mockRejectedValueOnce(new Error("connection reset"))
+        .mockResolvedValue("C:\\Temp\\ifort.exe");
+
+      jest.useFakeTimers();
+      const installPromise = installWin32(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(1);
+
+      // Advance past the 20s backoff after the first failure.
+      jest.advanceTimersByTime(20_000);
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await installPromise;
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      expect(mockedFs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining("ifort-2021.10.exe"),
+        { force: true },
+      );
+      expect(mockedCache.saveCache).toHaveBeenCalled();
+    });
+
+    it("gives up after three attempts and propagates the last error", async () => {
+      mockedCache.restoreCache.mockResolvedValue(undefined);
+      mockedTc.downloadTool.mockRejectedValue(new Error("network down"));
+
+      jest.useFakeTimers();
+      const installPromise = installWin32(baseInputs);
+
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(20_000); // backoff after attempt 1
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      jest.advanceTimersByTime(40_000); // backoff after attempt 2
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      await expect(installPromise).rejects.toThrow("network down");
+
+      expect(mockedTc.downloadTool).toHaveBeenCalledTimes(3);
+      expect(mockedFs.rmSync).toHaveBeenCalledTimes(3);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 1/3)"),
+      );
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Download failed (attempt 2/3)"),
+      );
+      expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    });
   });
 });
