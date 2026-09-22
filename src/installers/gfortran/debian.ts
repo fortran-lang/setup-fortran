@@ -85,7 +85,7 @@ export async function installDebian(
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
   }
 
-  await aptGetUpdateWithRetry(!!cacheHit, ppaAdded);
+  await aptGetUpdateWithRetry(ppaAdded);
 
   if (cacheHit) {
     core.info(`Cache hit for ${cacheKey}, installing from cache...`);
@@ -178,7 +178,6 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
 }
 
 async function aptGetUpdateWithRetry(
-  cacheHit: boolean,
   ppaAdded: boolean,
   maxAttempts = 3,
 ): Promise<void> {
@@ -213,10 +212,14 @@ async function aptGetUpdateWithRetry(
     // Repositories baked into the runner image that have nothing to do with
     // the toolchain (e.g. packages.microsoft.com returning a transient 403)
     // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
-    // PPA — whose index is required to resolve the gcc packages — is fatal.
+    // PPA — whose index is required to resolve the gcc packages — is fatal
+    // and must be retried, even on a cache hit: the .deb cache alone is
+    // useless without a fresh package index (apt still needs the index to
+    // resolve package names, so --no-download would fail with
+    // "Unable to locate package").
     const ppaFetchFailed =
       ppaAdded && indexFetchFailed(output, "ppa.launchpad");
-    if (cacheHit || !ppaFetchFailed) {
+    if (!ppaFetchFailed) {
       core.info(
         "apt-get update did not complete cleanly; continuing with cached/stale package index.",
       );

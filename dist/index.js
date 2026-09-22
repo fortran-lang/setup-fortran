@@ -96478,7 +96478,7 @@ async function installDebian(inputs) {
         info(`Adding PPA for GFortran ${version}...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
-    await aptGetUpdateWithRetry(!!cacheHit, ppaAdded);
+    await aptGetUpdateWithRetry(ppaAdded);
     if (cacheHit) {
         info(`Cache hit for ${cacheKey}, installing from cache...`);
         try {
@@ -96561,7 +96561,7 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(cacheHit, ppaAdded, maxAttempts = 3) {
+async function aptGetUpdateWithRetry(ppaAdded, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         let output = "";
         const exitCode = await exec_exec("sudo", [
@@ -96589,9 +96589,13 @@ async function aptGetUpdateWithRetry(cacheHit, ppaAdded, maxAttempts = 3) {
         // Repositories baked into the runner image that have nothing to do with
         // the toolchain (e.g. packages.microsoft.com returning a transient 403)
         // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
-        // PPA — whose index is required to resolve the gcc packages — is fatal.
+        // PPA — whose index is required to resolve the gcc packages — is fatal
+        // and must be retried, even on a cache hit: the .deb cache alone is
+        // useless without a fresh package index (apt still needs the index to
+        // resolve package names, so --no-download would fail with
+        // "Unable to locate package").
         const ppaFetchFailed = ppaAdded && indexFetchFailed(output, "ppa.launchpad");
-        if (cacheHit || !ppaFetchFailed) {
+        if (!ppaFetchFailed) {
             info("apt-get update did not complete cleanly; continuing with cached/stale package index.");
             return;
         }
