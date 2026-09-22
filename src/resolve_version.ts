@@ -367,6 +367,7 @@ export function isVersionListDescending(versions: readonly string[]): boolean {
 interface GitHubRelease {
   tag_name: string;
   prerelease: boolean;
+  assets?: { name: string; digest?: string | null }[];
 }
 
 // FIX: Added multi-page fallback strategy to guarantee legacy version visibility
@@ -405,6 +406,137 @@ export async function resolveLatestPatch(
 
   throw new Error(
     `No stable release found for ${repo} major ${major} within visible historical GitHub releases.`,
+  );
+}
+
+/**
+ * Resolves the newest stable patch of `major` that actually ships the
+ * required installer asset, along with its SHA-256 digest.
+ *
+ * `resolveLatestPatch` picks the newest tag blindly, which breaks when
+ * upstream stops publishing an asset for a newer patch (e.g. LLVM 23.1.2
+ * ships `win64.msi` but no `woa64.msi`, while 23.1.1 ships both). The
+ * release-list endpoint already embeds each release's asset names, so the
+ * newest patch *with* the asset is picked without extra per-tag fetches.
+ * Releases without an embedded asset list fall back to a `verifyAssetExists`
+ * probe (whose digest is reused, so the caller never re-verifies).
+ * Explicit user-pinned patches bypass this helper and keep failing
+ * loudly via `verifyAssetExists`.
+ */
+export async function resolveLatestPatchWithAsset(
+  repo: string,
+  major: string,
+  filenameForPatch: (patch: string) => string,
+  tagPrefix = `llvmorg-${major}.`,
+  tagStripper: (tag: string) => string = (tag) => tag.replace("llvmorg-", ""),
+  tagFromPatch: (patch: string) => string = (p) => `llvmorg-${p}`,
+): Promise<{ patch: string; digest: string | undefined }> {
+  core.info(
+    `Resolving latest patch version for ${repo} major ${major} with required asset via GitHub API...`,
+  );
+
+  // Collect stable candidates newest-first across pages; decide locally when
+  // the list response embeds assets, probe per-tag otherwise. A partial page
+  // (< per_page) is the last page: stop listing and probe what we have.
+  const unknownAssetCandidates: string[] = [];
+  const tried: string[] = [];
+
+  for (let page = 1; page <= 3; page++) {
+    const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
+    const { data: releases } = await fetchJsonWithRetry<GitHubRelease[]>(url, {
+      headers: githubHeaders(),
+    });
+
+    if (!releases || releases.length === 0) {
+      break;
+    }
+
+    for (const release of releases) {
+      if (
+        !release.tag_name.startsWith(tagPrefix) ||
+        release.prerelease ||
+        release.tag_name.includes("rc")
+      ) {
+        continue;
+      }
+      const patch = tagStripper(release.tag_name);
+      tried.push(patch);
+
+      if (release.assets !== undefined) {
+        const filename = filenameForPatch(patch);
+        if (release.assets.some((a) => a.name === filename)) {
+          // Drain any earlier unknowns that are newer: they need a probe to
+          // prove they lack the asset before falling back to this match.
+          const probed = await probeUnknownCandidates(
+            repo,
+            unknownAssetCandidates,
+            filenameForPatch,
+            tagFromPatch,
+          );
+          if (probed) return probed;
+          const digest = await verifyAssetExists(
+            repo,
+            patch,
+            filename,
+            tagFromPatch,
+          );
+          return { patch, digest };
+        }
+        core.info(
+          `Release ${release.tag_name} in ${repo} has no asset "${filename}", trying older patch...`,
+        );
+        continue;
+      }
+      unknownAssetCandidates.push(patch);
+    }
+
+    if (releases.length < 100) break;
+  }
+
+  // No list-embedded match: probe the unknowns newest-first.
+  const probed = await probeUnknownCandidates(
+    repo,
+    unknownAssetCandidates,
+    filenameForPatch,
+    tagFromPatch,
+  );
+  if (probed) return probed;
+
+  throw new Error(
+    `No stable release found for ${repo} major ${major} with required asset. Tried: ${tried.join(", ") || "none"}.`,
+  );
+}
+
+async function probeUnknownCandidates(
+  repo: string,
+  candidates: string[],
+  filenameForPatch: (patch: string) => string,
+  tagFromPatch: (patch: string) => string,
+): Promise<{ patch: string; digest: string | undefined } | undefined> {
+  for (const patch of candidates) {
+    const filename = filenameForPatch(patch);
+    try {
+      const digest = await verifyAssetExists(
+        repo,
+        patch,
+        filename,
+        tagFromPatch,
+      );
+      return { patch, digest };
+    } catch (e) {
+      if (!isMissingAssetError(e)) throw e;
+      core.info(
+        `Release ${tagFromPatch(patch)} in ${repo} has no asset "${filename}", trying older patch...`,
+      );
+    }
+  }
+  return undefined;
+}
+
+function isMissingAssetError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    msg.includes("has no asset") || msg.includes("does not exist (no release")
   );
 }
 

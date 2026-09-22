@@ -20,44 +20,55 @@ jest.mock("fs", () => ({
 
 describe("installWin32 (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockImplementation(
-      async (input: string | URL) =>
-        ({
+    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/releases?")) {
+        // Paginated list: only page 1 carries data; later pages are empty
+        // so asset-aware resolution terminates instead of re-scanning.
+        const page = new URL(url).searchParams.get("page") ?? "1";
+        return {
           ok: true,
           status: 200,
           json: async () =>
-            String(input).includes("/releases?")
+            page === "1"
               ? [
                   { tag_name: "llvmorg-23.1.0", prerelease: false },
                   { tag_name: "llvmorg-22.1.0", prerelease: false },
                 ]
-              : String(input).includes("llvmorg-23.1.0")
-                ? {
-                    assets: [
-                      {
-                        name: "LLVM-23.1.0-win64.msi",
-                        digest: `sha256:${"a".repeat(64)}`,
-                      },
-                      {
-                        name: "LLVM-23.1.0-woa64.msi",
-                        digest: `sha256:${"a".repeat(64)}`,
-                      },
-                    ],
-                  }
-                : {
-                    assets: [
-                      {
-                        name: "LLVM-22.1.0-win64.exe",
-                        digest: `sha256:${"a".repeat(64)}`,
-                      },
-                      {
-                        name: "LLVM-22.1.0-woa64.exe",
-                        digest: `sha256:${"a".repeat(64)}`,
-                      },
-                    ],
+              : [],
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          url.includes("llvmorg-23.1.0")
+            ? {
+                assets: [
+                  {
+                    name: "LLVM-23.1.0-win64.msi",
+                    digest: `sha256:${"a".repeat(64)}`,
                   },
-        }) as unknown as Response,
-    );
+                  {
+                    name: "LLVM-23.1.0-woa64.msi",
+                    digest: `sha256:${"a".repeat(64)}`,
+                  },
+                ],
+              }
+            : {
+                assets: [
+                  {
+                    name: "LLVM-22.1.0-win64.exe",
+                    digest: `sha256:${"a".repeat(64)}`,
+                  },
+                  {
+                    name: "LLVM-22.1.0-woa64.exe",
+                    digest: `sha256:${"a".repeat(64)}`,
+                  },
+                ],
+              },
+      };
+    });
   });
 
   afterEach(() => {
@@ -233,6 +244,80 @@ describe("installWin32 (Flang)", () => {
         Arch.ARM64,
       );
       expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+    });
+
+    it("falls back to an older patch when the newest lacks the woa64 asset", async () => {
+      // Regression test: llvmorg-23.1.2 ships win64.msi but no woa64.msi,
+      // while 23.1.1 ships both. A bare "23" on ARM64 must resolve to 23.1.1.
+      const inputs = { ...baseInputs, arch: Arch.ARM64, version: "23" };
+      const fetchMock = global.fetch as jest.Mock;
+      const originalImpl = fetchMock.getMockImplementation();
+      const digest = `sha256:${"b".repeat(64)}`;
+      fetchMock.mockImplementation(async (input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/releases?")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                tag_name: "llvmorg-23.1.2",
+                prerelease: false,
+                assets: [{ name: "LLVM-23.1.2-win64.msi" }],
+              },
+              {
+                tag_name: "llvmorg-23.1.1",
+                prerelease: false,
+                assets: [
+                  { name: "LLVM-23.1.1-win64.msi" },
+                  { name: "LLVM-23.1.1-woa64.msi" },
+                ],
+              },
+            ],
+          };
+        }
+        if (url.includes("llvmorg-23.1.1")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              assets: [
+                { name: "LLVM-23.1.1-win64.msi", digest },
+                { name: "LLVM-23.1.1-woa64.msi", digest },
+              ],
+            }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            assets: [{ name: "LLVM-23.1.2-win64.msi", digest }],
+          }),
+        };
+      });
+
+      try {
+        mockedTc.find.mockReturnValue("");
+        mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\llvm-woa64.msi");
+        mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\flang-arm64");
+
+        const result = await installWin32(inputs);
+
+        expect(mockedTc.downloadTool).toHaveBeenCalledWith(
+          expect.stringContaining("LLVM-23.1.1-woa64.msi"),
+          expect.stringContaining("LLVM-23.1.1-woa64.msi"),
+        );
+        expect(mockedTc.cacheDir).toHaveBeenCalledWith(
+          expect.any(String),
+          "flang-verified",
+          "23.1.1",
+          Arch.ARM64,
+        );
+        expect(result.fc).toEqual(expect.stringContaining("flang.exe"));
+      } finally {
+        fetchMock.mockImplementation(originalImpl);
+      }
     });
   });
 

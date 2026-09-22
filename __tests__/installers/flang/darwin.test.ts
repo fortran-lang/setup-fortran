@@ -30,24 +30,32 @@ jest.mock("fs", () => ({
 
 describe("installDarwin (Flang)", () => {
   beforeAll(() => {
-    global.fetch = jest.fn().mockImplementation(
-      async (input: string | URL) =>
-        ({
+    global.fetch = jest.fn().mockImplementation(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/releases?")) {
+        const page = new URL(url).searchParams.get("page") ?? "1";
+        return {
           ok: true,
           status: 200,
           json: async () =>
-            String(input).includes("/releases?")
+            page === "1"
               ? [{ tag_name: "llvmorg-19.1.7", prerelease: false }]
-              : {
-                  assets: [
-                    {
-                      name: "LLVM-19.1.7-macOS-X64.tar.xz",
-                      digest: `sha256:${"a".repeat(64)}`,
-                    },
-                  ],
-                },
-        }) as unknown as Response,
-    );
+              : [],
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assets: [
+            {
+              name: "LLVM-19.1.7-macOS-X64.tar.xz",
+              digest: `sha256:${"a".repeat(64)}`,
+            },
+          ],
+        }),
+      };
+    });
   });
 
   afterEach(() => {

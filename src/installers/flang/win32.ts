@@ -13,7 +13,7 @@ import {
 import {
   resolveWindowsVersion,
   parseMajorOrPatch,
-  resolveLatestPatch,
+  resolveLatestPatchWithAsset,
   verifyAssetExists,
 } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
@@ -220,23 +220,37 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
   });
   const { major, patch: userPatch } = parseMajorOrPatch(resolved);
 
+  const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
+  const majorNum = parseInt(major, 10);
+
   let patch: string;
+  let expectedSha256: string | undefined;
 
   if (userPatch !== undefined) {
     patch = userPatch;
+    const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
+    expectedSha256 = await verifyAssetExists(
+      "llvm/llvm-project",
+      patch,
+      filename,
+    );
   } else {
-    patch = await resolveLatestPatch("llvm/llvm-project", major);
+    // Newer patches may drop an arch installer (e.g. 23.1.2 ships win64.msi
+    // but no woa64.msi); resolve to the newest patch that has our asset.
+    // The helper already verified the asset and returns its digest.
+    const filenameForPatch = (p: string): string =>
+      `LLVM-${p}-${suffix}.${installerExtension(majorNum)}`;
+    const resolvedAsset = await resolveLatestPatchWithAsset(
+      "llvm/llvm-project",
+      major,
+      filenameForPatch,
+    );
+    patch = resolvedAsset.patch;
+    expectedSha256 = resolvedAsset.digest;
   }
 
-  const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
-  const majorNum = parseInt(major, 10);
   const isMsi = majorNum >= 23;
   const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
-  const expectedSha256 = await verifyAssetExists(
-    "llvm/llvm-project",
-    patch,
-    filename,
-  );
   const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
 
   core.info(

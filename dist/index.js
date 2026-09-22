@@ -96319,7 +96319,7 @@ function isVersionListDescending(versions) {
 }
 // FIX: Added multi-page fallback strategy to guarantee legacy version visibility
 async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
-    info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
+    core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
     // Walk up to 3 pagination indexes to unearth deep historical patches
     for (let page = 1; page <= 3; page++) {
         const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
@@ -96337,6 +96337,87 @@ async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, 
         }
     }
     throw new Error(`No stable release found for ${repo} major ${major} within visible historical GitHub releases.`);
+}
+/**
+ * Resolves the newest stable patch of `major` that actually ships the
+ * required installer asset, along with its SHA-256 digest.
+ *
+ * `resolveLatestPatch` picks the newest tag blindly, which breaks when
+ * upstream stops publishing an asset for a newer patch (e.g. LLVM 23.1.2
+ * ships `win64.msi` but no `woa64.msi`, while 23.1.1 ships both). The
+ * release-list endpoint already embeds each release's asset names, so the
+ * newest patch *with* the asset is picked without extra per-tag fetches.
+ * Releases without an embedded asset list fall back to a `verifyAssetExists`
+ * probe (whose digest is reused, so the caller never re-verifies).
+ * Explicit user-pinned patches bypass this helper and keep failing
+ * loudly via `verifyAssetExists`.
+ */
+async function resolveLatestPatchWithAsset(repo, major, filenameForPatch, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", ""), tagFromPatch = (p) => `llvmorg-${p}`) {
+    info(`Resolving latest patch version for ${repo} major ${major} with required asset via GitHub API...`);
+    // Collect stable candidates newest-first across pages; decide locally when
+    // the list response embeds assets, probe per-tag otherwise. A partial page
+    // (< per_page) is the last page: stop listing and probe what we have.
+    const unknownAssetCandidates = [];
+    const tried = [];
+    for (let page = 1; page <= 3; page++) {
+        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
+        const { data: releases } = await fetchJsonWithRetry(url, {
+            headers: githubHeaders(),
+        });
+        if (!releases || releases.length === 0) {
+            break;
+        }
+        for (const release of releases) {
+            if (!release.tag_name.startsWith(tagPrefix) ||
+                release.prerelease ||
+                release.tag_name.includes("rc")) {
+                continue;
+            }
+            const patch = tagStripper(release.tag_name);
+            tried.push(patch);
+            if (release.assets !== undefined) {
+                const filename = filenameForPatch(patch);
+                if (release.assets.some((a) => a.name === filename)) {
+                    // Drain any earlier unknowns that are newer: they need a probe to
+                    // prove they lack the asset before falling back to this match.
+                    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
+                    if (probed)
+                        return probed;
+                    const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
+                    return { patch, digest };
+                }
+                info(`Release ${release.tag_name} in ${repo} has no asset "${filename}", trying older patch...`);
+                continue;
+            }
+            unknownAssetCandidates.push(patch);
+        }
+        if (releases.length < 100)
+            break;
+    }
+    // No list-embedded match: probe the unknowns newest-first.
+    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
+    if (probed)
+        return probed;
+    throw new Error(`No stable release found for ${repo} major ${major} with required asset. Tried: ${tried.join(", ") || "none"}.`);
+}
+async function probeUnknownCandidates(repo, candidates, filenameForPatch, tagFromPatch) {
+    for (const patch of candidates) {
+        const filename = filenameForPatch(patch);
+        try {
+            const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
+            return { patch, digest };
+        }
+        catch (e) {
+            if (!isMissingAssetError(e))
+                throw e;
+            info(`Release ${tagFromPatch(patch)} in ${repo} has no asset "${filename}", trying older patch...`);
+        }
+    }
+    return undefined;
+}
+function isMissingAssetError(e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return (msg.includes("has no asset") || msg.includes("does not exist (no release"));
 }
 async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `llvmorg-${p}`) {
     const tag = tagFromPatch(patch);
@@ -100303,14 +100384,18 @@ async function flang_darwin_installDarwin(inputs) {
     // User specified a major or full patch version — use GitHub releases.
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
     let patch;
+    let expectedSha256;
     if (userPatch !== undefined) {
         patch = userPatch;
+        const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
+        expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     }
     else {
-        patch = await resolveLatestPatch("llvm/llvm-project", major);
+        const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
+        const resolvedAsset = await resolveLatestPatchWithAsset("llvm/llvm-project", major, (p) => `LLVM-${p}-${suffix}.tar.xz`);
+        patch = resolvedAsset.patch;
+        expectedSha256 = resolvedAsset.digest;
     }
-    const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
-    const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     return await installFromGitHub(inputs, major, patch, expectedSha256);
 }
 // Installs flang via Homebrew. The `flang` formula is unversioned and always
@@ -100629,18 +100714,26 @@ async function win32_installNative(inputs) {
         matchMajorIfPatch: true,
     });
     const { major, patch: userPatch } = parseMajorOrPatch(resolved);
-    let patch;
-    if (userPatch !== undefined) {
-        patch = userPatch;
-    }
-    else {
-        patch = await resolveLatestPatch("llvm/llvm-project", major);
-    }
     const suffix = WINDOWS_INSTALLER_SUFFIX[inputs.arch];
     const majorNum = parseInt(major, 10);
+    let patch;
+    let expectedSha256;
+    if (userPatch !== undefined) {
+        patch = userPatch;
+        const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
+        expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
+    }
+    else {
+        // Newer patches may drop an arch installer (e.g. 23.1.2 ships win64.msi
+        // but no woa64.msi); resolve to the newest patch that has our asset.
+        // The helper already verified the asset and returns its digest.
+        const filenameForPatch = (p) => `LLVM-${p}-${suffix}.${installerExtension(majorNum)}`;
+        const resolvedAsset = await resolveLatestPatchWithAsset("llvm/llvm-project", major, filenameForPatch);
+        patch = resolvedAsset.patch;
+        expectedSha256 = resolvedAsset.digest;
+    }
     const isMsi = majorNum >= 23;
     const filename = `LLVM-${patch}-${suffix}.${installerExtension(majorNum)}`;
-    const expectedSha256 = await verifyAssetExists("llvm/llvm-project", patch, filename);
     const downloadUrl = `https://github.com/llvm/llvm-project/releases/download/llvmorg-${patch}/${filename}`;
     info(`Installing Flang ${major} (${patch}) on Windows (${inputs.arch})...`);
     let toolRoot = find("flang-verified", patch, inputs.arch);

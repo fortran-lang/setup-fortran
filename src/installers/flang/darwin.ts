@@ -7,7 +7,7 @@ import { Arch, LATEST, type InstallationResult } from "../../types";
 import {
   resolveVersion,
   parseMajorOrPatch,
-  resolveLatestPatch,
+  resolveLatestPatchWithAsset,
   verifyAssetExists,
 } from "../../resolve_version";
 import type { Inputs } from "../../types";
@@ -57,18 +57,25 @@ export async function installDarwin(
   const { major, patch: userPatch } = parseMajorOrPatch(resolved);
 
   let patch: string;
+  let expectedSha256: string | undefined;
   if (userPatch !== undefined) {
     patch = userPatch;
+    const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
+    expectedSha256 = await verifyAssetExists(
+      "llvm/llvm-project",
+      patch,
+      filename,
+    );
   } else {
-    patch = await resolveLatestPatch("llvm/llvm-project", major);
+    const suffix = MACOS_ASSET_SUFFIX[inputs.arch];
+    const resolvedAsset = await resolveLatestPatchWithAsset(
+      "llvm/llvm-project",
+      major,
+      (p: string): string => `LLVM-${p}-${suffix}.tar.xz`,
+    );
+    patch = resolvedAsset.patch;
+    expectedSha256 = resolvedAsset.digest;
   }
-
-  const filename = `LLVM-${patch}-${MACOS_ASSET_SUFFIX[inputs.arch]}.tar.xz`;
-  const expectedSha256 = await verifyAssetExists(
-    "llvm/llvm-project",
-    patch,
-    filename,
-  );
 
   return await installFromGitHub(inputs, major, patch, expectedSha256);
 }

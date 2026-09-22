@@ -2,6 +2,7 @@ import {
   resolveVersion,
   resolveWindowsVersion,
   resolveLatestPatch,
+  resolveLatestPatchWithAsset,
   verifyAssetExists,
   stripTrailingPatchZero,
 } from "../src/resolve_version";
@@ -1029,5 +1030,189 @@ describe("year-version coercion: reject ambiguous bare numbers", () => {
         { stripPatchZero: true },
       ),
     ).toThrow(AMBIGUOUS_ERROR);
+  });
+});
+
+describe("resolveLatestPatchWithAsset", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const woa64 = (p: string) => `LLVM-${p}-woa64.msi`;
+
+  function listResponse(releases: unknown[]) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => releases,
+    };
+  }
+
+  function tagResponse(names: string[]) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ assets: names.map((name) => ({ name })) }),
+    };
+  }
+
+  // Mocks the releases list (paginated; only page 1 has data, rest empty)
+  // so the helper never runs past the mocked pages.
+  function mockListOnce(releases: unknown[]) {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      const s = String(url);
+      if (s.includes("/releases?")) {
+        const page = new URL(s).searchParams.get("page") ?? "1";
+        return page === "1" ? listResponse(releases) : listResponse([]);
+      }
+      throw new Error(`unexpected fetch: ${s}`);
+    });
+    return mockFetch;
+  }
+
+  it("returns the newest patch when it ships the asset", async () => {
+    const mockFetch = mockListOnce([
+      {
+        tag_name: "llvmorg-23.1.1",
+        prerelease: false,
+        assets: [{ name: woa64("23.1.1") }, { name: "other" }],
+      },
+      {
+        tag_name: "llvmorg-23.1.0",
+        prerelease: false,
+        assets: [{ name: woa64("23.1.0") }],
+      },
+    ]);
+
+    const digest = "c".repeat(64);
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      const s = String(url);
+      if (s.includes("/releases?")) {
+        const page = new URL(s).searchParams.get("page") ?? "1";
+        return page === "1"
+          ? listResponse([
+              {
+                tag_name: "llvmorg-23.1.1",
+                prerelease: false,
+                assets: [{ name: woa64("23.1.1") }, { name: "other" }],
+              },
+              {
+                tag_name: "llvmorg-23.1.0",
+                prerelease: false,
+                assets: [{ name: woa64("23.1.0") }],
+              },
+            ])
+          : listResponse([]);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assets: [{ name: woa64("23.1.1"), digest: `sha256:${digest}` }],
+        }),
+      };
+    });
+
+    const result = await resolveLatestPatchWithAsset(
+      "llvm/llvm-project",
+      "23",
+      woa64,
+    );
+    expect(result).toEqual({ patch: "23.1.1", digest });
+    // List + single verify of the chosen patch.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips a newer patch missing the asset (23.1.2 has no woa64.msi)", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    const digest = "d".repeat(64);
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      const s = String(url);
+      if (s.includes("/releases?")) {
+        const page = new URL(s).searchParams.get("page") ?? "1";
+        return page === "1"
+          ? listResponse([
+              {
+                tag_name: "llvmorg-23.1.2",
+                prerelease: false,
+                assets: [{ name: "LLVM-23.1.2-win64.msi" }],
+              },
+              {
+                tag_name: "llvmorg-23.1.1",
+                prerelease: false,
+                assets: [
+                  { name: "LLVM-23.1.1-win64.msi" },
+                  { name: woa64("23.1.1") },
+                ],
+              },
+            ])
+          : listResponse([]);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assets: [{ name: woa64("23.1.1"), digest: `sha256:${digest}` }],
+        }),
+      };
+    });
+
+    const result = await resolveLatestPatchWithAsset(
+      "llvm/llvm-project",
+      "23",
+      woa64,
+    );
+    expect(result).toEqual({ patch: "23.1.1", digest });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("probes per-tag when the list embeds no asset names", async () => {
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      const s = String(url);
+      if (s.includes("/releases?")) {
+        const page = new URL(s).searchParams.get("page") ?? "1";
+        if (page !== "1") return listResponse([]);
+        return listResponse([
+          { tag_name: "llvmorg-23.1.2", prerelease: false },
+          { tag_name: "llvmorg-23.1.1", prerelease: false },
+        ]);
+      }
+      if (s.includes("llvmorg-23.1.1")) {
+        return tagResponse(["LLVM-23.1.1-win64.msi", woa64("23.1.1")]);
+      }
+      return tagResponse(["LLVM-23.1.2-win64.msi"]);
+    });
+
+    const result = await resolveLatestPatchWithAsset(
+      "llvm/llvm-project",
+      "23",
+      woa64,
+    );
+    // No digest in the tag mock, so digest is undefined — still resolves.
+    expect(result).toEqual({ patch: "23.1.1", digest: undefined });
+    // 1 list fetch + 2 tag probes (newest fails, older succeeds; the
+    // successful probe's digest is reused, no extra verify call).
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("throws when no patch ships the asset", async () => {
+    mockListOnce([
+      {
+        tag_name: "llvmorg-23.1.2",
+        prerelease: false,
+        assets: [{ name: "LLVM-23.1.2-win64.msi" }],
+      },
+    ]);
+
+    await expect(
+      resolveLatestPatchWithAsset("llvm/llvm-project", "23", woa64),
+    ).rejects.toThrow(/No stable release found.*with required asset.*23\.1\.2/);
   });
 });
