@@ -207,7 +207,6 @@ async function aptGetUpdateWithRetry(
         },
       },
     );
-    if (exitCode === 0) return;
 
     // Repositories baked into the runner image that have nothing to do with
     // the toolchain (e.g. packages.microsoft.com returning a transient 403)
@@ -216,9 +215,13 @@ async function aptGetUpdateWithRetry(
     // and must be retried, even on a cache hit: the .deb cache alone is
     // useless without a fresh package index (apt still needs the index to
     // resolve package names, so --no-download would fail with
-    // "Unable to locate package").
+    // "Unable to locate package"). Note apt-get update can exit 0 even
+    // when the PPA's index failed (it only logs a W: warning), so the PPA
+    // check has to happen before any early return on exit code.
     const ppaFetchFailed =
       ppaAdded && indexFetchFailed(output, "ppa.launchpad");
+    if (exitCode === 0 && !ppaFetchFailed) return;
+
     if (!ppaFetchFailed) {
       core.info(
         "apt-get update did not complete cleanly; continuing with cached/stale package index.",
