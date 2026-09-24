@@ -273,6 +273,64 @@ describe("installDebian nvfortran", () => {
     );
   });
 
+  it("falls back to the 13.3 tarball for version 26.9", async () => {
+    const inputs = { ...baseInputs, version: "26.9" };
+    mockedGetExecOutput.mockImplementation(async (command, args) => ({
+      stdout:
+        command === "dpkg-query"
+          ? "install ok installed install ok installed"
+          : "",
+      stderr: "",
+      exitCode:
+        command === "curl" &&
+        args?.some((arg) => arg.includes("_cuda_13.3.tar.gz"))
+          ? 0
+          : command === "dpkg-query"
+            ? 0
+            : 22,
+    }));
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (commandLine === "nvfortran" && args?.[0] === "--version") {
+        options?.listeners?.stdout?.(Buffer.from("nvfortran 26.9-0"));
+      }
+      if (
+        commandLine === "sudo" &&
+        args?.includes("apt-get") &&
+        args.includes("nvhpc-26-9")
+      ) {
+        throw new Error("404 Not Found");
+      }
+      return 0;
+    });
+
+    await installDebian(inputs);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["apt-get", "install", "nvhpc-26-9"]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "-o",
+        expect.stringContaining("nvhpc_2026_269_Linux_x86_64_cuda_13.3.tar.gz"),
+        "https://developer.download.nvidia.com/hpc-sdk/26.9/nvhpc_2026_269_Linux_x86_64_cuda_13.3.tar.gz",
+      ]),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "env",
+        "NVHPC_SILENT=true",
+        "NVHPC_INSTALL_DIR=/opt/nvidia/hpc_sdk",
+        "NVHPC_INSTALL_TYPE=single",
+        expect.stringContaining(
+          "nvhpc_2026_269_Linux_x86_64_cuda_13.3/install",
+        ),
+      ]),
+    );
+  });
+
   it("retries the tarball install when the first curl download fails", async () => {
     const inputs = { ...baseInputs, version: "20.7" };
     let tarballDownloads = 0;

@@ -99440,6 +99440,7 @@ const APT_NETWORK_OPTIONS = [
 const NVHPC_SOURCE_LIST_FILE = "nvhpc.list";
 const nvfortran_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: [
+        "26.9",
         "26.5",
         "26.3",
         "26.1",
@@ -99480,6 +99481,7 @@ const nvfortran_debian_SUPPORTED_VERSIONS = {
         "20.7",
     ],
     [Arch.ARM64]: [
+        "26.9",
         "26.5",
         "26.3",
         "26.1",
@@ -99530,6 +99532,7 @@ const NV_ARCH = {
 };
 const LEGACY_NCURSES_MAX_VERSION = "24.3";
 const CUDA_VERSIONS = [
+    "13.3",
     "13.2",
     "13.1",
     "13.0",

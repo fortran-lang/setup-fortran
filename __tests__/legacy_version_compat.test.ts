@@ -239,6 +239,7 @@ const IFORT_WINDOWS = [
 ] as const;
 
 const NVF = [
+  "26.9",
   "26.5",
   "26.3",
   "26.1",

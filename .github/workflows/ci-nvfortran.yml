@@ -18,6 +18,7 @@ jobs:
       matrix:
         image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
         toolchain:
+          - { compiler: nvfortran, version: "26.9" }
           - { compiler: nvfortran, version: "26.5" }
           - { compiler: nvfortran, version: "26.3" }
           - { compiler: nvfortran, version: "26.1" }
