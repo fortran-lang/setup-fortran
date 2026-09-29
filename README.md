@@ -124,7 +124,7 @@ Notes:
 
 - In 2022, `ifx` compiler version numbers differed from oneAPI release numbers. Specify the compiler version here, not the oneAPI release number.
 
-- `ifx` versions ≤2023.1.0 can take significantly longer to install on `windows-2022`. When possible, use `2023.2.0` or newer.
+- `ifx` versions ≤2023.1.0 can take significantly longer to install on `windows-2022`. If possible, use `2023.2.0` or newer.
 
 ---
 
@@ -153,7 +153,7 @@ Notes:
 
 - Intel ships `ifort` for macOS as x86_64 binaries. On ARM64 runners they run under Rosetta 2, which the action verifies (and installs if missing) before installation. To keep companion C/C++ objects linkable there, the action exports `CFLAGS`, `CXXFLAGS`, and `LDFLAGS` with `-arch x86_64`.
 
-- `ifort` versions ≤2021.9 can take significantly longer to install on `windows-2022`. When possible, use `2021.10` or newer.
+- `ifort` versions ≤2021.9 can take significantly longer to install on `windows-2022`. If possible, use `2021.10` or newer.
 
 ---
 
