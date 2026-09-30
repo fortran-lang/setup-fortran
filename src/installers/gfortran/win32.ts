@@ -137,7 +137,10 @@ async function installNative(
 }
 
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
-  await setupMSYS2(inputs.msystem, ["gcc-fortran"]);
+  // The MSYS2 gcc-fortran package only lists libgomp as an optional
+  // dependency (split out in 16.2.0-4); without it -fopenmp fails to link
+  // with "cannot find -lgomp".
+  await setupMSYS2(inputs.msystem, ["gcc-fortran", "libgomp"]);
 
   const msysBin = path.win32.join("C:\\msys64", inputs.msystem, "bin");
   const gfortranPath = path.win32.join(msysBin, "gfortran.exe");

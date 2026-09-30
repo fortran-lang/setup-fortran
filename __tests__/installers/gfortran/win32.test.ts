@@ -139,8 +139,11 @@ describe("installWin32 (gfortran)", () => {
       };
       await installWin32(inputs);
 
+      // libgomp is required for -fopenmp; gcc-fortran only lists it
+      // as an optional dependency since 16.2.0-4.
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
         "gcc-fortran",
+        "libgomp",
       ]);
     });
   });
