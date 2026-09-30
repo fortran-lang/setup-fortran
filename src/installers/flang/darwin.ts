@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as tc from "@actions/tool-cache";
 import { Arch, LATEST, type InstallationResult } from "../../types";
 import {
@@ -164,7 +165,10 @@ async function installFromGitHub(
 
   if (!toolRoot) {
     core.info(`Downloading ${filename}...`);
-    const downloadPath = await downloadToolWithRetry(downloadUrl);
+    const downloadPath = await downloadToolWithRetry(
+      downloadUrl,
+      path.posix.join(os.tmpdir(), filename),
+    );
     if (expectedSha256) {
       await verifySha256(downloadPath, expectedSha256);
     }
@@ -261,7 +265,7 @@ function resolveFlangBinary(binDir: string): string {
 // minutes needs an outer loop. Mirrors src/installers/ifx/win32.ts.
 async function downloadToolWithRetry(
   url: string,
-  destination?: string,
+  destination: string,
   maxAttempts = 3,
 ): Promise<string> {
   let lastError: unknown;
@@ -272,9 +276,7 @@ async function downloadToolWithRetry(
     } catch (error) {
       lastError = error;
 
-      if (destination) {
-        fs.rmSync(destination, { force: true });
-      }
+      fs.rmSync(destination, { force: true });
 
       if (attempt === maxAttempts) break;
 
@@ -298,13 +300,17 @@ async function brewInstallWithRetry(
   maxAttempts = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const exitCode = await exec.exec("brew", ["install", formula], {
-      ignoreReturnCode: true,
-      env: {
-        ...process.env,
-        HOMEBREW_NO_AUTO_UPDATE: "1",
+    const exitCode = await exec.exec(
+      "brew",
+      ["install", "--skip-post-install", formula],
+      {
+        ignoreReturnCode: true,
+        env: {
+          ...process.env,
+          HOMEBREW_NO_AUTO_UPDATE: "1",
+        },
       },
-    });
+    );
 
     if (exitCode === 0) return;
 

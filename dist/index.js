@@ -100393,6 +100393,7 @@ async function flang_debian_resolveInstalledVersion(fc) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 //
@@ -100504,7 +100505,7 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
     let toolRoot = find("flang-verified", patch, inputs.arch);
     if (!toolRoot) {
         info(`Downloading ${filename}...`);
-        const downloadPath = await darwin_downloadToolWithRetry(downloadUrl);
+        const downloadPath = await darwin_downloadToolWithRetry(downloadUrl, external_path_.posix.join(external_os_.tmpdir(), filename));
         if (expectedSha256) {
             await verifySha256(downloadPath, expectedSha256);
         }
@@ -100584,9 +100585,7 @@ async function darwin_downloadToolWithRetry(url, destination, maxAttempts = 3) {
         }
         catch (error) {
             lastError = error;
-            if (destination) {
-                external_fs_namespaceObject.rmSync(destination, { force: true });
-            }
+            external_fs_namespaceObject.rmSync(destination, { force: true });
             if (attempt === maxAttempts)
                 break;
             const delaySeconds = attempt * 20;
@@ -100600,7 +100599,7 @@ async function darwin_downloadToolWithRetry(url, destination, maxAttempts = 3) {
 // Mirrors src/installers/gfortran/darwin.ts's brewInstallWithRetry.
 async function darwin_brewInstallWithRetry(formula, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const exitCode = await exec_exec("brew", ["install", formula], {
+        const exitCode = await exec_exec("brew", ["install", "--skip-post-install", formula], {
             ignoreReturnCode: true,
             env: {
                 ...process.env,
