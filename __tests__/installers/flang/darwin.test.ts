@@ -113,7 +113,7 @@ describe("installDarwin (Flang)", () => {
 
     expect(mockedExec).toHaveBeenCalledWith(
       "brew",
-      ["install", "flang"],
+      ["install", "--skip-post-install", "flang"],
       expect.objectContaining({
         ignoreReturnCode: true,
         env: expect.objectContaining({ HOMEBREW_NO_AUTO_UPDATE: "1" }),
@@ -140,7 +140,7 @@ describe("installDarwin (Flang)", () => {
 
     expect(mockedTc.downloadTool).toHaveBeenCalledWith(
       expect.stringContaining("github.com/llvm/llvm-project/releases/download"),
-      undefined,
+      expect.stringContaining("LLVM-19.1.7"),
     );
     expect(mockedTc.extractTar).toHaveBeenCalled();
     expect(core.addPath).toHaveBeenCalledWith(expect.stringContaining("bin"));
