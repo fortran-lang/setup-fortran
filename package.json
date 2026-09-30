@@ -34,7 +34,7 @@
     "all": "npm run format && npm run lint && npm run test && npm run build && npm run test:bundle"
   },
   "dependencies": {
-    "@actions/cache": "^6.2.0",
+    "@actions/cache": "^6.3.0",
     "@actions/core": "^3.0.1",
     "@actions/exec": "^3.0.0",
     "@actions/tool-cache": "^4.0.0"
@@ -42,15 +42,15 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.3",
     "@vercel/ncc": "^0.45.0",
-    "eslint": "^10.10.0",
+    "eslint": "^10.11.0",
     "globals": "^17.12.0",
-    "jest": "^30.5.1",
+    "jest": "^30.5.2",
     "js-yaml": "^5.4.2",
-    "prettier": "^3.9.6",
-    "ts-jest": "^29.4.12",
+    "prettier": "^3.9.9",
+    "ts-jest": "^29.4.14",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.71.0"
   }
 }
