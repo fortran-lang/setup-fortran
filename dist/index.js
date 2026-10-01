@@ -99605,6 +99605,19 @@ async function pacmanInstallWithRetry(pkgList, maxAttempts = 3) {
         }
     }
 }
+// pacman resolves against the package database baked into the runner image,
+// and this module never syncs it (a sync without a full upgrade is a partial
+// upgrade, which MSYS2 does not support). A package added upstream can
+// therefore be missing on an older image, so optional ones must be probed.
+async function msys2PackageAvailable(msystem, pkg) {
+    try {
+        await exec_exec("C:\\msys64\\usr\\bin\\bash.exe", ["-lc", `pacman -Si ${msys2PkgName(msystem, pkg)}`], { silent: true });
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 function msys2PkgName(msystem, pkg) {
     const prefix = PKG_PREFIX[msystem];
     if (!prefix) {
@@ -99753,10 +99766,15 @@ async function installNative(inputs, version) {
     return result;
 }
 async function installMSYS2(inputs) {
-    // The MSYS2 gcc-fortran package only lists libgomp as an optional
-    // dependency (split out in 16.2.0-4); without it -fopenmp fails to link
-    // with "cannot find -lgomp".
-    await setupMSYS2(inputs.msystem, ["gcc-fortran", "libgomp"]);
+    // gcc-fortran only lists libgomp as an optional dependency (split out in
+    // 16.2.0-4); without it -fopenmp fails to link with "cannot find -lgomp".
+    // On an image whose package database predates the split there is no libgomp
+    // package to install and the older gcc-fortran still bundles the runtime.
+    const packages = ["gcc-fortran"];
+    if (await msys2PackageAvailable(inputs.msystem, "libgomp")) {
+        packages.push("libgomp");
+    }
+    await setupMSYS2(inputs.msystem, packages);
     const msysBin = external_path_namespaceObject.win32.join("C:\\msys64", inputs.msystem, "bin");
     const gfortranPath = external_path_namespaceObject.win32.join(msysBin, "gfortran.exe");
     const gccPath = external_path_namespaceObject.win32.join(msysBin, "gcc.exe");

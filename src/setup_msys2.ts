@@ -60,6 +60,26 @@ export async function pacmanInstallWithRetry(
   }
 }
 
+// pacman resolves against the package database baked into the runner image,
+// and this module never syncs it (a sync without a full upgrade is a partial
+// upgrade, which MSYS2 does not support). A package added upstream can
+// therefore be missing on an older image, so optional ones must be probed.
+export async function msys2PackageAvailable(
+  msystem: Msystem,
+  pkg: string,
+): Promise<boolean> {
+  try {
+    await exec.exec(
+      "C:\\msys64\\usr\\bin\\bash.exe",
+      ["-lc", `pacman -Si ${msys2PkgName(msystem, pkg)}`],
+      { silent: true },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function msys2PkgName(msystem: Msystem, pkg: string): string {
   const prefix = PKG_PREFIX[msystem];
   if (!prefix) {

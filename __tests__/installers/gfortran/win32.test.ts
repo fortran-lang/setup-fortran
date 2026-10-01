@@ -3,7 +3,7 @@ import * as exec from "@actions/exec";
 import * as tc from "@actions/tool-cache";
 import * as path from "path";
 import { installWin32 } from "../../../src/installers/gfortran/win32";
-import { setupMSYS2 } from "../../../src/setup_msys2";
+import { msys2PackageAvailable, setupMSYS2 } from "../../../src/setup_msys2";
 import { verifySha256 } from "../../../src/verify_download";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
@@ -17,6 +17,8 @@ describe("installWin32 (gfortran)", () => {
   const mockedExec = exec.exec as jest.MockedFunction<typeof exec.exec>;
   const mockedTc = tc as jest.Mocked<typeof tc>;
   const mockedSetupMSYS2 = setupMSYS2 as jest.MockedFunction<typeof setupMSYS2>;
+  const mockedMsys2PackageAvailable =
+    msys2PackageAvailable as jest.MockedFunction<typeof msys2PackageAvailable>;
   const mockedVerifySha256 = verifySha256 as jest.MockedFunction<
     typeof verifySha256
   >;
@@ -131,19 +133,32 @@ describe("installWin32 (gfortran)", () => {
   });
 
   describe("MSYS2", () => {
-    it("calls setupMSYS2 and exports variables", async () => {
-      const inputs = {
-        ...baseInputs,
-        version: "latest",
-        msystem: Msystem.UCRT64,
-      };
-      await installWin32(inputs);
+    const msys2Inputs = {
+      ...baseInputs,
+      version: "latest",
+      msystem: Msystem.UCRT64,
+    };
+
+    it("installs libgomp when the package database provides it", async () => {
+      mockedMsys2PackageAvailable.mockResolvedValue(true);
+
+      await installWin32(msys2Inputs);
 
       // libgomp is required for -fopenmp; gcc-fortran only lists it
       // as an optional dependency since 16.2.0-4.
       expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
         "gcc-fortran",
         "libgomp",
+      ]);
+    });
+
+    it("omits libgomp when the package database predates the split", async () => {
+      mockedMsys2PackageAvailable.mockResolvedValue(false);
+
+      await installWin32(msys2Inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
+        "gcc-fortran",
       ]);
     });
   });

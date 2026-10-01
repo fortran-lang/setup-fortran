@@ -11,7 +11,7 @@ import {
   type Inputs,
 } from "../../types";
 import { resolveWindowsVersion } from "../../resolve_version";
-import { setupMSYS2 } from "../../setup_msys2";
+import { msys2PackageAvailable, setupMSYS2 } from "../../setup_msys2";
 import { verifySha256 } from "../../verify_download";
 
 // Make sure the versions are in descending order. The first one will be
@@ -137,10 +137,16 @@ async function installNative(
 }
 
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
-  // The MSYS2 gcc-fortran package only lists libgomp as an optional
-  // dependency (split out in 16.2.0-4); without it -fopenmp fails to link
-  // with "cannot find -lgomp".
-  await setupMSYS2(inputs.msystem, ["gcc-fortran", "libgomp"]);
+  // gcc-fortran only lists libgomp as an optional dependency (split out in
+  // 16.2.0-4); without it -fopenmp fails to link with "cannot find -lgomp".
+  // On an image whose package database predates the split there is no libgomp
+  // package to install and the older gcc-fortran still bundles the runtime.
+  const packages = ["gcc-fortran"];
+  if (await msys2PackageAvailable(inputs.msystem, "libgomp")) {
+    packages.push("libgomp");
+  }
+
+  await setupMSYS2(inputs.msystem, packages);
 
   const msysBin = path.win32.join("C:\\msys64", inputs.msystem, "bin");
   const gfortranPath = path.win32.join(msysBin, "gfortran.exe");

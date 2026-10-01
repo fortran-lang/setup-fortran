@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import {
   setupMSYS2,
+  msys2PackageAvailable,
   msys2PkgName,
   pacmanInstallWithRetry,
 } from "../src/setup_msys2";
@@ -97,6 +98,30 @@ describe("setupMSYS2", () => {
     expect(mockedExec).toHaveBeenCalledTimes(3);
     expect(core.addPath).not.toHaveBeenCalled();
     expect(core.exportVariable).not.toHaveBeenCalled();
+  });
+});
+
+describe("msys2PackageAvailable", () => {
+  it("reports a package the database knows about", async () => {
+    await expect(
+      msys2PackageAvailable(Msystem.UCRT64, "libgomp"),
+    ).resolves.toBe(true);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      PACMAN_CMD,
+      ["-lc", "pacman -Si mingw-w64-ucrt-x86_64-libgomp"],
+      { silent: true },
+    );
+  });
+
+  it("reports a package missing from the database", async () => {
+    mockedExec.mockRejectedValue(
+      new Error("error: package 'libgomp' was not found"),
+    );
+
+    await expect(
+      msys2PackageAvailable(Msystem.UCRT64, "libgomp"),
+    ).resolves.toBe(false);
   });
 });
 
