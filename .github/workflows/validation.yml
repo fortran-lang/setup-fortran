@@ -1,0 +1,137 @@
+name: validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  format-lint:
+    name: format, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Check Formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+  unit-tests:
+    name: unit tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test
+
+  build:
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    needs: [format-lint, unit-tests]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build dist
+        run: npm run build
+
+      - name: Smoke test bundled action
+        run: npm run test:bundle
+
+      - name: Save dist
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-${{ matrix.os }}
+          path: dist
+
+      - name: Build dist-verify
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run build:verify-installation
+
+      - name: Save dist-verify
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-verify
+          path: dist-verify
+
+      - name: Build dist-tests
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run build:integration-test
+
+      - name: Save dist-tests
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-dist-tests
+          path: dist-tests
+
+  verify-dist:
+    name: verify dist
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download ubuntu dist
+        uses: actions/download-artifact@v7
+        with:
+          name: generated-dist-ubuntu-latest
+          path: /tmp/dist-ubuntu
+
+      - name: Download windows dist
+        uses: actions/download-artifact@v7
+        with:
+          name: generated-dist-windows-latest
+          path: /tmp/dist-windows
+
+      - name: Verify committed dist matches ubuntu build
+        run: |
+          if ! diff -r dist /tmp/dist-ubuntu > /tmp/dist-stale.diff; then
+            echo "::error::dist/ is out of date. Please run 'npm run build' and commit the changes. If your dist/ is already up to date, but you are using another operating system, please check for a dependency or bundler change that caused the difference."
+            cat /tmp/dist-stale.diff
+            exit 1
+          fi
+
+      - name: Verify committed dist matches windows build
+        run: |
+          if ! diff -r dist /tmp/dist-windows > /tmp/dist-stale-windows.diff; then
+            echo "::error::dist/ is out of date. Please run 'npm run build' and commit the changes. If your dist/ is already up to date, but you are using another operating system, please check for a dependency or bundler change that caused the difference."
+            cat /tmp/dist-stale-windows.diff
+            exit 1
+          fi
