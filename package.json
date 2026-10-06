@@ -21,7 +21,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "ncc build src/index.ts -o dist --source-map",
+    "build": "ncc build src/index.ts -o dist",
     "build:integration-test": "ncc build src/run_fortran_tests.ts -o dist-tests --source-map",
     "build:verify-installation": "ncc build src/verify_installation.ts -o dist-verify --source-map",
     "format": "prettier --write src/**/*.ts \"__tests__/**/*.ts\"",
