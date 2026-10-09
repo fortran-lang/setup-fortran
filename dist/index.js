@@ -102011,8 +102011,13 @@ async function aocc_debian_installDebian(inputs) {
             `echo "${metadata.sha256}  ${debPath}" | sha256sum -c -`,
         ]);
         info(`Installing AOCC ${version}...`);
-        await exec_exec("sudo", ["dpkg", "-i", debPath]);
-        await aptGetFixInstallWithRetry();
+        if (dependsOnRenamedLibxml2(inputs.osVersion)) {
+            await installDebWithoutDependencyCheck(debPath, metadata.installDir);
+        }
+        else {
+            await exec_exec("sudo", ["dpkg", "-i", debPath]);
+            await aocc_debian_aptGetInstallWithRetry(["install", "-f", "-y"], "install -f");
+        }
         info(`Saving AOCC ${version} to cache...`);
         await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
         await exec_exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
@@ -102060,11 +102065,46 @@ async function aocc_debian_installDebian(inputs) {
     };
     return result;
 }
-// dpkg -i commonly leaves AOCC's declared dependencies unconfigured; this
+// Ubuntu 26.04 (resolute) renamed the libxml2 package to libxml2-16, so the
+// .deb's `Depends: libxml2` can never be satisfied there. AOCC does not link
+// libxml2 (no binary lists it as NEEDED), so the dependency is spurious.
+// Matches the runner's ImageOS ("ubuntu26") or a "26.04" style version.
+function dependsOnRenamedLibxml2(osVersion) {
+    const match = /ubuntu(\d+)|\b(\d+)\.04\b/.exec(osVersion);
+    const major = Number(match?.[1] ?? match?.[2]);
+    return major >= 26;
+}
+// The runtime dependencies from the .deb's control file, minus libxml2 and
+// the unused libncurses5-dev.
+const DEB_RUNTIME_DEPENDENCIES = [
+    "libstdc++6",
+    "libzstd1",
+    "libquadmath0",
+    "zlib1g",
+    "gcc",
+];
+// The .deb has no maintainer scripts and only contains the /opt/AMD tree, so
+// unpacking it is equivalent to installing it. Extract to a temp directory
+// first: dpkg-deb -x onto / would also reset the modes of / and /opt.
+async function installDebWithoutDependencyCheck(debPath, installDir) {
+    await aocc_debian_aptGetInstallWithRetry(["install", "-y", ...DEB_RUNTIME_DEPENDENCIES], "install -y");
+    const extractDir = external_path_namespaceObject.posix.join(external_os_.tmpdir(), "aocc-deb-extract");
+    await exec_exec("rm", ["-rf", extractDir]);
+    await exec_exec("dpkg-deb", ["-x", debPath, extractDir]);
+    await exec_exec("sudo", ["mkdir", "-p", installDir]);
+    await exec_exec("sudo", [
+        "cp",
+        "-rT",
+        external_path_namespaceObject.posix.join(extractDir, installDir),
+        installDir,
+    ]);
+    await exec_exec("rm", ["-rf", extractDir]);
+}
+// dpkg -i commonly leaves AOCC's declared dependencies unconfigured; the apt
 // fixup step fetches them over apt, so it is exposed to the same transient
 // mirror/network failures as any other apt-get call and needs the same
 // retry-with-backoff handling.
-async function aptGetFixInstallWithRetry(maxAttempts = 3) {
+async function aocc_debian_aptGetInstallWithRetry(args, label, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             await exec_exec("sudo", [
@@ -102073,9 +102113,7 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3) {
                 "--kill-after=30s",
                 "15m",
                 "apt-get",
-                "install",
-                "-f",
-                "-y",
+                ...args,
                 ...aocc_debian_APT_TIMEOUT_OPTS,
             ]);
             return;
@@ -102083,7 +102121,7 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            info(`apt-get install -f failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`apt-get ${label} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 10_000));
         }
     }
