@@ -336,14 +336,24 @@ function buildTestManifest(): TestCase[] {
       name: "polymorphism_test",
       fortranSources: ["polymorphism_mod_test.f90", "polymorphism_test.f90"],
       // Flang gained the required OOP support in LLVM 19.
-      skipReason: ({ compiler, isFlang, flangVersion }): string | undefined => {
+      // Skipped on Windows UCRT64: the MSYS2 flang build intermittently
+      // crashes compiling this test (frontend signal, access violation).
+      skipReason: ({
+        compiler,
+        isFlang,
+        flangVersion,
+        isUCRT64,
+      }): string | undefined => {
         const tooOldFlang =
           isFlang &&
           flangVersion !== undefined &&
           flangVersion !== LATEST &&
           flangVersion < 19;
-        return tooOldFlang
-          ? notSupportedMessage(compiler, flangVersion)
+        if (tooOldFlang) {
+          return notSupportedMessage(compiler, flangVersion);
+        }
+        return isFlang && isUCRT64
+          ? `intermittent flang frontend crash on UCRT64`
           : undefined;
       },
     },
