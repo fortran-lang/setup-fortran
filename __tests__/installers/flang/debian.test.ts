@@ -17,6 +17,7 @@ jest.mock("../../../src/verify_download");
 jest.mock("fs", () => ({
   ...jest.requireActual("fs"),
   existsSync: jest.fn(),
+  writeFileSync: jest.fn(),
 }));
 
 describe("installDebian (Flang)", () => {
@@ -210,6 +211,53 @@ describe("installDebian (Flang)", () => {
 
     await expect(installDebian(inputs)).rejects.toThrow(
       /no longer publishes LLVM 23\+ packages for jammy/,
+    );
+    // The guard fires before any repository configuration or download.
+    expect(mockedExec).not.toHaveBeenCalled();
+  });
+
+  it.each(["ubuntu26", "26.04"])(
+    "installs flang-22 from the resolute repository when osVersion is %s",
+    async (osVersion) => {
+      await installDebian({ ...baseInputs, version: "22", osVersion });
+
+      expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringContaining("llvm.list"),
+        expect.stringContaining(
+          "https://apt.llvm.org/resolute/ llvm-toolchain-resolute-22 main",
+        ),
+      );
+    },
+  );
+
+  it("accepts LLVM 21, the oldest release published for Ubuntu 26.04", async () => {
+    await installDebian({
+      ...baseInputs,
+      version: "21",
+      osVersion: "ubuntu26",
+    });
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["clang-21", "flang-21"]),
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
+  });
+
+  it("rejects an unsupported Ubuntu release", async () => {
+    const inputs = { ...baseInputs, osVersion: "ubuntu20" };
+
+    await expect(installDebian(inputs)).rejects.toThrow(
+      /only supported on Ubuntu 22\.04, 24\.04 and 26\.04 \(got: ubuntu20\)/,
+    );
+    expect(mockedExec).not.toHaveBeenCalled();
+  });
+
+  it("rejects LLVM 20 and older on Ubuntu 26.04 with an actionable error", async () => {
+    const inputs = { ...baseInputs, version: "20", osVersion: "ubuntu26" };
+
+    await expect(installDebian(inputs)).rejects.toThrow(
+      /Flang 20 is not available on Ubuntu 26\.04 \(resolute\)/,
     );
     // The guard fires before any repository configuration or download.
     expect(mockedExec).not.toHaveBeenCalled();

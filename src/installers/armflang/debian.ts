@@ -14,6 +14,14 @@ export const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["23.1", "22.1", "21.1", "20.1"],
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
+// Versions shipped through the current Arm Toolchains repository
+// (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older releases
+// live in the legacy OBS repositories and need the Release.key flow.
+const CURRENT_REPOSITORY_VERSIONS: ReadonlySet<string> = new Set([
+  "23.1",
+  "22.1",
+]);
+
 const PACKAGE = "arm-toolchain-for-linux";
 const ARM_ROOT = "/opt/arm";
 const INSTALL_DIR = "/opt/arm/arm-toolchain-for-linux";
@@ -50,6 +58,9 @@ function ubuntuRepository(osVersion: string): {
   release: string;
   codename: string;
 } {
+  if (osVersion.includes("26.04") || osVersion.includes("ubuntu26")) {
+    return { release: "26", codename: "resolute" };
+  }
   if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
     return { release: "24", codename: "noble" };
   }
@@ -57,7 +68,7 @@ function ubuntuRepository(osVersion: string): {
     return { release: "22", codename: "jammy" };
   }
   throw new Error(
-    `ArmFlang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`,
+    `ArmFlang is only supported on Ubuntu 22.04, 24.04 and 26.04 (got: ${osVersion}).`,
   );
 }
 
@@ -328,6 +339,19 @@ export async function installDebian(
 ): Promise<InstallationResult> {
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const repository = ubuntuRepository(inputs.osVersion);
+
+  // Arm publishes no legacy OBS repository for Ubuntu 26.04 (resolute).
+  if (
+    repository.codename === "resolute" &&
+    !CURRENT_REPOSITORY_VERSIONS.has(version)
+  ) {
+    throw new Error(
+      `ArmFlang ${version} is not available on Ubuntu 26.04 (resolute): it is ` +
+        `only published in Arm's legacy repositories, which have no resolute ` +
+        `repository. Use an ubuntu-24.04-arm runner or request a newer release.`,
+    );
+  }
+
   const legacyBaseUrl =
     `https://developer.arm.com/packages/arm-toolchains:ubuntu-${repository.release}` +
     `/${repository.codename}`;
@@ -374,14 +398,6 @@ export async function installDebian(
     await aptGetUpdateWithRetry();
     await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
 
-    // Versions shipped through the current Arm Toolchains repository
-    // (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older
-    // releases live in the legacy OBS repositories and need the Release.key
-    // flow below.
-    const CURRENT_REPOSITORY_VERSIONS: ReadonlySet<string> = new Set([
-      "23.1",
-      "22.1",
-    ]);
     if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
       await configureCurrentRepository(repository.codename);
     } else {
