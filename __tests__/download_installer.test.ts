@@ -256,6 +256,7 @@ describe("downloadInstaller", () => {
   });
 
   it("keeps retrying the resolver path when DoH also fails", async () => {
+    setPlatform("darwin");
     mockedDownloadTool
       .mockRejectedValueOnce(new Error("getaddrinfo ENOTFOUND"))
       .mockResolvedValue(DEST);
