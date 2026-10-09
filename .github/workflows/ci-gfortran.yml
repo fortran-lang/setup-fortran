@@ -39,6 +39,7 @@ jobs:
           - { compiler: gfortran, version: "11" }
         include:
           - image: ubuntu-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: ubuntu-26.04 # no compiler and version specified, defaults to the latest gfortran version
           - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: ubuntu-24.04
