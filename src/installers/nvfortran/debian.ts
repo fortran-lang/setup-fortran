@@ -294,7 +294,7 @@ async function installTarball(version: string, inputs: Inputs): Promise<void> {
   const archiveBase = `${archivePrefix}${cudaVersion}`;
   const archiveName = `${archiveBase}.tar.gz`;
   const tempDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), "setup-fortran-nvhpc-"),
+    path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), "setup-fortran-nvhpc-"),
   );
   const archivePath = path.posix.join(tempDir, archiveName);
   const url =

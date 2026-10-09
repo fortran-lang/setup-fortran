@@ -101712,7 +101712,7 @@ async function installTarball(version, inputs) {
     }
     const archiveBase = `${archivePrefix}${cudaVersion}`;
     const archiveName = `${archiveBase}.tar.gz`;
-    const tempDir = external_fs_namespaceObject.mkdtempSync(external_path_namespaceObject.join(external_os_.tmpdir(), "setup-fortran-nvhpc-"));
+    const tempDir = external_fs_namespaceObject.mkdtempSync(external_path_namespaceObject.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), "setup-fortran-nvhpc-"));
     const archivePath = external_path_namespaceObject.posix.join(tempDir, archiveName);
     const url = `https://developer.download.nvidia.com/hpc-sdk/${version}/` + archiveName;
     try {
