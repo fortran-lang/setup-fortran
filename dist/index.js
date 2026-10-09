@@ -102161,6 +102161,8 @@ async function installAOCC(inputs) {
 //   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
 //     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
 //     rejected with an explicit error in installDebian.
+//   - Ubuntu 26.04 (resolute): apt.llvm.org only publishes LLVM 21 and newer,
+//     so 16–20 are rejected with an explicit error in installDebian.
 const flang_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
     [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
@@ -102178,13 +102180,16 @@ const debian_APT_NETWORK_OPTIONS = [
     "Acquire::https::Timeout=10",
 ];
 function ubuntuCodename(osVersion) {
+    if (osVersion.includes("26.04") || osVersion.includes("ubuntu26")) {
+        return "resolute";
+    }
     if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
         return "noble";
     }
     if (osVersion.includes("22.04") || osVersion.includes("ubuntu22")) {
         return "jammy";
     }
-    throw new Error(`Flang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
+    throw new Error(`Flang is only supported on Ubuntu 22.04, 24.04 and 26.04 (got: ${osVersion}).`);
 }
 async function configureLlvmAptRepository(version, codename) {
     const tempDir = external_fs_namespaceObject.mkdtempSync(external_path_namespaceObject.join(external_os_.tmpdir(), "setup-fortran-llvm-"));
@@ -102280,6 +102285,11 @@ async function flang_debian_installDebian(inputs) {
         throw new Error(`Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
             `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
             `Use an ubuntu-24.04 runner or request Flang 22 or older.`);
+    }
+    if (major < 21 && codename === "resolute") {
+        throw new Error(`Flang ${version} is not available on Ubuntu 26.04 (resolute): the LLVM ` +
+            `apt repository only publishes LLVM 21 and newer for resolute. ` +
+            `Use an ubuntu-24.04 runner or request Flang 21 or newer.`);
     }
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
     info(`Adding the verified LLVM ${version} apt repository...`);
@@ -103602,6 +103612,13 @@ const armflang_debian_SUPPORTED_VERSIONS = {
     [Arch.X64]: undefined,
     [Arch.ARM64]: ["23.1", "22.1", "21.1", "20.1"],
 };
+// Versions shipped through the current Arm Toolchains repository
+// (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older releases
+// live in the legacy OBS repositories and need the Release.key flow.
+const CURRENT_REPOSITORY_VERSIONS = new Set([
+    "23.1",
+    "22.1",
+]);
 const PACKAGE = "arm-toolchain-for-linux";
 const ARM_ROOT = "/opt/arm";
 const INSTALL_DIR = "/opt/arm/arm-toolchain-for-linux";
@@ -103632,13 +103649,16 @@ const APT_ACQUIRE_OPTS = [
     "DPkg::Lock::Timeout=120",
 ];
 function ubuntuRepository(osVersion) {
+    if (osVersion.includes("26.04") || osVersion.includes("ubuntu26")) {
+        return { release: "26", codename: "resolute" };
+    }
     if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
         return { release: "24", codename: "noble" };
     }
     if (osVersion.includes("22.04") || osVersion.includes("ubuntu22")) {
         return { release: "22", codename: "jammy" };
     }
-    throw new Error(`ArmFlang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`);
+    throw new Error(`ArmFlang is only supported on Ubuntu 22.04, 24.04 and 26.04 (got: ${osVersion}).`);
 }
 function debian_computeSha256(filePath) {
     const fileBuffer = external_fs_namespaceObject.readFileSync(filePath);
@@ -103829,6 +103849,13 @@ async function stageInstallationForCache(cacheDir) {
 async function armflang_debian_installDebian(inputs) {
     const version = resolveVersion(inputs, armflang_debian_SUPPORTED_VERSIONS);
     const repository = ubuntuRepository(inputs.osVersion);
+    // Arm publishes no legacy OBS repository for Ubuntu 26.04 (resolute).
+    if (repository.codename === "resolute" &&
+        !CURRENT_REPOSITORY_VERSIONS.has(version)) {
+        throw new Error(`ArmFlang ${version} is not available on Ubuntu 26.04 (resolute): it is ` +
+            `only published in Arm's legacy repositories, which have no resolute ` +
+            `repository. Use an ubuntu-24.04-arm runner or request a newer release.`);
+    }
     const legacyBaseUrl = `https://developer.arm.com/packages/arm-toolchains:ubuntu-${repository.release}` +
         `/${repository.codename}`;
     const keyring = "/usr/share/keyrings/obs-oss-arm-com.gpg";
@@ -103864,14 +103891,6 @@ async function armflang_debian_installDebian(inputs) {
         // unrelated repository must not block this step.
         await armflang_debian_aptGetUpdateWithRetry();
         await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
-        // Versions shipped through the current Arm Toolchains repository
-        // (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older
-        // releases live in the legacy OBS repositories and need the Release.key
-        // flow below.
-        const CURRENT_REPOSITORY_VERSIONS = new Set([
-            "23.1",
-            "22.1",
-        ]);
         if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
             await configureCurrentRepository(repository.codename);
         }
