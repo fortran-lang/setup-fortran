@@ -113,8 +113,12 @@ export async function installDebian(
     ]);
 
     core.info(`Installing AOCC ${version}...`);
-    await exec.exec("sudo", ["dpkg", "-i", debPath]);
-    await aptGetFixInstallWithRetry();
+    if (dependsOnRenamedLibxml2(inputs.osVersion)) {
+      await installDebWithoutDependencyCheck(debPath, metadata.installDir);
+    } else {
+      await exec.exec("sudo", ["dpkg", "-i", debPath]);
+      await aptGetInstallWithRetry(["install", "-f", "-y"], "install -f");
+    }
 
     core.info(`Saving AOCC ${version} to cache...`);
     await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
@@ -170,11 +174,56 @@ export async function installDebian(
   return result;
 }
 
-// dpkg -i commonly leaves AOCC's declared dependencies unconfigured; this
-// fixup step fetches them over apt, so it is exposed to the same transient
-// mirror/network failures as any other apt-get call and needs the same
-// retry-with-backoff handling.
-async function aptGetFixInstallWithRetry(maxAttempts = 3): Promise<void> {
+// Ubuntu 26.04 renamed libxml2 to libxml2-16, so the .deb's `Depends: libxml2`
+// can't be satisfied. AOCC doesn't link libxml2, so the check is skipped there.
+function dependsOnRenamedLibxml2(osVersion: string): boolean {
+  const match = /ubuntu(\d+)|\b(\d+)\.04\b/.exec(osVersion);
+  const major = Number(match?.[1] ?? match?.[2]);
+  return major >= 26;
+}
+
+// The .deb's Depends, minus libxml2 (see above) and libncurses5-dev, which
+// nothing in the package links.
+const DEB_RUNTIME_DEPENDENCIES = [
+  "libstdc++6",
+  "libzstd1",
+  "libquadmath0",
+  "zlib1g",
+  "gcc",
+] as const;
+
+// The .deb ships only /opt/AMD and has no maintainer scripts, so unpacking it
+// is equivalent to installing it. Extract to a temp dir first: dpkg-deb -x
+// onto / would reset the modes of / and /opt.
+async function installDebWithoutDependencyCheck(
+  debPath: string,
+  installDir: string,
+): Promise<void> {
+  await aptGetInstallWithRetry(
+    ["install", "-y", ...DEB_RUNTIME_DEPENDENCIES],
+    "install -y",
+  );
+
+  const extractDir = path.posix.join(os.tmpdir(), "aocc-deb-extract");
+  await exec.exec("rm", ["-rf", extractDir]);
+  await exec.exec("dpkg-deb", ["-x", debPath, extractDir]);
+  await exec.exec("sudo", ["mkdir", "-p", installDir]);
+  await exec.exec("sudo", [
+    "cp",
+    "-rT",
+    path.posix.join(extractDir, installDir),
+    installDir,
+  ]);
+  await exec.exec("rm", ["-rf", extractDir]);
+}
+
+// Used for both the `install -f` fixup and the explicit dependency install:
+// apt fetches over the network, so transient mirror failures get retried.
+async function aptGetInstallWithRetry(
+  args: readonly string[],
+  label: string,
+  maxAttempts = 3,
+): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await exec.exec("sudo", [
@@ -183,16 +232,14 @@ async function aptGetFixInstallWithRetry(maxAttempts = 3): Promise<void> {
         "--kill-after=30s",
         "15m",
         "apt-get",
-        "install",
-        "-f",
-        "-y",
+        ...args,
         ...APT_TIMEOUT_OPTS,
       ]);
       return;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
       core.info(
-        `apt-get install -f failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
+        `apt-get ${label} failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`,
       );
       await new Promise((res) => setTimeout(res, attempt * 10_000));
     }

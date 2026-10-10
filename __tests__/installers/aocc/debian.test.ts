@@ -132,6 +132,60 @@ describe("installDebian (AOCC)", () => {
     );
   });
 
+  it.each(["ubuntu26", "26.04"])(
+    "extracts the .deb instead of dpkg -i when osVersion is %s",
+    async (osVersion) => {
+      await installDebian({ ...baseInputs, osVersion });
+
+      const calls = mockedExec.mock.calls;
+      expect(calls).not.toContainEqual([
+        "sudo",
+        ["dpkg", "-i", expect.anything()],
+      ]);
+      expect(calls).toContainEqual([
+        "dpkg-deb",
+        [
+          "-x",
+          expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+          expect.stringContaining("aocc-deb-extract"),
+        ],
+      ]);
+      expect(calls).toContainEqual([
+        "sudo",
+        [
+          "cp",
+          "-rT",
+          expect.stringContaining(
+            "aocc-deb-extract/opt/AMD/aocc-compiler-5.1.0",
+          ),
+          "/opt/AMD/aocc-compiler-5.1.0",
+        ],
+      ]);
+      const aptInstall = calls.find(
+        ([, args]) =>
+          args?.includes("apt-get") && args.includes("libquadmath0"),
+      );
+      expect(aptInstall?.[1]).not.toContain("libxml2");
+    },
+  );
+
+  it.each(["ubuntu24", "ubuntu22", "22.04", "6.8.0-1010-azure"])(
+    "keeps dpkg -i when osVersion is %s",
+    async (osVersion) => {
+      await installDebian({ ...baseInputs, osVersion });
+
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "dpkg",
+        "-i",
+        expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),
+      ]);
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        "dpkg-deb",
+        expect.anything(),
+      );
+    },
+  );
+
   it("retries apt-get install -f on failure and eventually succeeds", async () => {
     let attempts = 0;
     mockedExec.mockImplementation(async (cmd, args, options) => {
