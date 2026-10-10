@@ -25,3 +25,27 @@ export function addMsvcBinFromPath(pathValue: string): string | undefined {
 
   return msvcBin;
 }
+
+// core.exportVariable("PATH") only sets the baseline; earlier core.addPath
+// entries (e.g. gfortran) are re-prepended over it, so addPath this one too.
+export function addIntelCompilerBinFromPath(
+  pathValue: string,
+): string | undefined {
+  const intelBin = pathValue.split(";").find((entry) => {
+    const normalized = entry.toLowerCase();
+    return (
+      normalized.includes("\\oneapi\\compiler\\") &&
+      normalized.endsWith("\\bin")
+    );
+  });
+
+  if (intelBin) {
+    core.addPath(intelBin);
+  } else {
+    core.warning(
+      "Could not find the Intel compiler executable directory in PATH.",
+    );
+  }
+
+  return intelBin;
+}

@@ -100156,6 +100156,22 @@ function addMsvcBinFromPath(pathValue) {
     }
     return msvcBin;
 }
+// core.exportVariable("PATH") only sets the baseline; earlier core.addPath
+// entries (e.g. gfortran) are re-prepended over it, so addPath this one too.
+function addIntelCompilerBinFromPath(pathValue) {
+    const intelBin = pathValue.split(";").find((entry) => {
+        const normalized = entry.toLowerCase();
+        return (normalized.includes("\\oneapi\\compiler\\") &&
+            normalized.endsWith("\\bin"));
+    });
+    if (intelBin) {
+        addPath(intelBin);
+    }
+    else {
+        warning("Could not find the Intel compiler executable directory in PATH.");
+    }
+    return intelBin;
+}
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
 
@@ -100402,6 +100418,7 @@ async function win32_installWin32(inputs) {
                     .join(";");
                 exportVariable("PATH", filteredPath);
                 addMsvcBinFromPath(filteredPath);
+                addIntelCompilerBinFromPath(filteredPath);
             }
             else {
                 exportVariable(key, val);
@@ -101389,6 +101406,7 @@ async function ifort_win32_installWin32(inputs) {
                     .join(";");
                 exportVariable("PATH", filteredPath);
                 addMsvcBinFromPath(filteredPath);
+                addIntelCompilerBinFromPath(filteredPath);
             }
             else {
                 exportVariable(key, val);
