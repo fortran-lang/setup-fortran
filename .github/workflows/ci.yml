@@ -61,7 +61,7 @@ jobs:
     uses: ./.github/workflows/ci-nvfortran.yml
 
   two-invocations:
-    name: sequential installations in one job (${{ matrix.image }}, ${{
+    name: sequential installations (${{ matrix.image }}, ${{
       matrix.first.compiler }} -> ${{ matrix.second.compiler }})
     needs: [validation]
     runs-on: ${{ matrix.image }}
@@ -70,21 +70,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: ubuntu-24.04
+          - image: ubuntu-latest
             first: { compiler: gfortran, version: "14" }
             second: { compiler: gfortran, version: "15" }
-          # Windows never ran this job before (#261): most installers add to
-          # PATH incrementally (core.addPath), but ifx/ifort fully overwrite
-          # PATH/env (core.exportVariable, the same asymmetry behind #250).
-          # Cover the addPath->addPath baseline plus both orderings against
-          # ifx's full overwrite.
-          - image: windows-2022
+          - image: windows-latest
             first: { compiler: gfortran, version: "14" }
             second: { compiler: gfortran, version: "15" }
-          - image: windows-2022
+          - image: windows-latest
             first: { compiler: gfortran, version: "14" }
             second: { compiler: ifx }
-          - image: windows-2022
+          - image: windows-latest
             first: { compiler: ifx }
             second: { compiler: gfortran, version: "14" }
     steps:
