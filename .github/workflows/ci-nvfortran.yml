@@ -58,6 +58,9 @@ jobs:
           - { compiler: nvfortran, version: "20.9" }
           - { compiler: nvfortran, version: "20.7" }
         include:
+          # /tmp is a ~7.8 GB tmpfs on ubuntu-26.04; 20.9 uses the tarball path
+          - image: ubuntu-26.04
+            toolchain: { compiler: nvfortran, version: "20.9" }
           - image: ubuntu-24.04-arm
             toolchain: { compiler: nvidia-hpc } # test compatibility alias
 

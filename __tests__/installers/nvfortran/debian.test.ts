@@ -1,6 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { installDebian } from "../../../src/installers/nvfortran/debian";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
@@ -412,5 +415,36 @@ describe("installDebian nvfortran", () => {
         "https://developer.download.nvidia.com/hpc-sdk/20.9/nvhpc_2020_209_Linux_aarch64_cuda_11.0.tar.gz",
       ]),
     );
+  });
+
+  it("downloads and extracts the tarball under RUNNER_TEMP", async () => {
+    const originalRunnerTemp = process.env.RUNNER_TEMP;
+    const runnerTemp = fs.mkdtempSync(
+      path.join(os.tmpdir(), "setup-fortran-nvhpc-tests-"),
+    );
+    process.env.RUNNER_TEMP = runnerTemp;
+
+    try {
+      await installDebian({ ...baseInputs, version: "20.9" });
+
+      const curlArgs = mockedExec.mock.calls.find(
+        ([command, args]) =>
+          command === "curl" && args?.includes("-o") && args.includes("-4"),
+      )?.[1] as string[];
+      expect(curlArgs[curlArgs.indexOf("-o") + 1].startsWith(runnerTemp)).toBe(
+        true,
+      );
+
+      const tarArgs = mockedExec.mock.calls.find(
+        ([command]) => command === "tar",
+      )?.[1] as string[];
+      expect(tarArgs[tarArgs.indexOf("-C") + 1].startsWith(runnerTemp)).toBe(
+        true,
+      );
+    } finally {
+      if (originalRunnerTemp === undefined) delete process.env.RUNNER_TEMP;
+      else process.env.RUNNER_TEMP = originalRunnerTemp;
+      fs.rmSync(runnerTemp, { recursive: true, force: true });
+    }
   });
 });
