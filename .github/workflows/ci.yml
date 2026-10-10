@@ -154,19 +154,8 @@ jobs:
           fi
           echo "First installation env vars: OK (FC, CC, CXX, F77, F90)"
 
-          # PATH ordering: resolve FC to the real path invoking it would run.
-          # Most installers advertise FIRST_FC as that path already, but
-          # ifx/ifort on Windows advertise a bare name (e.g. "ifx") backed by
-          # a full PATH overwrite rather than an addPath'd directory, so
-          # `dirname` on the raw value alone doesn't give a real bin dir.
-          #
-          # The resolved path also needs normalizing to POSIX form before
-          # comparing against $PATH: on Windows, `command -v` returns an
-          # already-absolute installer path (e.g. gfortran's) unchanged,
-          # which is backslash-separated, while Git Bash's own $PATH is
-          # always POSIX-style (/c/...). cygpath is a Git-for-Windows tool;
-          # it doesn't exist (and isn't needed) on Linux/macOS, where paths
-          # are already POSIX.
+          # PATH ordering: first compiler's bin dir must be present
+          # Windows paths are backslash-separated, Git Bash's $PATH is POSIX
           to_posix_path() {
             if command -v cygpath >/dev/null 2>&1; then
               cygpath -u "$1"
@@ -175,6 +164,7 @@ jobs:
             fi
           }
 
+          # ifx/ifort on Windows report a bare name, so resolve it first
           if ! resolved_first_fc=$(command -v "$FIRST_FC"); then
             echo "::error::First compiler ($FIRST_FC) could not be resolved on PATH"
             exit 1
@@ -245,11 +235,6 @@ jobs:
           echo "Env-var overwrite: OK (FC, CC, CXX, F77, F90 all replaced)"
 
           # 2. PATH ordering: second compiler's bin dir must precede first's.
-          # Resolve both through `command -v`, normalized to POSIX form (see
-          # the baseline step above for why). The first compiler's directory
-          # is allowed to have dropped off PATH entirely (a full PATH
-          # overwrite can do that); it just must not still precede the
-          # second's if it's there.
           to_posix_path() {
             if command -v cygpath >/dev/null 2>&1; then
               cygpath -u "$1"

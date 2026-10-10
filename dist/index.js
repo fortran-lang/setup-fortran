@@ -100156,14 +100156,8 @@ function addMsvcBinFromPath(pathValue) {
     }
     return msvcBin;
 }
-// Intel's setvars.bat composes a full PATH with the compiler's own bin
-// directory already ahead of everything else, but exporting that composed
-// string via core.exportVariable("PATH", ...) only sets the baseline PATH
-// for later steps. GITHUB_PATH entries added via core.addPath (e.g.
-// gfortran's) are re-prepended on top of that baseline for the rest of the
-// job regardless, so a prior addPath call would otherwise keep winning over
-// a later Intel installation. Registering the compiler's own bin directory
-// through addPath too lets it compete on equal footing.
+// core.exportVariable("PATH") only sets the baseline; earlier core.addPath
+// entries (e.g. gfortran) are re-prepended over it, so addPath this one too.
 function addIntelCompilerBinFromPath(pathValue) {
     const intelBin = pathValue.split(";").find((entry) => {
         const normalized = entry.toLowerCase();
