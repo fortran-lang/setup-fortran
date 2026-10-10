@@ -102065,17 +102065,15 @@ async function aocc_debian_installDebian(inputs) {
     };
     return result;
 }
-// Ubuntu 26.04 (resolute) renamed the libxml2 package to libxml2-16, so the
-// .deb's `Depends: libxml2` can never be satisfied there. AOCC does not link
-// libxml2 (no binary lists it as NEEDED), so the dependency is spurious.
-// Matches the runner's ImageOS ("ubuntu26") or a "26.04" style version.
+// Ubuntu 26.04 renamed libxml2 to libxml2-16, so the .deb's `Depends: libxml2`
+// can't be satisfied. AOCC doesn't link libxml2, so the check is skipped there.
 function dependsOnRenamedLibxml2(osVersion) {
     const match = /ubuntu(\d+)|\b(\d+)\.04\b/.exec(osVersion);
     const major = Number(match?.[1] ?? match?.[2]);
     return major >= 26;
 }
-// The runtime dependencies from the .deb's control file, minus libxml2 and
-// the unused libncurses5-dev.
+// The .deb's Depends, minus libxml2 (see above) and libncurses5-dev, which
+// nothing in the package links.
 const DEB_RUNTIME_DEPENDENCIES = [
     "libstdc++6",
     "libzstd1",
@@ -102083,9 +102081,9 @@ const DEB_RUNTIME_DEPENDENCIES = [
     "zlib1g",
     "gcc",
 ];
-// The .deb has no maintainer scripts and only contains the /opt/AMD tree, so
-// unpacking it is equivalent to installing it. Extract to a temp directory
-// first: dpkg-deb -x onto / would also reset the modes of / and /opt.
+// The .deb ships only /opt/AMD and has no maintainer scripts, so unpacking it
+// is equivalent to installing it. Extract to a temp dir first: dpkg-deb -x
+// onto / would reset the modes of / and /opt.
 async function installDebWithoutDependencyCheck(debPath, installDir) {
     await aocc_debian_aptGetInstallWithRetry(["install", "-y", ...DEB_RUNTIME_DEPENDENCIES], "install -y");
     const extractDir = external_path_namespaceObject.posix.join(external_os_.tmpdir(), "aocc-deb-extract");
@@ -102100,10 +102098,8 @@ async function installDebWithoutDependencyCheck(debPath, installDir) {
     ]);
     await exec_exec("rm", ["-rf", extractDir]);
 }
-// dpkg -i commonly leaves AOCC's declared dependencies unconfigured; the apt
-// fixup step fetches them over apt, so it is exposed to the same transient
-// mirror/network failures as any other apt-get call and needs the same
-// retry-with-backoff handling.
+// Used for both the `install -f` fixup and the explicit dependency install:
+// apt fetches over the network, so transient mirror failures get retried.
 async function aocc_debian_aptGetInstallWithRetry(args, label, maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
