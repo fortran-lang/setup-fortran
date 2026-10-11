@@ -14,13 +14,18 @@ export const SUPPORTED_VERSIONS = {
   [Arch.ARM64]: ["23.1", "22.1", "21.1", "20.1"],
 } as const satisfies Record<Arch, readonly string[] | undefined>;
 
-// Versions shipped through the current Arm Toolchains repository
-// (https://developer.arm.com/packages/arm-toolchains/ubuntu). Older releases
-// live in the legacy OBS repositories and need the Release.key flow.
-const CURRENT_REPOSITORY_VERSIONS: ReadonlySet<string> = new Set([
-  "23.1",
-  "22.1",
+// Versions that only exist in the legacy OBS repositories, which need the
+// Release.key flow. Everything else comes from the current Arm Toolchains
+// repository (https://developer.arm.com/packages/arm-toolchains/ubuntu).
+const LEGACY_REPOSITORY_VERSIONS: ReadonlySet<string> = new Set([
+  "21.1",
+  "20.1",
 ]);
+
+// Arm's resolute repository only carries these. The other supported versions
+// are either legacy-repository releases, for which no resolute repository
+// exists at all, or simply not built for resolute.
+const RESOLUTE_VERSIONS: ReadonlySet<string> = new Set(["23.1"]);
 
 const PACKAGE = "arm-toolchain-for-linux";
 const ARM_ROOT = "/opt/arm";
@@ -340,16 +345,14 @@ export async function installDebian(
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const repository = ubuntuRepository(inputs.osVersion);
 
-  // Arm publishes no legacy OBS repository for Ubuntu 26.04 (resolute).
-  if (
-    repository.codename === "resolute" &&
-    !CURRENT_REPOSITORY_VERSIONS.has(version)
-  ) {
+  // Reject unsupported versions up front: otherwise they only fail in the
+  // package lookup, after the Arm repository package has been installed.
+  if (repository.codename === "resolute" && !RESOLUTE_VERSIONS.has(version)) {
     throw new Error(
-      `ArmFlang ${version} is not available on Ubuntu 26.04 (resolute): it is ` +
-        `only published in Arm's legacy repositories, which have no resolute ` +
-        `repository. Use an ubuntu-22.04-arm or ubuntu-24.04-arm runner, or ` +
-        `request a newer release.`,
+      `ArmFlang ${version} is not available on Ubuntu 26.04 (resolute): the ` +
+        `Arm resolute repository only carries ` +
+        `${[...RESOLUTE_VERSIONS].join(", ")}. Use an ubuntu-22.04-arm or ` +
+        `ubuntu-24.04-arm runner, or request a newer release.`,
     );
   }
 
@@ -399,7 +402,7 @@ export async function installDebian(
     await aptGetUpdateWithRetry();
     await aptGetWithRetry(["install", "-y", "curl", "gpg"]);
 
-    if (CURRENT_REPOSITORY_VERSIONS.has(version)) {
+    if (!LEGACY_REPOSITORY_VERSIONS.has(version)) {
       await configureCurrentRepository(repository.codename);
     } else {
       const releaseKeyPath = path.posix.join(

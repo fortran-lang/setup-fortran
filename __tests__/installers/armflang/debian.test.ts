@@ -190,26 +190,6 @@ describe("installDebian (ArmFlang)", () => {
     },
   );
 
-  it("reports the available versions when ArmFlang 22.1 is missing from the resolute repository", async () => {
-    mockedGetExecOutput.mockResolvedValue({
-      stdout: " arm-toolchain-for-linux | 23.1-70~resolute | repo\n",
-      stderr: "",
-      exitCode: 0,
-    });
-
-    // 22.1 passes the legacy-repository guard; the missing package is caught
-    // by the package lookup instead.
-    await expect(
-      installDebian({
-        ...inputs,
-        version: "22.1",
-        osVersion: "ubuntu26-arm64",
-      }),
-    ).rejects.toThrow(
-      /ArmFlang 22\.1 is not available from the configured Arm repository.*23\.1-70~resolute/,
-    );
-  });
-
   it("rejects an unsupported Ubuntu release", async () => {
     await expect(
       installDebian({ ...inputs, osVersion: "ubuntu20" }),
@@ -219,19 +199,20 @@ describe("installDebian (ArmFlang)", () => {
     expect(mockedExec).not.toHaveBeenCalled();
   });
 
-  it("rejects legacy-repository versions on Ubuntu 26.04 with an actionable error", async () => {
-    await expect(
-      installDebian({
-        ...inputs,
-        version: "21.1",
-        osVersion: "ubuntu26-arm64",
-      }),
-    ).rejects.toThrow(/ArmFlang 21\.1 is not available on Ubuntu 26\.04/);
+  it.each(["22.1", "21.1", "20.1"])(
+    "rejects ArmFlang %s on Ubuntu 26.04 with an actionable error",
+    async (version) => {
+      await expect(
+        installDebian({ ...inputs, version, osVersion: "ubuntu26-arm64" }),
+      ).rejects.toThrow(
+        `ArmFlang ${version} is not available on Ubuntu 26.04 (resolute)`,
+      );
 
-    // The guard fires before any cache lookup or network work.
-    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
-    expect(mockedExec).not.toHaveBeenCalled();
-  });
+      // The guard fires before any cache lookup or network work.
+      expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+      expect(mockedExec).not.toHaveBeenCalled();
+    },
+  );
 
   it("stages and saves the installed toolchain on a cache miss", async () => {
     await installDebian(inputs);
