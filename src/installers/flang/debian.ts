@@ -26,6 +26,8 @@ import { verifySha256 } from "../../verify_download";
 //   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
 //     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
 //     rejected with an explicit error in installDebian.
+//   - Ubuntu 26.04 (resolute): apt.llvm.org only publishes LLVM 21 and newer,
+//     so 16–20 are rejected with an explicit error in installDebian.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
   [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
@@ -46,6 +48,9 @@ const APT_NETWORK_OPTIONS = [
 ];
 
 function ubuntuCodename(osVersion: string): string {
+  if (osVersion.includes("26.04") || osVersion.includes("ubuntu26")) {
+    return "resolute";
+  }
   if (osVersion.includes("24.04") || osVersion.includes("ubuntu24")) {
     return "noble";
   }
@@ -53,7 +58,7 @@ function ubuntuCodename(osVersion: string): string {
     return "jammy";
   }
   throw new Error(
-    `Flang is only supported on Ubuntu 22.04 and 24.04 (got: ${osVersion}).`,
+    `Flang is only supported on Ubuntu 22.04, 24.04 and 26.04 (got: ${osVersion}).`,
   );
 }
 
@@ -171,6 +176,14 @@ export async function installDebian(
       `Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
         `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
         `Use an ubuntu-24.04 runner or request Flang 22 or older.`,
+    );
+  }
+
+  if (major < 21 && codename === "resolute") {
+    throw new Error(
+      `Flang ${version} is not available on Ubuntu 26.04 (resolute): the LLVM ` +
+        `apt repository only publishes LLVM 21 and newer for resolute. ` +
+        `Use an ubuntu-24.04 runner or request Flang 21 or newer.`,
     );
   }
 
