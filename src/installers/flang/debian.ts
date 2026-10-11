@@ -180,10 +180,13 @@ export async function installDebian(
   }
 
   if (major < 21 && codename === "resolute") {
+    // LLVM 16 is jammy-only (no noble repo); 17-20 are published for both.
+    const alternativeRunners =
+      major >= 17 ? "ubuntu-22.04 or ubuntu-24.04" : "ubuntu-22.04";
     throw new Error(
       `Flang ${version} is not available on Ubuntu 26.04 (resolute): the LLVM ` +
         `apt repository only publishes LLVM 21 and newer for resolute. ` +
-        `Use an ubuntu-24.04 runner or request Flang 21 or newer.`,
+        `Use an ${alternativeRunners} runner, or request Flang 21 or newer.`,
     );
   }
 

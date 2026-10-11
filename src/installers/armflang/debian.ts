@@ -348,7 +348,8 @@ export async function installDebian(
     throw new Error(
       `ArmFlang ${version} is not available on Ubuntu 26.04 (resolute): it is ` +
         `only published in Arm's legacy repositories, which have no resolute ` +
-        `repository. Use an ubuntu-24.04-arm runner or request a newer release.`,
+        `repository. Use an ubuntu-22.04-arm or ubuntu-24.04-arm runner, or ` +
+        `request a newer release.`,
     );
   }
 
