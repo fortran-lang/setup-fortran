@@ -59,7 +59,7 @@ jobs:
           - { compiler: nvfortran, version: "20.7" }
         include:
           - image: ubuntu-26.04
-            toolchain: { compiler: nvfortran, version: "20.9" } # 20.9 uses the tarball path
+            toolchain: { compiler: nvfortran, version: "20.9" } # uses the tarball path
           - image: ubuntu-24.04-arm
             toolchain: { compiler: nvidia-hpc } # test compatibility alias
 
