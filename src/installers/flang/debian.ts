@@ -23,9 +23,6 @@ import { verifySha256 } from "../../verify_download";
 //   - ARM64: LLVM 15/16 have no noble (24.04) repo and broken jammy (22.04)
 //     packaging. 17 is the effective floor on arm64.
 //   - X64: LLVM 15/16 are available on jammy (22.04) only; no noble repo.
-//   - Ubuntu 22.04 (jammy): LLVM 23 is the first release with no jammy repo at
-//     all (apt.llvm.org stopped publishing for it), so 23+ are noble-only and
-//     rejected with an explicit error in installDebian.
 //   - Ubuntu 26.04 (resolute): apt.llvm.org only publishes LLVM 21 and newer,
 //     so 16–20 are rejected with an explicit error in installDebian.
 export const SUPPORTED_VERSIONS = {
@@ -168,16 +165,6 @@ export async function installDebian(
   const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
   const major = parseInt(version, 10);
   const codename = ubuntuCodename(inputs.osVersion);
-
-  // apt.llvm.org stopped publishing for jammy (22.04) with LLVM 23; without
-  // this guard the failure surfaces as an opaque apt-get update 404.
-  if (major >= 23 && codename === "jammy") {
-    throw new Error(
-      `Flang ${version} is not available on Ubuntu 22.04 (jammy): the LLVM ` +
-        `apt repository no longer publishes LLVM 23+ packages for jammy. ` +
-        `Use an ubuntu-24.04 runner or request Flang 22 or older.`,
-    );
-  }
 
   if (major < 21 && codename === "resolute") {
     // LLVM 16 is jammy-only (no noble repo); 17-20 are published for both.

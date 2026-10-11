@@ -25,11 +25,6 @@ jobs:
           - { compiler: flang, version: "19" }
           - { compiler: flang, version: "18" }
           - { compiler: flang, version: "17" }
-        exclude:
-          - image: ubuntu-22.04
-            toolchain: { compiler: flang, version: "23" }
-          - image: ubuntu-22.04-arm
-            toolchain: { compiler: flang, version: "23" }
         include:
           - image: ubuntu-22.04
             toolchain: { compiler: flang, version: "16" }
