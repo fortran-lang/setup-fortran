@@ -18,13 +18,18 @@ export const SUPPORTED_VERSIONS = {
 
 const CACHE_SCHEMA_VERSION = "v2";
 
-function aptCacheKey(inputs: Inputs, version: string): string {
+function aptCacheKey(
+  inputs: Inputs,
+  version: string,
+  revision: string,
+): string {
   return [
     "apt-gfortran",
     CACHE_SCHEMA_VERSION,
     inputs.osVersion,
     inputs.arch,
     version,
+    revision,
   ].join("-");
 }
 
@@ -66,18 +71,6 @@ export async function installDebian(
   const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
   const cacheDir = aptCacheDir(inputs, version);
   const cachePaths = [cacheDir];
-  const cacheKey = aptCacheKey(inputs, version);
-
-  // APT expects this directory to exist beneath its archive directory.
-  fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
-  let cacheHit: string | undefined;
-  try {
-    cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-  } catch (err) {
-    core.info(
-      `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
-    );
-  }
 
   const ppaAdded = needsPpa(version, inputs.osVersion);
   if (ppaAdded) {
@@ -87,8 +80,31 @@ export async function installDebian(
 
   await aptGetUpdateWithRetry(ppaAdded);
 
+  const revision = await candidateVersion(`gfortran-${version}`);
+  const cacheKey = revision
+    ? aptCacheKey(inputs, version, revision)
+    : undefined;
+
+  // APT expects this directory to exist beneath its archive directory.
+  fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
+  let cacheHit: string | undefined;
+  if (cacheKey) {
+    try {
+      const restoredKey = await cache.restoreCache(cachePaths, cacheKey);
+      if (restoredKey === cacheKey) cacheHit = restoredKey;
+    } catch (err) {
+      core.info(
+        `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
+      );
+    }
+  } else {
+    core.info(
+      `Could not determine the candidate version of gfortran-${version}; skipping the package cache.`,
+    );
+  }
+
   if (cacheHit) {
-    core.info(`Cache hit for ${cacheKey}, installing from cache...`);
+    core.info(`Cache hit for ${cacheHit}, installing from cache...`);
     try {
       await aptGetInstallFromCache(packages, cacheDir);
       await verifyInstalledToolchain(version);
@@ -103,11 +119,13 @@ export async function installDebian(
   } else {
     await aptGetInstallWithRetry(packages, cacheDir);
     await verifyInstalledToolchain(version);
-    try {
-      await prepareCacheForSave(cacheDir);
-      await cache.saveCache(cachePaths, cacheKey);
-    } catch (err) {
-      core.info(`Could not save the GFortran package cache: ${String(err)}`);
+    if (cacheKey) {
+      try {
+        await prepareCacheForSave(cacheDir);
+        await cache.saveCache(cachePaths, cacheKey);
+      } catch (err) {
+        core.info(`Could not save the GFortran package cache: ${String(err)}`);
+      }
     }
   }
 
@@ -239,6 +257,22 @@ async function aptGetUpdateWithRetry(
     );
     await new Promise((res) => setTimeout(res, attempt * 10_000));
   }
+}
+
+async function candidateVersion(pkg: string): Promise<string | undefined> {
+  let output = "";
+  const exitCode = await exec.exec("apt-cache", ["policy", pkg], {
+    ignoreReturnCode: true,
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  if (exitCode !== 0) return undefined;
+  const candidate = /^\s*Candidate:\s*(\S+)/m.exec(output)?.[1];
+  return candidate === "(none)" ? undefined : candidate;
 }
 
 async function aptGetInstallFromCache(

@@ -98389,13 +98389,14 @@ const SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
 const CACHE_SCHEMA_VERSION = "v2";
-function aptCacheKey(inputs, version) {
+function aptCacheKey(inputs, version, revision) {
     return [
         "apt-gfortran",
         CACHE_SCHEMA_VERSION,
         inputs.osVersion,
         inputs.arch,
         version,
+        revision,
     ].join("-");
 }
 function aptCacheDir(inputs, version) {
@@ -98422,24 +98423,34 @@ async function installDebian(inputs) {
     const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
     const cacheDir = aptCacheDir(inputs, version);
     const cachePaths = [cacheDir];
-    const cacheKey = aptCacheKey(inputs, version);
-    // APT expects this directory to exist beneath its archive directory.
-    external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
-    let cacheHit;
-    try {
-        cacheHit = await restoreCache(cachePaths, cacheKey);
-    }
-    catch (err) {
-        info(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
-    }
     const ppaAdded = needsPpa(version, inputs.osVersion);
     if (ppaAdded) {
         info(`Adding PPA for GFortran ${version}...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
     await aptGetUpdateWithRetry(ppaAdded);
+    const revision = await candidateVersion(`gfortran-${version}`);
+    const cacheKey = revision
+        ? aptCacheKey(inputs, version, revision)
+        : undefined;
+    // APT expects this directory to exist beneath its archive directory.
+    external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
+    let cacheHit;
+    if (cacheKey) {
+        try {
+            const restoredKey = await restoreCache(cachePaths, cacheKey);
+            if (restoredKey === cacheKey)
+                cacheHit = restoredKey;
+        }
+        catch (err) {
+            info(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
+        }
+    }
+    else {
+        info(`Could not determine the candidate version of gfortran-${version}; skipping the package cache.`);
+    }
     if (cacheHit) {
-        info(`Cache hit for ${cacheKey}, installing from cache...`);
+        info(`Cache hit for ${cacheHit}, installing from cache...`);
         try {
             await aptGetInstallFromCache(packages, cacheDir);
             await verifyInstalledToolchain(version);
@@ -98454,12 +98465,14 @@ async function installDebian(inputs) {
     else {
         await aptGetInstallWithRetry(packages, cacheDir);
         await verifyInstalledToolchain(version);
-        try {
-            await prepareCacheForSave(cacheDir);
-            await cache_saveCache(cachePaths, cacheKey);
-        }
-        catch (err) {
-            info(`Could not save the GFortran package cache: ${String(err)}`);
+        if (cacheKey) {
+            try {
+                await prepareCacheForSave(cacheDir);
+                await cache_saveCache(cachePaths, cacheKey);
+            }
+            catch (err) {
+                info(`Could not save the GFortran package cache: ${String(err)}`);
+            }
         }
     }
     await exec_exec("sudo", [
@@ -98566,6 +98579,22 @@ async function aptGetUpdateWithRetry(ppaAdded, maxAttempts = 3) {
         info(`apt-get update failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
         await new Promise((res) => setTimeout(res, attempt * 10_000));
     }
+}
+async function candidateVersion(pkg) {
+    let output = "";
+    const exitCode = await exec_exec("apt-cache", ["policy", pkg], {
+        ignoreReturnCode: true,
+        silent: true,
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    if (exitCode !== 0)
+        return undefined;
+    const candidate = /^\s*Candidate:\s*(\S+)/m.exec(output)?.[1];
+    return candidate === "(none)" ? undefined : candidate;
 }
 async function aptGetInstallFromCache(packages, cacheDir) {
     await exec_exec("sudo", [
