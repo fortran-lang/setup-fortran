@@ -26,10 +26,10 @@ function aptCacheKey(
   return [
     "apt-gfortran",
     CACHE_SCHEMA_VERSION,
+    revision,
     inputs.osVersion,
     inputs.arch,
     version,
-    revision,
   ].join("-");
 }
 
@@ -90,8 +90,7 @@ export async function installDebian(
   let cacheHit: string | undefined;
   if (cacheKey) {
     try {
-      const restoredKey = await cache.restoreCache(cachePaths, cacheKey);
-      if (restoredKey === cacheKey) cacheHit = restoredKey;
+      cacheHit = await cache.restoreCache(cachePaths, cacheKey);
     } catch (err) {
       core.info(
         `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,

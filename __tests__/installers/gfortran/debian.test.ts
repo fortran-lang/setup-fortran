@@ -40,7 +40,7 @@ describe("GFortran Debian Installer", () => {
     "14",
   );
   const revision = "14.2.0-4ubuntu2~24.04";
-  const cacheKey = `apt-gfortran-v2-20.04.6-x64-14-${revision}`;
+  const cacheKey = `apt-gfortran-v2-${revision}-20.04.6-x64-14`;
 
   const emitCandidate = (
     commandLine: string,
@@ -54,9 +54,6 @@ describe("GFortran Debian Installer", () => {
         ),
       );
     }
-  };
-  const restoreExactKey = (): void => {
-    mockedCache.restoreCache.mockImplementation(async (_paths, key) => key);
   };
 
   beforeEach(() => {
@@ -285,7 +282,7 @@ describe("GFortran Debian Installer", () => {
       // without gcc-16, and the old code skipped the update retry because of
       // the cache hit, so both the cached (--no-download) and online installs
       // failed with "Unable to locate package".
-      restoreExactKey();
+      mockedCache.restoreCache.mockResolvedValue("hit");
       const timeoutSpy = jest
         .spyOn(global, "setTimeout")
         .mockImplementation((callback) => {
@@ -429,7 +426,7 @@ describe("GFortran Debian Installer", () => {
 
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
         [expect.stringContaining(path.join("arm64", "14"))],
-        `apt-gfortran-v2-20.04.6-arm64-14-${revision}`,
+        `apt-gfortran-v2-${revision}-20.04.6-arm64-14`,
       );
     });
 
@@ -442,17 +439,6 @@ describe("GFortran Debian Installer", () => {
       expect(
         mockedCache.restoreCache.mock.invocationCallOrder[0],
       ).toBeGreaterThan(mockedExec.mock.invocationCallOrder[updateCall]);
-    });
-
-    it("ignores an entry restored under a different key", async () => {
-      mockedCache.restoreCache.mockResolvedValue(`${cacheKey}.1`);
-      await installDebian(baseInputs);
-
-      expect(mockedExec).not.toHaveBeenCalledWith(
-        "sudo",
-        expect.arrayContaining(["--no-download"]),
-      );
-      expect(mockedCache.saveCache).toHaveBeenCalledWith([cacheDir], cacheKey);
     });
 
     it.each([
@@ -480,7 +466,7 @@ describe("GFortran Debian Installer", () => {
     );
 
     it("installs from cache on cache hit", async () => {
-      restoreExactKey();
+      mockedCache.restoreCache.mockResolvedValue("hit");
       await installDebian(baseInputs);
 
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
@@ -521,7 +507,7 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("falls back to an online install when cached packages are incomplete", async () => {
-      restoreExactKey();
+      mockedCache.restoreCache.mockResolvedValue("hit");
       mockedExec.mockImplementation(async (commandLine, args, options) => {
         emitCandidate(commandLine, args, options);
         if (commandLine === "sudo" && args?.includes("--no-download")) {
@@ -568,7 +554,7 @@ describe("GFortran Debian Installer", () => {
     });
 
     it("falls back when cached tools fail validation", async () => {
-      restoreExactKey();
+      mockedCache.restoreCache.mockResolvedValue("hit");
       let validationAttempts = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
         emitCandidate(commandLine, args, options);
