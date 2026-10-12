@@ -105,18 +105,23 @@ runs:
     - name: Set outputs and env vars
       shell: bash
       id: outputs
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
+        win_intel_cc_cxx() {
+          (cd "$(echo "/$GITHUB_ACTION_PATH" | sed -e 's/\\/\//g' -e 's/://')" &&
+            bash -c 'source ./setup-fortran.sh >/dev/null 2>&1; intel_win_cc_cxx "$@"' _ "$@")
+        }
+
         # Intel compilers may have restored from cache so env vars may not be set
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           if [[ "${{ inputs.compiler }}" == "intel" ]]; then
             FC=ifx
-            CC=icx
-            CXX=icx
+            read -r CC CXX <<< "$(win_intel_cc_cxx "${VERSION:-2025.0}" false)"
             echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
             FC=ifort
-            CC=icl
-            CXX=icl
+            read -r CC CXX <<< "$(win_intel_cc_cxx "${VERSION:-2023.2.0}" true)"
             echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           fi
         fi
