@@ -18,11 +18,17 @@ export async function validateRestoredCompilerCache(
   }
 
   try {
+    let output = "";
+    const append = (data: Buffer): void => {
+      output += data.toString();
+    };
     const exitCode = await exec.exec(command, args, {
       ignoreReturnCode: true,
       silent: true,
+      listeners: { stdout: append, stderr: append },
     });
     if (exitCode === 0) return true;
+    if (output.trim()) core.info(output.trim());
     core.info(
       `Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`,
     );

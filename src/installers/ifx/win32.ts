@@ -11,12 +11,12 @@ import {
 import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import path from "path";
-import { captureIntelWindowsEnvironment } from "../../intel_windows_env";
-import { verifyIntelAuthenticode } from "../../verify_download";
 import {
-  saveCompilerCache,
-  validateRestoredCompilerCache,
-} from "../../cache_validation";
+  captureIntelWindowsEnvironment,
+  validateRestoredIntelWindowsCache,
+} from "../../intel_windows_env";
+import { verifyIntelAuthenticode } from "../../verify_download";
+import { saveCompilerCache } from "../../cache_validation";
 
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
@@ -186,16 +186,10 @@ export async function installWin32(
   }
 
   const cacheValid = cacheHit
-    ? await validateRestoredCompilerCache(
+    ? await validateRestoredIntelWindowsCache(
         `ifx ${version}`,
-        [SETVARS_BAT],
-        "cmd",
-        [
-          "/D",
-          "/S",
-          "/C",
-          `call "${SETVARS_BAT}" --force >nul && ifx --version >nul`,
-        ],
+        SETVARS_BAT,
+        "ifx",
       )
     : false;
 

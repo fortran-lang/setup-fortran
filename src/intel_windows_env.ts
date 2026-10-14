@@ -3,10 +3,41 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as os from "os";
 import path from "path";
+import { validateRestoredCompilerCache } from "./cache_validation";
 import { addIntelCompilerBinFromPath, addMsvcBinFromPath } from "./setup_msvc";
 
 const CAPTURED_ENV_KEY_PATTERN =
   /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
+
+function intelEnvironmentBatchLines(setvarsBat: string): string[] {
+  return [
+    `@echo off`,
+    `:: 1. Find MSVC Installation Path via vswhere`,
+    `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
+
+    `:: 2. Initialize MSVC Environment Natively`,
+    `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
+
+    `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
+    `call "${setvarsBat}" --force`,
+  ];
+}
+
+export async function validateRestoredIntelWindowsCache(
+  label: string,
+  setvarsBat: string,
+  compiler: string,
+): Promise<boolean> {
+  const batFile = path.win32.join(os.tmpdir(), `validate_${compiler}.bat`);
+  fs.writeFileSync(
+    batFile,
+    [...intelEnvironmentBatchLines(setvarsBat), `${compiler} /QV`].join("\r\n"),
+  );
+  return validateRestoredCompilerCache(label, [setvarsBat], "cmd", [
+    "/C",
+    batFile,
+  ]);
+}
 
 /**
  * Runs vcvars64.bat, then Intel's setvars.bat, and exports the combined
@@ -21,16 +52,7 @@ export async function captureIntelWindowsEnvironment(
   fs.writeFileSync(
     batFile,
     [
-      `@echo off`,
-      `:: 1. Find MSVC Installation Path via vswhere`,
-      `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
-
-      `:: 2. Initialize MSVC Environment Natively`,
-      `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
-
-      `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
-      `call "${setvarsBat}" --force`,
-
+      ...intelEnvironmentBatchLines(setvarsBat),
       `:: 4. Dump the fully combined environment`,
       `set`,
     ].join("\r\n"),

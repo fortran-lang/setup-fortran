@@ -99854,12 +99854,19 @@ async function validateRestoredCompilerCache(label, requiredPaths, command, args
         return false;
     }
     try {
+        let output = "";
+        const append = (data) => {
+            output += data.toString();
+        };
         const exitCode = await exec_exec(command, args, {
             ignoreReturnCode: true,
             silent: true,
+            listeners: { stdout: append, stderr: append },
         });
         if (exitCode === 0)
             return true;
+        if (output.trim())
+            info(output.trim());
         info(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
     }
     catch (error) {
@@ -100180,14 +100187,10 @@ function addIntelCompilerBinFromPath(pathValue) {
 
 
 
+
 const CAPTURED_ENV_KEY_PATTERN = /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
-/**
- * Runs vcvars64.bat, then Intel's setvars.bat, and exports the combined
- * environment so ifx/ifort can link against MSVC. Shared by both installers.
- */
-async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
-    const batFile = external_path_default().win32.join(external_os_.tmpdir(), batchFileName);
-    external_fs_namespaceObject.writeFileSync(batFile, [
+function intelEnvironmentBatchLines(setvarsBat) {
+    return [
         `@echo off`,
         `:: 1. Find MSVC Installation Path via vswhere`,
         `for /f "usebackq tokens=*" %%i in (\`"%ProgramFiles(x86)%\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -property installationPath\`) do set VS_INSTALL_DIR=%%i`,
@@ -100195,6 +100198,24 @@ async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
         `if exist "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat" call "%VS_INSTALL_DIR%\\VC\\Auxiliary\\Build\\vcvars64.bat"`,
         `:: 3. Call Intel's setvars.bat (it will detect MSVC is already active)`,
         `call "${setvarsBat}" --force`,
+    ];
+}
+async function validateRestoredIntelWindowsCache(label, setvarsBat, compiler) {
+    const batFile = external_path_default().win32.join(external_os_.tmpdir(), `validate_${compiler}.bat`);
+    external_fs_namespaceObject.writeFileSync(batFile, [...intelEnvironmentBatchLines(setvarsBat), `${compiler} /QV`].join("\r\n"));
+    return validateRestoredCompilerCache(label, [setvarsBat], "cmd", [
+        "/C",
+        batFile,
+    ]);
+}
+/**
+ * Runs vcvars64.bat, then Intel's setvars.bat, and exports the combined
+ * environment so ifx/ifort can link against MSVC. Shared by both installers.
+ */
+async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
+    const batFile = external_path_default().win32.join(external_os_.tmpdir(), batchFileName);
+    external_fs_namespaceObject.writeFileSync(batFile, [
+        ...intelEnvironmentBatchLines(setvarsBat),
         `:: 4. Dump the fully combined environment`,
         `set`,
     ].join("\r\n"));
@@ -100405,12 +100426,7 @@ async function win32_installWin32(inputs) {
         }
     }
     const cacheValid = cacheHit
-        ? await validateRestoredCompilerCache(`ifx ${version}`, [SETVARS_BAT], "cmd", [
-            "/D",
-            "/S",
-            "/C",
-            `call "${SETVARS_BAT}" --force >nul && ifx --version >nul`,
-        ])
+        ? await validateRestoredIntelWindowsCache(`ifx ${version}`, SETVARS_BAT, "ifx")
         : false;
     if (cacheValid) {
         info(`Restored ifx installation from cache (${cacheHit ?? cacheKey}).`);
@@ -101334,12 +101350,7 @@ async function ifort_win32_installWin32(inputs) {
     }
     const cacheHit = await restoreCache(cachePaths, cacheKey);
     const cacheValid = cacheHit
-        ? await validateRestoredCompilerCache(`ifort ${version}`, [win32_SETVARS_BAT], "cmd", [
-            "/D",
-            "/S",
-            "/C",
-            `call "${win32_SETVARS_BAT}" --force >nul && ifort /what >nul`,
-        ])
+        ? await validateRestoredIntelWindowsCache(`ifort ${version}`, win32_SETVARS_BAT, "ifort")
         : false;
     if (cacheValid) {
         info(`Restored ifort installation from cache (${cacheHit ?? cacheKey}).`);

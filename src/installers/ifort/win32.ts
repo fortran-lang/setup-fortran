@@ -11,12 +11,12 @@ import {
 import { resolveWindowsVersion } from "../../resolve_version";
 import * as fs from "fs";
 import path from "path";
-import { captureIntelWindowsEnvironment } from "../../intel_windows_env";
-import { verifyIntelAuthenticode } from "../../verify_download";
 import {
-  saveCompilerCache,
-  validateRestoredCompilerCache,
-} from "../../cache_validation";
+  captureIntelWindowsEnvironment,
+  validateRestoredIntelWindowsCache,
+} from "../../intel_windows_env";
+import { verifyIntelAuthenticode } from "../../verify_download";
+import { saveCompilerCache } from "../../cache_validation";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
@@ -92,16 +92,10 @@ export async function installWin32(
 
   const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
   const cacheValid = cacheHit
-    ? await validateRestoredCompilerCache(
+    ? await validateRestoredIntelWindowsCache(
         `ifort ${version}`,
-        [SETVARS_BAT],
-        "cmd",
-        [
-          "/D",
-          "/S",
-          "/C",
-          `call "${SETVARS_BAT}" --force >nul && ifort /what >nul`,
-        ],
+        SETVARS_BAT,
+        "ifort",
       )
     : false;
   if (cacheValid) {
