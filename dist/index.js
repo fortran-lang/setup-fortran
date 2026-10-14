@@ -100263,7 +100263,60 @@ async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/intel_windows_installer.ts
+
+
+// Older oneAPI bootstrappers choke on --components, so they install in full.
+const KITS_WITHOUT_COMPONENT_FILTER = new Set([
+    "2022.2.0",
+    "2022.3.0",
+    "2023.1.0",
+    "2023.2.0",
+]);
+// HPC kits bundle MPI, TBB, debuggers and Inspector/ITAC, none of which this
+// action exposes. Taking only the Fortran component shrinks the installation
+// and its cached copy several times over. The Fortran-only packages are already
+// minimal, so there is nothing to prune there.
+function isFullKitInstaller(url) {
+    return /hpckit|hpc-toolkit/i.test(url);
+}
+function supportsComponentFilter(oneApiRelease, url) {
+    return (isFullKitInstaller(url) && !KITS_WITHOUT_COMPONENT_FILTER.has(oneApiRelease));
+}
+async function resolveFortranComponentId(installerPath) {
+    let output = "";
+    await exec_exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
+    if (!line) {
+        info("This installer doesn't expose the Fortran compiler as a separately " +
+            "installable component; installing the full kit instead.");
+        return undefined;
+    }
+    const id = line.trim().split(/\s+/)[0];
+    if (!id) {
+        throw new Error(`Failed to parse component ID from line: "${line}"`);
+    }
+    return id;
+}
+// Installer arguments restricting an HPC kit to its Fortran component; empty
+// for every other installer. `oneApiRelease` is the oneAPI release the
+// installer ships, which the callers source differently: ifort from its
+// installer filename, ifx from its release table.
+async function fortranComponentArgs(installerPath, oneApiRelease, url) {
+    if (!supportsComponentFilter(oneApiRelease, url))
+        return [];
+    const componentId = await resolveFortranComponentId(installerPath);
+    return componentId ? [`--components=${componentId}`] : [];
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifx/win32.ts
+
 
 
 
@@ -100387,12 +100440,6 @@ const ifx_win32_SUPPORTED_VERSIONS = {
         [Msystem.Clang64]: undefined,
     },
 };
-const LEGACY_KIT_VERSIONS = new Set([
-    "2022.2.0",
-    "2022.3.0",
-    "2023.1.0",
-    "2023.2.0",
-]);
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
 const SETVARS_BAT = `${ONEAPI_ROOT}\\setvars.bat`;
 async function win32_installWin32(inputs) {
@@ -100439,14 +100486,8 @@ async function win32_installWin32(inputs) {
         info("Verifying installer...");
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install...");
-        const extraArgs = [];
-        if (supportsComponentFilter(version, release.url)) {
-            const componentId = await resolveFortranComponentId(installerPath);
-            if (componentId) {
-                extraArgs.push(`--components=${componentId}`);
-            }
-        }
-        await runInstallerWithRetry(installerPath, extraArgs);
+        const componentArgs = await fortranComponentArgs(installerPath, version, release.url);
+        await runInstallerWithRetry(installerPath, componentArgs);
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);
     }
@@ -100485,33 +100526,6 @@ async function win32_downloadToolWithRetry(url, destination, maxAttempts = 3) {
         }
     }
     throw lastError;
-}
-function isFullKitInstaller(url) {
-    return /hpckit|hpc-toolkit/i.test(url);
-}
-function supportsComponentFilter(version, url) {
-    return isFullKitInstaller(url) && !LEGACY_KIT_VERSIONS.has(version);
-}
-async function resolveFortranComponentId(installerPath) {
-    let output = "";
-    await exec_exec(`"${installerPath}"`, ["-s", "-a", "--list-components"], {
-        listeners: {
-            stdout: (data) => {
-                output += data.toString();
-            },
-        },
-    });
-    const line = output.split("\n").find((l) => /ifort-compiler/i.test(l));
-    if (!line) {
-        info("This installer doesn't expose the Fortran compiler as a separately " +
-            "installable component; installing the full kit instead.");
-        return undefined;
-    }
-    const id = line.trim().split(/\s+/)[0];
-    if (!id) {
-        throw new Error(`Failed to parse component ID from line: "${line}"`);
-    }
-    return id;
 }
 async function runInstallerWithRetry(installerPath, extraArgs = [], maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -101288,36 +101302,48 @@ async function ifort_darwin_resolveInstalledVersion() {
 
 
 
+
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry
+//
+// `bundle` is the oneAPI release the installer ships, as named in its filename.
+// It gates component selection and can differ from the apt bundle in debian.ts
+// for the same ifort version.
 const win32_IFORT_RELEASES = [
     {
         version: "2021.13",
+        bundle: "2024.2.1",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
     },
     {
         version: "2021.12",
+        bundle: "2024.1.0",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe",
     },
     {
         version: "2021.11",
+        bundle: "2024.0.2",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe",
     },
     {
         version: "2021.10",
+        bundle: "2023.2.1",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
     },
     {
         version: "2021.9",
+        bundle: "2023.1.0",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
     },
     {
         version: "2021.7",
+        bundle: "2022.3.0",
         url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
     },
     {
         version: "2021.6",
+        bundle: "2022.2.0",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe",
     },
 ];
@@ -101362,6 +101388,7 @@ async function ifort_win32_installWin32(inputs) {
         const installerPath = await ifort_win32_downloadToolWithRetry(release.url, external_path_default().win32.join(process.env.RUNNER_TEMP ?? "C:\\Temp", `ifort-${version}.exe`));
         await verifyIntelAuthenticode(installerPath);
         info("Running silent install (this may take several minutes)...");
+        const componentArgs = await fortranComponentArgs(installerPath, release.bundle, release.url);
         await exec_exec(`"${installerPath}"`, [
             "-s",
             "-a",
@@ -101370,6 +101397,7 @@ async function ifort_win32_installWin32(inputs) {
             "accept",
             "-p=NEED_VS2019_INTEGRATION=0",
             "-p=NEED_VS2022_INTEGRATION=0",
+            ...componentArgs,
         ]);
         info("Saving installation to cache...");
         await saveCompilerCache(cachePaths, cacheKey);

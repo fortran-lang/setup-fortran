@@ -15,39 +15,51 @@ import {
   captureIntelWindowsEnvironment,
   validateRestoredIntelWindowsCache,
 } from "../../intel_windows_env";
+import { fortranComponentArgs } from "../../intel_windows_installer";
 import { verifyIntelAuthenticode } from "../../verify_download";
 import { saveCompilerCache } from "../../cache_validation";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
 // LATEST resolves to the first entry
+//
+// `bundle` is the oneAPI release the installer ships, as named in its filename.
+// It gates component selection and can differ from the apt bundle in debian.ts
+// for the same ifort version.
 const IFORT_RELEASES = [
   {
     version: "2021.13",
+    bundle: "2024.2.1",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ea23d696-a77f-4a4a-8996-20d02cdbc48f/w_fortran-compiler_p_2024.2.1.81_offline.exe",
   },
   {
     version: "2021.12",
+    bundle: "2024.1.0",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/c95a3b26-fc45-496c-833b-df08b10297b9/w_HPCKit_p_2024.1.0.561_offline.exe",
   },
   {
     version: "2021.11",
+    bundle: "2024.0.2",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3a64aab4-3c35-40ba-bc9c-f80f136a8005/w_fortran-compiler_p_2024.0.2.27_offline.exe",
   },
   {
     version: "2021.10",
+    bundle: "2023.2.1",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1720594b-b12c-4aca-b7fb-a7d317bac5cb/w_fortran-compiler_p_2023.2.1.7_offline.exe",
   },
   {
     version: "2021.9",
+    bundle: "2023.1.0",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe",
   },
   {
     version: "2021.7",
+    bundle: "2022.3.0",
     url: "https://registrationcenter-download.intel.com/akdlm/irc_nas/18857/w_HPCKit_p_2022.3.0.9564_offline.exe",
   },
   {
     version: "2021.6",
+    bundle: "2022.2.0",
     url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/18680/w_HPCKit_p_2022.2.0.173_offline.exe",
   },
 ] as const;
@@ -115,6 +127,11 @@ export async function installWin32(
     await verifyIntelAuthenticode(installerPath);
 
     core.info("Running silent install (this may take several minutes)...");
+    const componentArgs = await fortranComponentArgs(
+      installerPath,
+      release.bundle,
+      release.url,
+    );
     await exec.exec(`"${installerPath}"`, [
       "-s",
       "-a",
@@ -123,6 +140,7 @@ export async function installWin32(
       "accept",
       "-p=NEED_VS2019_INTEGRATION=0",
       "-p=NEED_VS2022_INTEGRATION=0",
+      ...componentArgs,
     ]);
 
     core.info("Saving installation to cache...");
