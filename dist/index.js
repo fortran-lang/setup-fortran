@@ -98382,6 +98382,7 @@ function indexFetchFailed(output, repositoryHost) {
 
 
 
+
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
 const SUPPORTED_VERSIONS = {
@@ -98429,12 +98430,13 @@ async function installDebian(inputs) {
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
     }
     await aptGetUpdateWithRetry(ppaAdded);
-    const revision = await candidateVersion(`gfortran-${version}`);
-    const cacheKey = revision
-        ? aptCacheKey(inputs, version, revision)
-        : undefined;
     // APT expects this directory to exist beneath its archive directory.
     external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
+    const revision = await candidateVersion(`gfortran-${version}`);
+    const fingerprint = await downloadFingerprint(packages, cacheDir);
+    const cacheKey = revision && fingerprint
+        ? aptCacheKey(inputs, version, `${revision}-${fingerprint}`)
+        : undefined;
     let cacheHit;
     if (cacheKey) {
         try {
@@ -98445,7 +98447,7 @@ async function installDebian(inputs) {
         }
     }
     else {
-        info(`Could not determine the candidate version of gfortran-${version}; skipping the package cache.`);
+        info(`Could not determine the GFortran ${version} packages to download; skipping the package cache.`);
     }
     if (cacheHit) {
         info(`Cache hit for ${cacheHit}, installing from cache...`);
@@ -98593,6 +98595,33 @@ async function candidateVersion(pkg) {
         return undefined;
     const candidate = /^\s*Candidate:\s*(\S+)/m.exec(output)?.[1];
     return candidate === "(none)" ? undefined : candidate;
+}
+async function downloadFingerprint(packages, cacheDir) {
+    let output = "";
+    const exitCode = await exec_exec("sudo", [
+        "apt-get",
+        "install",
+        "-y",
+        "-qq",
+        "--print-uris",
+        ...aptCacheOptions(cacheDir),
+        ...packages,
+    ], {
+        ignoreReturnCode: true,
+        silent: true,
+        listeners: {
+            stdout: (data) => {
+                output += data.toString();
+            },
+        },
+    });
+    if (exitCode !== 0)
+        return undefined;
+    const files = [...output.matchAll(/^'[^']*'\s+(\S+)/gm)].map((m) => m[1]);
+    return external_crypto_namespaceObject.createHash("sha256")
+        .update(files.sort().join("\n"))
+        .digest("hex")
+        .slice(0, 8);
 }
 async function aptGetInstallFromCache(packages, cacheDir) {
     await exec_exec("sudo", [
