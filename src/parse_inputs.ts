@@ -119,6 +119,7 @@ export function parseInputs(): Inputs {
   const rawMsystem = core.getInput("msystem").trim();
   const cleanupDisk = core.getBooleanInput("cleanup-disk");
   const updateEnvironment = core.getBooleanInput("update-environment");
+  const cache = core.getBooleanInput("cache");
 
   const compiler = parseCompiler(rawCompiler);
   const detectedOS = detectOS();
@@ -132,6 +133,7 @@ export function parseInputs(): Inputs {
     msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
     cleanupDisk,
     updateEnvironment,
+    cache,
   };
 
   return inputs;

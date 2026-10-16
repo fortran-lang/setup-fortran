@@ -21,6 +21,7 @@ function makeInputs(overrides: Partial<Inputs> = {}): Inputs {
     msystem: Msystem.Native,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     ...overrides,
   };
 }

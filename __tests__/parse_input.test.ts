@@ -36,7 +36,7 @@ describe("parseInputs", () => {
     jest.clearAllMocks();
     mockedGetInput.mockReturnValue("");
     mockedGetBooleanInput.mockImplementation((name) => {
-      if (name === "update-environment") return true;
+      if (name === "update-environment" || name === "cache") return true;
       return false;
     });
     mockedArch.mockReturnValue("x64");
@@ -63,6 +63,7 @@ describe("parseInputs", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     });
   });
 
@@ -78,6 +79,7 @@ describe("parseInputs", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     });
   });
 
@@ -367,6 +369,7 @@ describe("parseInputs", () => {
           version: LATEST,
           os: expectedOS,
           updateEnvironment: true,
+          cache: true,
         });
       },
     );
@@ -457,6 +460,29 @@ describe("parseInputs", () => {
       });
       expect(() => parseInputs()).toThrow(
         'Input "update-environment" must be true or false; received "maybe".',
+      );
+    });
+  });
+
+  describe("cache input", () => {
+    it.each([true, false])("parses %s", (value) => {
+      mockedGetBooleanInput.mockImplementation((name) =>
+        name === "cache" ? value : true,
+      );
+      expect(parseInputs().cache).toBe(value);
+    });
+
+    it("throws for invalid values", () => {
+      mockedGetBooleanInput.mockImplementation((name) => {
+        if (name === "cache") {
+          throw new Error(
+            'Input "cache" must be true or false; received "maybe".',
+          );
+        }
+        return true;
+      });
+      expect(() => parseInputs()).toThrow(
+        'Input "cache" must be true or false; received "maybe".',
       );
     });
   });

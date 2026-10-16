@@ -30,6 +30,7 @@ describe("installDebian nvfortran", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -169,6 +170,7 @@ describe("installDebian nvfortran", () => {
       fc: "nvfortran",
       cc: "nvc",
       cxx: "nvc++",
+      cacheHit: false,
     });
   });
 

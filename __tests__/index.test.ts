@@ -70,6 +70,7 @@ describe("action invocation", () => {
         msystem: Msystem.Native,
         cleanupDisk: false,
         updateEnvironment: true,
+        cache: true,
       };
       const result: InstallationResult = {
         version: "1.2.3",
@@ -110,6 +111,7 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     };
     const result: InstallationResult = {
       version: "14.2.0",
@@ -156,6 +158,7 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: false,
+      cache: true,
     };
     const result: InstallationResult = {
       version: "14.2.0",
@@ -201,6 +204,7 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     };
     parseInputs.mockReturnValue(inputs);
     installIFX.mockRejectedValue(
@@ -271,6 +275,7 @@ describe("action invocation", () => {
         msystem: Msystem.Native,
         cleanupDisk: false,
         updateEnvironment: true,
+        cache: true,
       };
       parseInputs.mockReturnValue(inputs);
       installer.mockRejectedValue(new Error(expectedMessage));

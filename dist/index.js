@@ -41813,6 +41813,7 @@ function parseInputs() {
     const rawMsystem = getInput("msystem").trim();
     const cleanupDisk = getBooleanInput("cleanup-disk");
     const updateEnvironment = getBooleanInput("update-environment");
+    const cache = getBooleanInput("cache");
     const compiler = parseCompiler(rawCompiler);
     const detectedOS = detectOS();
     const inputs = {
@@ -41824,8 +41825,434 @@ function parseInputs() {
         msystem: rawMsystem ? parseMsystem(rawMsystem) : DEFAULTS.msystem,
         cleanupDisk,
         updateEnvironment,
+        cache,
     };
     return inputs;
+}
+
+;// CONCATENATED MODULE: ./src/resolve_version.ts
+
+
+const MAX_GITHUB_RATE_LIMIT_WAIT_MS = 30_000;
+class GitHubRateLimitError extends Error {
+}
+/**
+ * A production-grade wrapper around native fetch that handles stream timeouts,
+ * precise GitHub rate-limit reset windows, and exponential backoff.
+ */
+async function fetchJsonWithRetry(url, options = {}) {
+    const maxRetries = options.maxRetries ?? 3;
+    const timeoutMs = options.timeoutMs ?? 5000;
+    const fetchOptions = { headers: options.headers };
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, timeoutMs);
+        try {
+            const response = await fetch(url, {
+                ...fetchOptions,
+                signal: controller.signal,
+            });
+            if (response.status === 404) {
+                clearTimeout(timeoutId);
+                return { status: 404, data: null };
+            }
+            // A short reset window is worth waiting for, but an exhausted anonymous
+            // quota can otherwise suspend the action for close to an hour.
+            if (response.status === 403 || response.status === 429) {
+                const resetHeader = response.headers.get("x-ratelimit-reset");
+                if (resetHeader) {
+                    const resetTimeMs = parseInt(resetHeader, 10) * 1000;
+                    const sleepTimeMs = Math.max(resetTimeMs - Date.now() + 1000, 2000);
+                    if (!Number.isFinite(resetTimeMs)) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit response contained an invalid x-ratelimit-reset value: ${resetHeader}.`);
+                    }
+                    if (sleepTimeMs > MAX_GITHUB_RATE_LIMIT_WAIT_MS) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit for ${url} resets at ${new Date(resetTimeMs).toISOString()} ` +
+                            `(${Math.ceil(sleepTimeMs / 1000).toString()} seconds away), which exceeds the ` +
+                            `${(MAX_GITHUB_RATE_LIMIT_WAIT_MS / 1000).toString()}-second maximum wait. ` +
+                            "Retry later or provide a GITHUB_TOKEN with available API quota.");
+                    }
+                    if (attempt === maxRetries) {
+                        throw new GitHubRateLimitError(`GitHub API rate limit remained active after ${maxRetries.toString()} attempts for ${url}. ` +
+                            `Retry after ${new Date(resetTimeMs).toISOString()} or provide a GITHUB_TOKEN with available API quota.`);
+                    }
+                    info(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
+                        `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`);
+                    clearTimeout(timeoutId);
+                    await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
+                    continue;
+                }
+                throw new GitHubRateLimitError(`GitHub API returned status ${response.status.toString()} for ${url} without a usable ` +
+                    "x-ratelimit-reset header, so the action cannot retry safely. Check GITHUB_TOKEN permissions and quota, then retry.");
+            }
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
+            }
+            const data = (await response.json());
+            clearTimeout(timeoutId);
+            return { status: response.status, data };
+        }
+        catch (e) {
+            clearTimeout(timeoutId);
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (error instanceof GitHubRateLimitError) {
+                throw error;
+            }
+            const isAbort = error.name === "AbortError";
+            const errorMessage = isAbort
+                ? `Request or body streaming timed out after ${timeoutMs.toString()}ms`
+                : error.message;
+            if (attempt === maxRetries) {
+                throw new Error(`Request failed after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`, { cause: e });
+            }
+            const backoffMs = 1000 * Math.pow(2, attempt + 1);
+            info(`Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
+                `(Attempt ${attempt.toString()}/${maxRetries.toString()})...`);
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
+    }
+    throw new Error("Unreachable");
+}
+// ==========================================
+// Exported Core Functions
+// ==========================================
+// Compilers whose supported-version tables use bare integer majors (e.g.
+// gfortran "14", flang "19"). For these a bare numeric input is a legitimate
+// table entry. Every other compiler (ifx/ifort year releases, nvfortran,
+// lfortran, aocc, armflang) only ships dotted/quoted releases, so a bare
+// numeric input is ambiguous — it is almost always a GitHub Actions-coerced
+// `YYYY.0` — and is rejected with an actionable error instead of guessed.
+const BARE_NUMERIC_ACCEPTED_COMPILERS = new Set([
+    Compiler.GFortran,
+    Compiler.Flang,
+]);
+/**
+ * Normalizes a version string by stripping a trailing `.0` patch segment.
+ * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
+ * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
+ * while the replacement tracks releases by minor version (`5.1`).
+ */
+function stripTrailingPatchZero(version) {
+    const match = /^(\d+\.\d+)\.0$/.exec(version);
+    return match ? match[1] : version;
+}
+function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, } = {}) {
+    const versions = supportedVersions[inputs.arch];
+    if (!versions) {
+        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
+    }
+    const rawVersion = inputs.version === types_LATEST ? versions[0] : inputs.version;
+    if (!rawVersion) {
+        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
+    }
+    // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
+    // replacement's minor-version release entry. Only strips a trailing .0;
+    // X.Y.1 and other patch versions are left untouched so that genuinely
+    // unsupported versions still produce a clear error.
+    const version = stripPatchZero
+        ? stripTrailingPatchZero(rawVersion)
+        : rawVersion;
+    // Inform the user that AOCC releases are tracked by major.minor only, so
+    // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
+    if (stripPatchZero && version !== rawVersion) {
+        warning(`The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
+            `version "${rawVersion}" was normalized to "${version}". Consider ` +
+            `dropping the patch number.`);
+    }
+    const versionList = versions;
+    if (!versionList.includes(version)) {
+        if (matchMajorIfPatch) {
+            const major = parseMajorOrPatch(version).major;
+            if (versionList.includes(major)) {
+                return version;
+            }
+        }
+        // FIX: Modified standard regex to accept BOTH standard semantic numbers (e.g. 14.1) and years (e.g. 2025.1)
+        if (resolveMinorToLatestPatch && /^\d+\.\d+$/.test(version)) {
+            const prefix = `${version}.`;
+            const match = versionList.find((v) => v.startsWith(prefix));
+            if (match) {
+                return match;
+            }
+        }
+        // A bare numeric version is never a valid table entry for the year-based
+        // compilers (ifx/ifort/nvfortran/lfortran/aocc/armflang). GitHub Actions
+        // coerces an unquoted `version: 2026.0` YAML number to the bare string
+        // "2026", silently dropping the trailing `.0`. That input is ambiguous
+        // (it could mean that exact release or the latest release in the series),
+        // so we refuse to guess and point the user at exact, quoted table entries.
+        // gfortran/flang accept bare integer majors and are exempt. The
+        // unrecoverable trailing-zero collision (2021.10 -> "2021.1") is handled
+        // above by the patch-prefix fall through and is documented in the README
+        // as a quoting requirement.
+        if (!BARE_NUMERIC_ACCEPTED_COMPILERS.has(inputs.compiler) &&
+            /^\d+$/.test(version)) {
+            const examples = versions.slice(0, 2).map((v) => `"${v}"`);
+            throw new Error(`${inputs.compiler} version "${version}" is ambiguous and must be ` +
+                `quoted exactly as listed in the supported-version table. GitHub ` +
+                `Actions coerces unquoted YAML numbers into bare strings, silently ` +
+                `dropping segments like ".0", so the intended release is unclear; ` +
+                `specify the full release (e.g. ${examples.join(" or ")}) wrapped ` +
+                `in quotes. (gfortran and flang accept bare integer majors such as ` +
+                `"14" or "19".) Supported versions: ${versions.join(", ")}`);
+        }
+        throw new Error(`${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
+            `Supported versions: ${versions.join(", ")}`);
+    }
+    return version;
+}
+function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+    const archVersions = supportedVersions[inputs.arch];
+    if (!archVersions) {
+        throw new Error(`Architecture "${inputs.arch}" is not supported for ${inputs.compiler} on Windows.`);
+    }
+    const msystem = inputs.msystem;
+    const versions = archVersions[msystem];
+    if (!versions) {
+        throw new Error(`The environment "${msystem}" is not supported for Windows ${inputs.arch}.`);
+    }
+    return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
+}
+// FIX: Handles string segmentation gracefully for minor versions (length === 2)
+function parseMajorOrPatch(input) {
+    const parts = input.split(".");
+    if (parts.length >= 1 && parts.length <= 3) {
+        return {
+            major: parts[0],
+            patch: parts.length === 3 ? input : undefined,
+        };
+    }
+    throw new Error(`Invalid version format: "${input}". Specify a major version (e.g. "22"), minor (e.g. "22.1") or full patch version (e.g. "22.1.3").`);
+}
+// ==========================================
+// Version ordering helpers
+// ==========================================
+/**
+ * Numeric sort key for a version string. Releases are calendar-or-sequential
+ * (e.g. "2026.1.2", "0.57.0", "16"), so each dot-separated segment is parsed
+ * as an integer and compared left-to-right: `2026.1.1` outranks `2026.1`, and
+ * `2021.10` outranks `2021.2`.
+ *
+ * `LATEST` represents the newest rolling release (Homebrew, pacman, conda) and
+ * therefore sorts above any concrete version; in a descending list it must
+ * occupy the first (default) position.
+ */
+function versionSortKey(version) {
+    if (version === LATEST)
+        return [Number.POSITIVE_INFINITY];
+    return version.split(".").map((segment) => {
+        const n = parseInt(segment, 10);
+        return Number.isNaN(n) ? 0 : n;
+    });
+}
+/**
+ * Compares two version strings numerically. Returns a negative number when
+ * `a` is older than `b`, a positive number when `a` is newer, and 0 when equal.
+ * `LATEST` is treated as newer than any concrete version.
+ */
+function compareVersions(a, b) {
+    const ka = versionSortKey(a);
+    const kb = versionSortKey(b);
+    const len = Math.max(ka.length, kb.length);
+    for (let i = 0; i < len; i++) {
+        const va = i < ka.length ? ka[i] : -Number.POSITIVE_INFINITY;
+        const vb = i < kb.length ? kb[i] : -Number.POSITIVE_INFINITY;
+        if (va !== vb)
+            return va - vb;
+    }
+    return 0;
+}
+/**
+ * True when the sequence is non-increasing by version (each entry is newer
+ * than or equal to the next). This is the invariant that keeps
+ * {@link resolveVersion}'s `latest` resolution correct: when no version is
+ * supplied, `versions[0]` is installed, so the first entry must be the newest
+ * release. `LATEST`, when present, is only valid as the leading entry.
+ */
+function isVersionListDescending(versions) {
+    for (let i = 0; i < versions.length - 1; i++) {
+        if (compareVersions(versions[i], versions[i + 1]) < 0)
+            return false;
+    }
+    return true;
+}
+// FIX: Added multi-page fallback strategy to guarantee legacy version visibility
+async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
+    core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
+    // Walk up to 3 pagination indexes to unearth deep historical patches
+    for (let page = 1; page <= 3; page++) {
+        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
+        const { data: releases } = await fetchJsonWithRetry(url, {
+            headers: githubHeaders(),
+        });
+        if (!releases || releases.length === 0) {
+            break;
+        }
+        const match = releases.find((r) => r.tag_name.startsWith(tagPrefix) &&
+            !r.prerelease &&
+            !r.tag_name.includes("rc"));
+        if (match) {
+            return tagStripper(match.tag_name);
+        }
+    }
+    throw new Error(`No stable release found for ${repo} major ${major} within visible historical GitHub releases.`);
+}
+/**
+ * Resolves the newest stable patch of `major` that actually ships the
+ * required installer asset, along with its SHA-256 digest.
+ *
+ * `resolveLatestPatch` picks the newest tag blindly, which breaks when
+ * upstream stops publishing an asset for a newer patch (e.g. LLVM 23.1.2
+ * ships `win64.msi` but no `woa64.msi`, while 23.1.1 ships both). The
+ * release-list endpoint already embeds each release's asset names, so the
+ * newest patch *with* the asset is picked without extra per-tag fetches.
+ * Releases without an embedded asset list fall back to a `verifyAssetExists`
+ * probe (whose digest is reused, so the caller never re-verifies).
+ * Explicit user-pinned patches bypass this helper and keep failing
+ * loudly via `verifyAssetExists`.
+ */
+async function resolveLatestPatchWithAsset(repo, major, filenameForPatch, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", ""), tagFromPatch = (p) => `llvmorg-${p}`) {
+    info(`Resolving latest patch version for ${repo} major ${major} with required asset via GitHub API...`);
+    // Collect stable candidates newest-first across pages; decide locally when
+    // the list response embeds assets, probe per-tag otherwise. A partial page
+    // (< per_page) is the last page: stop listing and probe what we have.
+    const unknownAssetCandidates = [];
+    const tried = [];
+    for (let page = 1; page <= 3; page++) {
+        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
+        const { data: releases } = await fetchJsonWithRetry(url, {
+            headers: githubHeaders(),
+        });
+        if (!releases || releases.length === 0) {
+            break;
+        }
+        for (const release of releases) {
+            if (!release.tag_name.startsWith(tagPrefix) ||
+                release.prerelease ||
+                release.tag_name.includes("rc")) {
+                continue;
+            }
+            const patch = tagStripper(release.tag_name);
+            tried.push(patch);
+            if (release.assets !== undefined) {
+                const filename = filenameForPatch(patch);
+                if (release.assets.some((a) => a.name === filename)) {
+                    // Drain any earlier unknowns that are newer: they need a probe to
+                    // prove they lack the asset before falling back to this match.
+                    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
+                    if (probed)
+                        return probed;
+                    const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
+                    return { patch, digest };
+                }
+                info(`Release ${release.tag_name} in ${repo} has no asset "${filename}", trying older patch...`);
+                continue;
+            }
+            unknownAssetCandidates.push(patch);
+        }
+        if (releases.length < 100)
+            break;
+    }
+    // No list-embedded match: probe the unknowns newest-first.
+    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
+    if (probed)
+        return probed;
+    throw new Error(`No stable release found for ${repo} major ${major} with required asset. Tried: ${tried.join(", ") || "none"}.`);
+}
+async function probeUnknownCandidates(repo, candidates, filenameForPatch, tagFromPatch) {
+    for (const patch of candidates) {
+        const filename = filenameForPatch(patch);
+        try {
+            const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
+            return { patch, digest };
+        }
+        catch (e) {
+            if (!isMissingAssetError(e))
+                throw e;
+            info(`Release ${tagFromPatch(patch)} in ${repo} has no asset "${filename}", trying older patch...`);
+        }
+    }
+    return undefined;
+}
+function isMissingAssetError(e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return (msg.includes("has no asset") || msg.includes("does not exist (no release"));
+}
+async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `llvmorg-${p}`) {
+    const tag = tagFromPatch(patch);
+    info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
+    const url = `https://api.github.com/repos/${repo}/releases/tags/${tag}`;
+    const { status, data: release } = await fetchJsonWithRetry(url, {
+        headers: githubHeaders(),
+    });
+    if (status === 404) {
+        throw new Error(`Requested version "${patch}" does not exist (no release for ${tag} in ${repo}).`);
+    }
+    if (!release) {
+        throw new Error(`Failed to fetch release metadata for tag ${tag} in ${repo}.`);
+    }
+    const asset = release.assets.find((a) => a.name === filename);
+    if (!asset) {
+        throw new Error(`Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
+            `See https://github.com/${repo}/releases/tag/${tag} for available assets.`);
+    }
+    if (!asset.digest?.startsWith("sha256:")) {
+        info(`GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}. ` +
+            `Download integrity cannot be verified automatically.`);
+        return undefined;
+    }
+    const digest = asset.digest.slice("sha256:".length).toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(digest)) {
+        throw new Error(`GitHub returned an invalid SHA-256 digest for ${repo} release asset ${filename}.`);
+    }
+    return digest;
+}
+function githubHeaders() {
+    const headers = {
+        Accept: "application/vnd.github+json",
+    };
+    const token = process.env.GITHUB_TOKEN;
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    else {
+        warning("GITHUB_TOKEN is missing from the environment. Concurrent execution of these tests will likely hit rate limits and fail.");
+    }
+    return headers;
+}
+
+;// CONCATENATED MODULE: ./src/apt_sources.ts
+/**
+ * apt-get options that scope a command to a single source list file,
+ * ignoring every other configured repository.
+ *
+ * Used for `apt-get update` after this action has added its own repository:
+ * unrelated repositories baked into the GitHub runner images (e.g.
+ * packages.microsoft.com) can return transient 403/5xx responses and fail an
+ * unscoped update, breaking compiler installs that never needed them.
+ *
+ * `Dir::Etc::SourceList` is resolved relative to `/etc/apt`; pointing
+ * `Dir::Etc::SourceParts` at a non-existent entry ("-") suppresses loading
+ * of all other source files.
+ */
+function scopedSourceListOptions(sourceListFile) {
+    return [
+        "-o",
+        `Dir::Etc::SourceList=sources.list.d/${sourceListFile}`,
+        "-o",
+        "Dir::Etc::SourceParts=-",
+    ];
+}
+/**
+ * Whether captured apt-get output indicates that fetching an index from the
+ * given repository host failed. Distinguishes failures of the repository the
+ * installer needs from failures of unrelated repositories baked into the
+ * runner image.
+ */
+function indexFetchFailed(output, repositoryHost) {
+    return output.includes("Failed to fetch") && output.includes(repositoryHost);
 }
 
 ;// CONCATENATED MODULE: ./node_modules/@actions/glob/lib/internal-glob-options-helper.js
@@ -98053,429 +98480,56 @@ function saveCacheV2(paths_1, key_1, options_1) {
     });
 }
 //# sourceMappingURL=cache.js.map
-;// CONCATENATED MODULE: ./src/resolve_version.ts
+;// CONCATENATED MODULE: ./src/cache_validation.ts
 
 
-const MAX_GITHUB_RATE_LIMIT_WAIT_MS = 30_000;
-class GitHubRateLimitError extends Error {
-}
-/**
- * A production-grade wrapper around native fetch that handles stream timeouts,
- * precise GitHub rate-limit reset windows, and exponential backoff.
- */
-async function fetchJsonWithRetry(url, options = {}) {
-    const maxRetries = options.maxRetries ?? 3;
-    const timeoutMs = options.timeoutMs ?? 5000;
-    const fetchOptions = { headers: options.headers };
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            controller.abort();
-        }, timeoutMs);
-        try {
-            const response = await fetch(url, {
-                ...fetchOptions,
-                signal: controller.signal,
-            });
-            if (response.status === 404) {
-                clearTimeout(timeoutId);
-                return { status: 404, data: null };
-            }
-            // A short reset window is worth waiting for, but an exhausted anonymous
-            // quota can otherwise suspend the action for close to an hour.
-            if (response.status === 403 || response.status === 429) {
-                const resetHeader = response.headers.get("x-ratelimit-reset");
-                if (resetHeader) {
-                    const resetTimeMs = parseInt(resetHeader, 10) * 1000;
-                    const sleepTimeMs = Math.max(resetTimeMs - Date.now() + 1000, 2000);
-                    if (!Number.isFinite(resetTimeMs)) {
-                        throw new GitHubRateLimitError(`GitHub API rate limit response contained an invalid x-ratelimit-reset value: ${resetHeader}.`);
-                    }
-                    if (sleepTimeMs > MAX_GITHUB_RATE_LIMIT_WAIT_MS) {
-                        throw new GitHubRateLimitError(`GitHub API rate limit for ${url} resets at ${new Date(resetTimeMs).toISOString()} ` +
-                            `(${Math.ceil(sleepTimeMs / 1000).toString()} seconds away), which exceeds the ` +
-                            `${(MAX_GITHUB_RATE_LIMIT_WAIT_MS / 1000).toString()}-second maximum wait. ` +
-                            "Retry later or provide a GITHUB_TOKEN with available API quota.");
-                    }
-                    if (attempt === maxRetries) {
-                        throw new GitHubRateLimitError(`GitHub API rate limit remained active after ${maxRetries.toString()} attempts for ${url}. ` +
-                            `Retry after ${new Date(resetTimeMs).toISOString()} or provide a GITHUB_TOKEN with available API quota.`);
-                    }
-                    info(`GitHub API Rate limit hit (Status ${response.status.toString()}). ` +
-                        `Sleeping for ${(sleepTimeMs / 1000).toString()}s until reset window opens...`);
-                    clearTimeout(timeoutId);
-                    await new Promise((resolve) => setTimeout(resolve, sleepTimeMs));
-                    continue;
-                }
-                throw new GitHubRateLimitError(`GitHub API returned status ${response.status.toString()} for ${url} without a usable ` +
-                    "x-ratelimit-reset header, so the action cannot retry safely. Check GITHUB_TOKEN permissions and quota, then retry.");
-            }
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status.toString()}: ${response.statusText}`);
-            }
-            const data = (await response.json());
-            clearTimeout(timeoutId);
-            return { status: response.status, data };
-        }
-        catch (e) {
-            clearTimeout(timeoutId);
-            const error = e instanceof Error ? e : new Error(String(e));
-            if (error instanceof GitHubRateLimitError) {
-                throw error;
-            }
-            const isAbort = error.name === "AbortError";
-            const errorMessage = isAbort
-                ? `Request or body streaming timed out after ${timeoutMs.toString()}ms`
-                : error.message;
-            if (attempt === maxRetries) {
-                throw new Error(`Request failed after ${maxRetries.toString()} attempts. Last error: ${errorMessage}`, { cause: e });
-            }
-            const backoffMs = 1000 * Math.pow(2, attempt + 1);
-            info(`Network error encountered (${errorMessage}). Retrying in ${(backoffMs / 1000).toString()}s ` +
-                `(Attempt ${attempt.toString()}/${maxRetries.toString()})...`);
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-        }
+
+
+async function validateRestoredCompilerCache(label, requiredPaths, command, args) {
+    const missing = requiredPaths.filter((entry) => !external_fs_namespaceObject.existsSync(entry));
+    if (missing.length > 0) {
+        info(`Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`);
+        return false;
     }
-    throw new Error("Unreachable");
-}
-// ==========================================
-// Exported Core Functions
-// ==========================================
-// Compilers whose supported-version tables use bare integer majors (e.g.
-// gfortran "14", flang "19"). For these a bare numeric input is a legitimate
-// table entry. Every other compiler (ifx/ifort year releases, nvfortran,
-// lfortran, aocc, armflang) only ships dotted/quoted releases, so a bare
-// numeric input is ambiguous — it is almost always a GitHub Actions-coerced
-// `YYYY.0` — and is rejected with an actionable error instead of guessed.
-const BARE_NUMERIC_ACCEPTED_COMPILERS = new Set([
-    Compiler.GFortran,
-    Compiler.Flang,
-]);
-/**
- * Normalizes a version string by stripping a trailing `.0` patch segment.
- * For example, `5.1.0` becomes `5.1`, while `5.1` and `5.1.1` are unchanged.
- * This lets users pass the incumbent's `X.Y.0` spelling (e.g. AOCC `5.1.0`)
- * while the replacement tracks releases by minor version (`5.1`).
- */
-function stripTrailingPatchZero(version) {
-    const match = /^(\d+\.\d+)\.0$/.exec(version);
-    return match ? match[1] : version;
-}
-function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, } = {}) {
-    const versions = supportedVersions[inputs.arch];
-    if (!versions) {
-        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
-    }
-    const rawVersion = inputs.version === types_LATEST ? versions[0] : inputs.version;
-    if (!rawVersion) {
-        throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
-    }
-    // Silently normalize X.Y.0 → X.Y (the incumbent's spelling) to the
-    // replacement's minor-version release entry. Only strips a trailing .0;
-    // X.Y.1 and other patch versions are left untouched so that genuinely
-    // unsupported versions still produce a clear error.
-    const version = stripPatchZero
-        ? stripTrailingPatchZero(rawVersion)
-        : rawVersion;
-    // Inform the user that AOCC releases are tracked by major.minor only, so
-    // specifying a .0 patch (e.g. 5.1.0) is accepted but unnecessary.
-    if (stripPatchZero && version !== rawVersion) {
-        warning(`The AOCC compiler specifies versions as MAJOR.MINOR. Your specified ` +
-            `version "${rawVersion}" was normalized to "${version}". Consider ` +
-            `dropping the patch number.`);
-    }
-    const versionList = versions;
-    if (!versionList.includes(version)) {
-        if (matchMajorIfPatch) {
-            const major = parseMajorOrPatch(version).major;
-            if (versionList.includes(major)) {
-                return version;
-            }
-        }
-        // FIX: Modified standard regex to accept BOTH standard semantic numbers (e.g. 14.1) and years (e.g. 2025.1)
-        if (resolveMinorToLatestPatch && /^\d+\.\d+$/.test(version)) {
-            const prefix = `${version}.`;
-            const match = versionList.find((v) => v.startsWith(prefix));
-            if (match) {
-                return match;
-            }
-        }
-        // A bare numeric version is never a valid table entry for the year-based
-        // compilers (ifx/ifort/nvfortran/lfortran/aocc/armflang). GitHub Actions
-        // coerces an unquoted `version: 2026.0` YAML number to the bare string
-        // "2026", silently dropping the trailing `.0`. That input is ambiguous
-        // (it could mean that exact release or the latest release in the series),
-        // so we refuse to guess and point the user at exact, quoted table entries.
-        // gfortran/flang accept bare integer majors and are exempt. The
-        // unrecoverable trailing-zero collision (2021.10 -> "2021.1") is handled
-        // above by the patch-prefix fall through and is documented in the README
-        // as a quoting requirement.
-        if (!BARE_NUMERIC_ACCEPTED_COMPILERS.has(inputs.compiler) &&
-            /^\d+$/.test(version)) {
-            const examples = versions.slice(0, 2).map((v) => `"${v}"`);
-            throw new Error(`${inputs.compiler} version "${version}" is ambiguous and must be ` +
-                `quoted exactly as listed in the supported-version table. GitHub ` +
-                `Actions coerces unquoted YAML numbers into bare strings, silently ` +
-                `dropping segments like ".0", so the intended release is unclear; ` +
-                `specify the full release (e.g. ${examples.join(" or ")}) wrapped ` +
-                `in quotes. (gfortran and flang accept bare integer majors such as ` +
-                `"14" or "19".) Supported versions: ${versions.join(", ")}`);
-        }
-        throw new Error(`${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
-            `Supported versions: ${versions.join(", ")}`);
-    }
-    return version;
-}
-function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
-    const archVersions = supportedVersions[inputs.arch];
-    if (!archVersions) {
-        throw new Error(`Architecture "${inputs.arch}" is not supported for ${inputs.compiler} on Windows.`);
-    }
-    const msystem = inputs.msystem;
-    const versions = archVersions[msystem];
-    if (!versions) {
-        throw new Error(`The environment "${msystem}" is not supported for Windows ${inputs.arch}.`);
-    }
-    return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
-}
-// FIX: Handles string segmentation gracefully for minor versions (length === 2)
-function parseMajorOrPatch(input) {
-    const parts = input.split(".");
-    if (parts.length >= 1 && parts.length <= 3) {
-        return {
-            major: parts[0],
-            patch: parts.length === 3 ? input : undefined,
+    try {
+        let output = "";
+        const append = (data) => {
+            output += data.toString();
         };
-    }
-    throw new Error(`Invalid version format: "${input}". Specify a major version (e.g. "22"), minor (e.g. "22.1") or full patch version (e.g. "22.1.3").`);
-}
-// ==========================================
-// Version ordering helpers
-// ==========================================
-/**
- * Numeric sort key for a version string. Releases are calendar-or-sequential
- * (e.g. "2026.1.2", "0.57.0", "16"), so each dot-separated segment is parsed
- * as an integer and compared left-to-right: `2026.1.1` outranks `2026.1`, and
- * `2021.10` outranks `2021.2`.
- *
- * `LATEST` represents the newest rolling release (Homebrew, pacman, conda) and
- * therefore sorts above any concrete version; in a descending list it must
- * occupy the first (default) position.
- */
-function versionSortKey(version) {
-    if (version === LATEST)
-        return [Number.POSITIVE_INFINITY];
-    return version.split(".").map((segment) => {
-        const n = parseInt(segment, 10);
-        return Number.isNaN(n) ? 0 : n;
-    });
-}
-/**
- * Compares two version strings numerically. Returns a negative number when
- * `a` is older than `b`, a positive number when `a` is newer, and 0 when equal.
- * `LATEST` is treated as newer than any concrete version.
- */
-function compareVersions(a, b) {
-    const ka = versionSortKey(a);
-    const kb = versionSortKey(b);
-    const len = Math.max(ka.length, kb.length);
-    for (let i = 0; i < len; i++) {
-        const va = i < ka.length ? ka[i] : -Number.POSITIVE_INFINITY;
-        const vb = i < kb.length ? kb[i] : -Number.POSITIVE_INFINITY;
-        if (va !== vb)
-            return va - vb;
-    }
-    return 0;
-}
-/**
- * True when the sequence is non-increasing by version (each entry is newer
- * than or equal to the next). This is the invariant that keeps
- * {@link resolveVersion}'s `latest` resolution correct: when no version is
- * supplied, `versions[0]` is installed, so the first entry must be the newest
- * release. `LATEST`, when present, is only valid as the leading entry.
- */
-function isVersionListDescending(versions) {
-    for (let i = 0; i < versions.length - 1; i++) {
-        if (compareVersions(versions[i], versions[i + 1]) < 0)
-            return false;
-    }
-    return true;
-}
-// FIX: Added multi-page fallback strategy to guarantee legacy version visibility
-async function resolveLatestPatch(repo, major, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", "")) {
-    core.info(`Resolving latest patch version for ${repo} major ${major} via GitHub API...`);
-    // Walk up to 3 pagination indexes to unearth deep historical patches
-    for (let page = 1; page <= 3; page++) {
-        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
-        const { data: releases } = await fetchJsonWithRetry(url, {
-            headers: githubHeaders(),
+        const exitCode = await exec_exec(command, args, {
+            ignoreReturnCode: true,
+            silent: true,
+            listeners: { stdout: append, stderr: append },
         });
-        if (!releases || releases.length === 0) {
-            break;
-        }
-        const match = releases.find((r) => r.tag_name.startsWith(tagPrefix) &&
-            !r.prerelease &&
-            !r.tag_name.includes("rc"));
-        if (match) {
-            return tagStripper(match.tag_name);
-        }
+        if (exitCode === 0)
+            return true;
+        if (output.trim())
+            info(output.trim());
+        info(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
     }
-    throw new Error(`No stable release found for ${repo} major ${major} within visible historical GitHub releases.`);
+    catch (error) {
+        info(`Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`);
+    }
+    return false;
 }
-/**
- * Resolves the newest stable patch of `major` that actually ships the
- * required installer asset, along with its SHA-256 digest.
- *
- * `resolveLatestPatch` picks the newest tag blindly, which breaks when
- * upstream stops publishing an asset for a newer patch (e.g. LLVM 23.1.2
- * ships `win64.msi` but no `woa64.msi`, while 23.1.1 ships both). The
- * release-list endpoint already embeds each release's asset names, so the
- * newest patch *with* the asset is picked without extra per-tag fetches.
- * Releases without an embedded asset list fall back to a `verifyAssetExists`
- * probe (whose digest is reused, so the caller never re-verifies).
- * Explicit user-pinned patches bypass this helper and keep failing
- * loudly via `verifyAssetExists`.
- */
-async function resolveLatestPatchWithAsset(repo, major, filenameForPatch, tagPrefix = `llvmorg-${major}.`, tagStripper = (tag) => tag.replace("llvmorg-", ""), tagFromPatch = (p) => `llvmorg-${p}`) {
-    info(`Resolving latest patch version for ${repo} major ${major} with required asset via GitHub API...`);
-    // Collect stable candidates newest-first across pages; decide locally when
-    // the list response embeds assets, probe per-tag otherwise. A partial page
-    // (< per_page) is the last page: stop listing and probe what we have.
-    const unknownAssetCandidates = [];
-    const tried = [];
-    for (let page = 1; page <= 3; page++) {
-        const url = `https://api.github.com/repos/${repo}/releases?per_page=100&page=${page.toString()}`;
-        const { data: releases } = await fetchJsonWithRetry(url, {
-            headers: githubHeaders(),
-        });
-        if (!releases || releases.length === 0) {
-            break;
-        }
-        for (const release of releases) {
-            if (!release.tag_name.startsWith(tagPrefix) ||
-                release.prerelease ||
-                release.tag_name.includes("rc")) {
-                continue;
-            }
-            const patch = tagStripper(release.tag_name);
-            tried.push(patch);
-            if (release.assets !== undefined) {
-                const filename = filenameForPatch(patch);
-                if (release.assets.some((a) => a.name === filename)) {
-                    // Drain any earlier unknowns that are newer: they need a probe to
-                    // prove they lack the asset before falling back to this match.
-                    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
-                    if (probed)
-                        return probed;
-                    const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
-                    return { patch, digest };
-                }
-                info(`Release ${release.tag_name} in ${repo} has no asset "${filename}", trying older patch...`);
-                continue;
-            }
-            unknownAssetCandidates.push(patch);
-        }
-        if (releases.length < 100)
-            break;
-    }
-    // No list-embedded match: probe the unknowns newest-first.
-    const probed = await probeUnknownCandidates(repo, unknownAssetCandidates, filenameForPatch, tagFromPatch);
-    if (probed)
-        return probed;
-    throw new Error(`No stable release found for ${repo} major ${major} with required asset. Tried: ${tried.join(", ") || "none"}.`);
-}
-async function probeUnknownCandidates(repo, candidates, filenameForPatch, tagFromPatch) {
-    for (const patch of candidates) {
-        const filename = filenameForPatch(patch);
-        try {
-            const digest = await verifyAssetExists(repo, patch, filename, tagFromPatch);
-            return { patch, digest };
-        }
-        catch (e) {
-            if (!isMissingAssetError(e))
-                throw e;
-            info(`Release ${tagFromPatch(patch)} in ${repo} has no asset "${filename}", trying older patch...`);
-        }
-    }
-    return undefined;
-}
-function isMissingAssetError(e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return (msg.includes("has no asset") || msg.includes("does not exist (no release"));
-}
-async function verifyAssetExists(repo, patch, filename, tagFromPatch = (p) => `llvmorg-${p}`) {
-    const tag = tagFromPatch(patch);
-    info(`Verifying that ${filename} exists for ${repo} release ${tag}...`);
-    const url = `https://api.github.com/repos/${repo}/releases/tags/${tag}`;
-    const { status, data: release } = await fetchJsonWithRetry(url, {
-        headers: githubHeaders(),
-    });
-    if (status === 404) {
-        throw new Error(`Requested version "${patch}" does not exist (no release for ${tag} in ${repo}).`);
-    }
-    if (!release) {
-        throw new Error(`Failed to fetch release metadata for tag ${tag} in ${repo}.`);
-    }
-    const asset = release.assets.find((a) => a.name === filename);
-    if (!asset) {
-        throw new Error(`Release ${tag} in ${repo} exists but has no asset "${filename}". ` +
-            `See https://github.com/${repo}/releases/tag/${tag} for available assets.`);
-    }
-    if (!asset.digest?.startsWith("sha256:")) {
-        info(`GitHub does not provide a SHA-256 digest for ${repo} release asset ${filename}. ` +
-            `Download integrity cannot be verified automatically.`);
+async function restoreCompilerCache(enabled, paths, key) {
+    if (!enabled) {
+        info(`Caching disabled; skipping restore of ${key}.`);
         return undefined;
     }
-    const digest = asset.digest.slice("sha256:".length).toLowerCase();
-    if (!/^[a-f0-9]{64}$/.test(digest)) {
-        throw new Error(`GitHub returned an invalid SHA-256 digest for ${repo} release asset ${filename}.`);
-    }
-    return digest;
+    return restoreCache(paths, key);
 }
-function githubHeaders() {
-    const headers = {
-        Accept: "application/vnd.github+json",
-    };
-    const token = process.env.GITHUB_TOKEN;
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
+async function saveCompilerCache(enabled, paths, key) {
+    if (!enabled) {
+        info(`Caching disabled; skipping save of ${key}.`);
+        return;
     }
-    else {
-        warning("GITHUB_TOKEN is missing from the environment. Concurrent execution of these tests will likely hit rate limits and fail.");
+    try {
+        await cache_saveCache(paths, key);
     }
-    return headers;
-}
-
-;// CONCATENATED MODULE: ./src/apt_sources.ts
-/**
- * apt-get options that scope a command to a single source list file,
- * ignoring every other configured repository.
- *
- * Used for `apt-get update` after this action has added its own repository:
- * unrelated repositories baked into the GitHub runner images (e.g.
- * packages.microsoft.com) can return transient 403/5xx responses and fail an
- * unscoped update, breaking compiler installs that never needed them.
- *
- * `Dir::Etc::SourceList` is resolved relative to `/etc/apt`; pointing
- * `Dir::Etc::SourceParts` at a non-existent entry ("-") suppresses loading
- * of all other source files.
- */
-function scopedSourceListOptions(sourceListFile) {
-    return [
-        "-o",
-        `Dir::Etc::SourceList=sources.list.d/${sourceListFile}`,
-        "-o",
-        "Dir::Etc::SourceParts=-",
-    ];
-}
-/**
- * Whether captured apt-get output indicates that fetching an index from the
- * given repository host failed. Distinguishes failures of the repository the
- * installer needs from failures of unrelated repositories baked into the
- * runner image.
- */
-function indexFetchFailed(output, repositoryHost) {
-    return output.includes("Failed to fetch") && output.includes(repositoryHost);
+    catch (error) {
+        info(`Could not save compiler cache ${key}: ${String(error)}`);
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/installers/gfortran/debian.ts
@@ -98546,7 +98600,7 @@ async function installDebian(inputs) {
     let cacheHit;
     if (cacheKey) {
         try {
-            cacheHit = await restoreCache(cachePaths, cacheKey);
+            cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey);
         }
         catch (err) {
             info(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
@@ -98567,11 +98621,13 @@ async function installDebian(inputs) {
     else {
         info(`GFortran ${version} is already installed with nothing to download; skipping the package cache.`);
     }
+    let cacheUsed = false;
     if (cacheHit) {
         info(`Cache hit for ${cacheHit}, installing from cache...`);
         try {
             await aptGetInstallFromCache(packages, cacheDir);
             await verifyInstalledToolchain(version);
+            cacheUsed = true;
         }
         catch (err) {
             info(`Cached GFortran packages were incomplete or invalid; ` +
@@ -98585,8 +98641,9 @@ async function installDebian(inputs) {
         await verifyInstalledToolchain(version);
         if (cacheKey) {
             try {
-                await prepareCacheForSave(cacheDir);
-                await cache_saveCache(cachePaths, cacheKey);
+                if (inputs.cache)
+                    await prepareCacheForSave(cacheDir);
+                await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
             }
             catch (err) {
                 info(`Could not save the GFortran package cache: ${String(err)}`);
@@ -98612,6 +98669,7 @@ async function installDebian(inputs) {
         fc: `gfortran-${version}`,
         cc: `gcc-${version}`,
         cxx: `g++-${version}`,
+        cacheHit: cacheUsed,
     };
     return result;
 }
@@ -100021,47 +100079,6 @@ async function installGFortran(inputs) {
     }
 }
 
-;// CONCATENATED MODULE: ./src/cache_validation.ts
-
-
-
-
-async function validateRestoredCompilerCache(label, requiredPaths, command, args) {
-    const missing = requiredPaths.filter((entry) => !external_fs_namespaceObject.existsSync(entry));
-    if (missing.length > 0) {
-        info(`Restored ${label} cache is incomplete; missing: ${missing.join(", ")}. Reinstalling.`);
-        return false;
-    }
-    try {
-        let output = "";
-        const append = (data) => {
-            output += data.toString();
-        };
-        const exitCode = await exec_exec(command, args, {
-            ignoreReturnCode: true,
-            silent: true,
-            listeners: { stdout: append, stderr: append },
-        });
-        if (exitCode === 0)
-            return true;
-        if (output.trim())
-            info(output.trim());
-        info(`Restored ${label} cache failed compiler validation with exit code ${exitCode.toString()}. Reinstalling.`);
-    }
-    catch (error) {
-        info(`Restored ${label} cache failed compiler validation: ${String(error)}. Reinstalling.`);
-    }
-    return false;
-}
-async function saveCompilerCache(paths, key) {
-    try {
-        await cache_saveCache(paths, key);
-    }
-    catch (error) {
-        info(`Could not save compiler cache ${key}: ${String(error)}`);
-    }
-}
-
 ;// CONCATENATED MODULE: ./src/intel_linux.ts
 // Intel dropped classic icc/icpc after oneAPI 2023.
 const CLASSIC_CPP_YEARS = ["2021", "2022", "2023"];
@@ -100079,7 +100096,6 @@ function intelLinuxCacheKey(arch, bundle) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
-
 
 
 
@@ -100145,7 +100161,7 @@ async function debian_installDebian(inputs) {
     if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
-    const cacheHit = await restoreCache(cachePaths, cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey);
     const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
     const cacheValid = cacheHit
         ? await validateRestoredCompilerCache(`ifx ${version}`, [setVarsScript], "bash", [
@@ -100182,7 +100198,7 @@ async function debian_installDebian(inputs) {
             fortranPkg,
             cppPkg,
         ]);
-        await saveCompilerCache(cachePaths, cacheKey);
+        await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     }
     else {
         info(`Cache hit for ${cacheKey}, skipping installation...`);
@@ -100214,6 +100230,7 @@ async function debian_installDebian(inputs) {
         fc: "ifx",
         cc: "icx",
         cxx: "icpx",
+        cacheHit: cacheValid,
     };
 }
 async function aptInstallWithRetry(args, maxAttempts = 3) {
@@ -100519,7 +100536,6 @@ async function fortranComponentArgs(installerPath, oneApiRelease, url) {
 
 
 
-
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
 const IFX_RELEASES = [
@@ -100656,7 +100672,7 @@ async function win32_installWin32(inputs) {
     let cacheHit;
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-            cacheHit = await restoreCache(cachePaths, cacheKey); // Sometimes fails
+            cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey); // Sometimes fails
             break;
         }
         catch (err) {
@@ -100685,7 +100701,7 @@ async function win32_installWin32(inputs) {
         const componentArgs = await fortranComponentArgs(installerPath, version, release.url);
         await runInstallerWithRetry(installerPath, componentArgs);
         info("Saving installation to cache...");
-        await saveCompilerCache(cachePaths, cacheKey);
+        await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     }
     await captureIntelWindowsEnvironment(SETVARS_BAT, "setvars_and_dump.bat");
     const resolvedVersion = await ifx_win32_resolveInstalledVersion();
@@ -100701,6 +100717,7 @@ async function win32_installWin32(inputs) {
         fc: "ifx",
         cc: "cl",
         cxx: "cl",
+        cacheHit: cacheValid,
     };
     return result;
 }
@@ -100794,7 +100811,6 @@ async function installIFX(inputs) {
 
 
 
-
 const debian_ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -100847,7 +100863,7 @@ async function ifort_debian_installDebian(inputs) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
     const cacheKey = intelLinuxCacheKey(inputs.arch, bundle);
-    const cacheHit = await restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, ONEAPI_CACHE_PATHS, cacheKey);
     const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
     const cacheValid = cacheHit
         ? await validateRestoredCompilerCache(`ifort ${version}`, [setVarsScript], "bash", ["-c", `source "${setVarsScript}" --force && ifort --version`])
@@ -100867,7 +100883,7 @@ async function ifort_debian_installDebian(inputs) {
         const [fortranPkg, cppPkg] = intelLinuxPackages(bundle);
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
         await debian_aptGetInstallWithRetry([fortranPkg, cppPkg]);
-        await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
+        await saveCompilerCache(inputs.cache, ONEAPI_CACHE_PATHS, cacheKey);
     }
     else {
         info(`Cache hit for ${cacheKey}, skipping installation...`);
@@ -100906,6 +100922,7 @@ async function ifort_debian_installDebian(inputs) {
         fc: "ifort",
         cc: hasClassicCpp(bundle) ? "icc" : "icx",
         cxx: hasClassicCpp(bundle) ? "icpc" : "icpx",
+        cacheHit: cacheValid,
     };
     return result;
 }
@@ -101247,7 +101264,6 @@ async function downloadInstaller(url, destPath) {
 
 
 
-
 // Intel dropped ifort support starting with the 2024 oneAPI release.
 // NOTE: Intel's macOS download GUIDs change frequently. These are the standard
 // known releases, but if you hit a 403, the GUID in the URL needs updating.
@@ -101378,7 +101394,7 @@ async function darwin_installDarwin(inputs) {
     const currentUser = process.env.USER ?? "runner";
     await exec_exec("sudo", ["chown", "-R", currentUser, darwin_ONEAPI_ROOT]);
     // 2. Restore from cache if present
-    const cacheHit = await restoreCache(cachePaths, cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey);
     const cacheValid = cacheHit
         ? await validateRestoredCompilerCache(`ifort ${version}`, [SETVARS_SH], "bash", ["-c", `source "${SETVARS_SH}" --force && ifort --version`])
         : false;
@@ -101419,7 +101435,7 @@ async function darwin_installDarwin(inputs) {
             info(`Running silent install via ${installScript}...`);
             await runInstaller(installScript);
             info("Saving installation to cache...");
-            await saveCompilerCache(cachePaths, cacheKey);
+            await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
         }
         finally {
             info("Unmounting DMG...");
@@ -101460,6 +101476,7 @@ async function darwin_installDarwin(inputs) {
         fc: "ifort",
         cc: "clang",
         cxx: "clang++",
+        cacheHit: cacheValid,
     };
 }
 async function ifort_darwin_resolveInstalledVersion() {
@@ -101476,7 +101493,6 @@ async function ifort_darwin_resolveInstalledVersion() {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifort/win32.ts
-
 
 
 
@@ -101559,7 +101575,7 @@ async function ifort_win32_installWin32(inputs) {
     if (!external_fs_namespaceObject.existsSync(win32_ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(win32_ONEAPI_ROOT, { recursive: true });
     }
-    const cacheHit = await restoreCache(cachePaths, cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey);
     const cacheValid = cacheHit
         ? await validateRestoredIntelWindowsCache(`ifort ${version}`, win32_SETVARS_BAT, "ifort")
         : false;
@@ -101585,7 +101601,7 @@ async function ifort_win32_installWin32(inputs) {
             ...componentArgs,
         ]);
         info("Saving installation to cache...");
-        await saveCompilerCache(cachePaths, cacheKey);
+        await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     }
     await captureIntelWindowsEnvironment(win32_SETVARS_BAT, "setvars_ifort_dump.bat");
     const resolvedVersion = await ifort_win32_resolveInstalledVersion();
@@ -101600,6 +101616,7 @@ async function ifort_win32_installWin32(inputs) {
         fc: "ifort",
         cc: "cl",
         cxx: "cl",
+        cacheHit: cacheValid,
     };
     return result;
 }
@@ -101658,7 +101675,6 @@ async function installIFort(inputs) {
 }
 
 ;// CONCATENATED MODULE: ./src/installers/nvfortran/debian.ts
-
 
 
 
@@ -101961,7 +101977,7 @@ async function nvfortran_debian_installDebian(inputs) {
     const installDir = `/opt/nvidia/hpc_sdk/${nvArch}/${version}`;
     const binDir = `${installDir}/compilers/bin`;
     const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
-    const cacheHit = await restoreCache([installDir], cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, [installDir], cacheKey);
     const compilerPaths = ["nvfortran", "nvc", "nvc++"].map((compiler) => `${binDir}/${compiler}`);
     const cacheValid = cacheHit
         ? await validateRestoredCompilerCache(`nvhpc ${version}`, compilerPaths, compilerPaths[0], ["--version"])
@@ -102035,7 +102051,7 @@ async function nvfortran_debian_installDebian(inputs) {
         info("Cleaning up apt archives...");
         await exec_exec("sudo", ["apt-get", "clean"]);
         info(`Saving nvhpc ${version} to cache...`);
-        await saveCompilerCache([installDir], cacheKey);
+        await saveCompilerCache(inputs.cache, [installDir], cacheKey);
     }
     info(`Adding ${binDir} to PATH...`);
     addPath(binDir);
@@ -102049,6 +102065,7 @@ async function nvfortran_debian_installDebian(inputs) {
         fc: "nvfortran",
         cc: "nvc",
         cxx: "nvc++",
+        cacheHit: cacheValid,
     };
 }
 async function cleanupDisk() {
@@ -102187,7 +102204,7 @@ async function aocc_debian_installDebian(inputs) {
     info(`Installing AOCC ${version} on Linux (${inputs.arch})...`);
     const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
     const tempInstallDir = external_path_namespaceObject.posix.join(external_os_.homedir(), ".aocc-cache");
-    const cacheHit = await restoreCache([tempInstallDir], cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, [tempInstallDir], cacheKey);
     if (cacheHit) {
         info("Restored from cache, moving to /opt...");
         await exec_exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
@@ -102211,16 +102228,23 @@ async function aocc_debian_installDebian(inputs) {
             await exec_exec("sudo", ["dpkg", "-i", debPath]);
             await aocc_debian_aptGetInstallWithRetry(["install", "-f", "-y"], "install -f");
         }
-        info(`Saving AOCC ${version} to cache...`);
-        await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
-        await exec_exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
-        await exec_exec("sudo", [
-            "chown",
-            "-R",
-            external_os_.userInfo().username,
-            tempInstallDir,
-        ]);
-        await cache_saveCache([tempInstallDir], cacheKey);
+        if (inputs.cache) {
+            info(`Saving AOCC ${version} to cache...`);
+            await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
+            await exec_exec("sudo", [
+                "cp",
+                "-rT",
+                metadata.installDir,
+                tempInstallDir,
+            ]);
+            await exec_exec("sudo", [
+                "chown",
+                "-R",
+                external_os_.userInfo().username,
+                tempInstallDir,
+            ]);
+        }
+        await saveCompilerCache(inputs.cache, [tempInstallDir], cacheKey);
     }
     else {
         info(`AOCC ${version} already installed at ${metadata.installDir}, skipping download.`);
@@ -102255,6 +102279,7 @@ async function aocc_debian_installDebian(inputs) {
         fc: "flang",
         cc: "clang",
         cxx: "clang++",
+        cacheHit: Boolean(cacheHit),
     };
     return result;
 }
@@ -104098,7 +104123,7 @@ async function armflang_debian_installDebian(inputs) {
     const fc = external_path_namespaceObject.posix.join(binDir, "armflang");
     const cc = external_path_namespaceObject.posix.join(binDir, "armclang");
     const cxx = external_path_namespaceObject.posix.join(binDir, "armclang++");
-    const cacheHit = await restoreCache([cacheDir], cacheKey);
+    const cacheHit = await restoreCompilerCache(inputs.cache, [cacheDir], cacheKey);
     let isCacheValid = false;
     if (cacheHit) {
         await restoreInstallationFromCache(cacheDir);
@@ -104161,13 +104186,9 @@ async function armflang_debian_installDebian(inputs) {
             "--fix-missing",
             `${PACKAGE}=${packageVersion}`,
         ]);
-        await stageInstallationForCache(cacheDir);
-        try {
-            await cache_saveCache([cacheDir], cacheKey);
-        }
-        catch (err) {
-            info(`Failed to save ArmFlang installation to cache: ${err.message}`);
-        }
+        if (inputs.cache)
+            await stageInstallationForCache(cacheDir);
+        await saveCompilerCache(inputs.cache, [cacheDir], cacheKey);
     }
     for (const binary of [fc, cc, cxx]) {
         if (!external_fs_namespaceObject.existsSync(binary)) {
@@ -104194,6 +104215,7 @@ async function armflang_debian_installDebian(inputs) {
         fc,
         cc,
         cxx,
+        cacheHit: isCacheValid,
     };
 }
 
@@ -104242,6 +104264,7 @@ function setInstallationOutputs(result) {
     setOutput("fc", result.fc);
     setOutput("cc", result.cc);
     setOutput("cxx", result.cxx);
+    setOutput("cache-hit", String(result.cacheHit ?? false));
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts

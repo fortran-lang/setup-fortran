@@ -45,6 +45,7 @@ describe("action.yml metadata contract", () => {
     it("declares the expected input names", () => {
       expect(Object.keys(actionYml.inputs).sort()).toEqual(
         [
+          "cache",
           "cleanup-disk",
           "compiler",
           "msystem",
@@ -88,7 +89,7 @@ describe("action.yml metadata contract", () => {
   describe("outputs", () => {
     it("declares the expected output names", () => {
       expect(Object.keys(actionYml.outputs).sort()).toEqual(
-        ["cc", "cxx", "fc", "version"].sort(),
+        ["cache-hit", "cc", "cxx", "fc", "version"].sort(),
       );
     });
   });

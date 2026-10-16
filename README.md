@@ -37,6 +37,7 @@ Migrating from `v1` requires only a few changes:
 | `msystem`            | Windows toolchain environment (`native`, `ucrt64`, `clang64`)                                                                                                  | `native`   |
 | `cleanup-disk`       | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`)                                                         | `false`    |
 | `update-environment` | Whether to export toolchain environment variables (`FC`, `CC`, `CXX`, `FPM_*`, `F77`, `F90`, `FORTRAN_COMPILER`) into the runner environment (`true`, `false`) | `true`     |
+| `cache`              | Restore and save the installation with the GitHub Actions cache (`true`, `false`); no effect for `flang`, `lfortran`, and `gfortran` on macOS and Windows      | `true`     |
 
 For compatibility with `fortran-lang/setup-fortran`, the legacy names `gcc`,
 `intel`, `intel-classic`, and `nvidia-hpc` are accepted as aliases for
@@ -333,12 +334,13 @@ jobs:
 
 ## Outputs
 
-| Output    | Description                                |
-| --------- | ------------------------------------------ |
-| `version` | Resolved version of the installed compiler |
-| `fc`      | Command or path to the Fortran compiler    |
-| `cc`      | Command or path to the C compiler          |
-| `cxx`     | Command or path to the C++ compiler        |
+| Output      | Description                                                              |
+| ----------- | ------------------------------------------------------------------------ |
+| `version`   | Resolved version of the installed compiler                               |
+| `fc`        | Command or path to the Fortran compiler                                  |
+| `cc`        | Command or path to the C compiler                                        |
+| `cxx`       | Command or path to the C++ compiler                                      |
+| `cache-hit` | `true` if a cached installation was restored and used, otherwise `false` |
 
 ## Environment Variables
 

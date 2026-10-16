@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import {
   Arch,
@@ -17,7 +16,10 @@ import {
 } from "../../intel_windows_env";
 import { fortranComponentArgs } from "../../intel_windows_installer";
 import { verifyIntelAuthenticode } from "../../verify_download";
-import { saveCompilerCache } from "../../cache_validation";
+import {
+  restoreCompilerCache,
+  saveCompilerCache,
+} from "../../cache_validation";
 
 // ifort (Intel Fortran Compiler Classic) was discontinued in 2024.
 // Only legacy versions (2023 and earlier) are listed here.
@@ -102,7 +104,11 @@ export async function installWin32(
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    cachePaths,
+    cacheKey,
+  );
   const cacheValid = cacheHit
     ? await validateRestoredIntelWindowsCache(
         `ifort ${version}`,
@@ -144,7 +150,7 @@ export async function installWin32(
     ]);
 
     core.info("Saving installation to cache...");
-    await saveCompilerCache(cachePaths, cacheKey);
+    await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
   }
 
   await captureIntelWindowsEnvironment(SETVARS_BAT, "setvars_ifort_dump.bat");
@@ -161,6 +167,7 @@ export async function installWin32(
     fc: "ifort",
     cc: "cl",
     cxx: "cl",
+    cacheHit: cacheValid,
   };
   return result;
 }

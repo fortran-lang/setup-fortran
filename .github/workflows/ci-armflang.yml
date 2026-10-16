@@ -59,6 +59,7 @@ jobs:
         with:
           compiler: armflang
           version: ${{ matrix.toolchain.version }}
+          cache: false
 
       - name: Verify installation
         env:

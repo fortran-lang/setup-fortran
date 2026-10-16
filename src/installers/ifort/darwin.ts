@@ -1,11 +1,11 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import * as fs from "fs";
 import path from "path";
 import {
+  restoreCompilerCache,
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
@@ -158,7 +158,11 @@ export async function installDarwin(
   await exec.exec("sudo", ["chown", "-R", currentUser, ONEAPI_ROOT]);
 
   // 2. Restore from cache if present
-  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    cachePaths,
+    cacheKey,
+  );
   const cacheValid = cacheHit
     ? await validateRestoredCompilerCache(
         `ifort ${version}`,
@@ -226,7 +230,7 @@ export async function installDarwin(
       await runInstaller(installScript);
 
       core.info("Saving installation to cache...");
-      await saveCompilerCache(cachePaths, cacheKey);
+      await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     } finally {
       core.info("Unmounting DMG...");
       await exec.exec("hdiutil", ["detach", mountPoint, "-force"], {
@@ -274,6 +278,7 @@ export async function installDarwin(
     fc: "ifort",
     cc: "clang",
     cxx: "clang++",
+    cacheHit: cacheValid,
   };
 }
 
