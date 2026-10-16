@@ -19,6 +19,7 @@ jobs:
       matrix:
         image: [ubuntu-24.04, ubuntu-22.04]
         toolchain:
+          - { compiler: ifx, version: "2026.2" }
           - { compiler: ifx, version: "2026.1" }
           - { compiler: ifx, version: "2026.0" }
           - { compiler: ifx, version: "2025.3" }

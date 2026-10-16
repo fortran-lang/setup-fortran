@@ -14,6 +14,7 @@ const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: [
+    "2026.2",
     "2026.1",
     "2026.0",
     "2025.3",

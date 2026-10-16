@@ -143,6 +143,7 @@ const INCUMBENT_GREEN_CELLS: readonly CompatCell[] = [
 const GF = ["16", "15", "14", "13", "12", "11"] as const;
 
 const IFX_LINUX = [
+  "2026.2",
   "2026.1",
   "2026.0",
   "2025.3",
