@@ -174,6 +174,27 @@ describe("installDebian nvfortran", () => {
     });
   });
 
+  it("reinstalls and reports no cache hit when the restored install is incomplete", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+
+    const result = await installDebian(baseInputs);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "rm",
+      "-rf",
+      "/opt/nvidia/hpc_sdk/Linux_x86_64/24.1",
+    ]);
+    expect(result.cacheHit).toBe(false);
+  });
+
+  it("skips restore and save when caching is disabled", async () => {
+    const result = await installDebian({ ...baseInputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
+  });
+
   it("does not write global APT settings or rewrite Ubuntu mirrors", async () => {
     await installDebian(baseInputs);
 

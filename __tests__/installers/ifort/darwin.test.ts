@@ -73,10 +73,36 @@ describe("installDarwin (ifort)", () => {
   it("restores from cache if available", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
 
-    await installDarwin(baseInputs);
+    const result = await installDarwin(baseInputs);
 
     expect(mockedCache.restoreCache).toHaveBeenCalled();
     expect(mockedTc.downloadTool).not.toHaveBeenCalled();
+    expect(result.cacheHit).toBe(true);
+  });
+
+  it("reinstalls and reports no cache hit when the restored install fails validation", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+    const defaultExec = mockedExec.getMockImplementation();
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (options?.silent && args?.[1]?.includes("ifort --version")) return 1;
+      return defaultExec!(commandLine, args, options);
+    });
+
+    const result = await installDarwin(baseInputs);
+
+    expect(mockedTc.downloadTool).toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
+  });
+
+  it("skips restore and save when caching is disabled", async () => {
+    mockedTc.downloadTool.mockResolvedValue("/tmp/ifort.dmg");
+
+    const result = await installDarwin({ ...baseInputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
   });
 
   it("downloads and installs if cache is missing", async () => {
