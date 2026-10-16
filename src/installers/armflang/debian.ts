@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
@@ -8,6 +7,10 @@ import * as path from "path";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import { indexFetchFailed } from "../../apt_sources";
+import {
+  restoreCompilerCache,
+  saveCompilerCache,
+} from "../../cache_validation";
 
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: undefined,
@@ -371,7 +374,11 @@ export async function installDebian(
   const cc = path.posix.join(binDir, "armclang");
   const cxx = path.posix.join(binDir, "armclang++");
 
-  const cacheHit = await cache.restoreCache([cacheDir], cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    [cacheDir],
+    cacheKey,
+  );
   let isCacheValid = false;
   if (cacheHit) {
     await restoreInstallationFromCache(cacheDir);
@@ -445,14 +452,8 @@ export async function installDebian(
       `${PACKAGE}=${packageVersion}`,
     ]);
 
-    await stageInstallationForCache(cacheDir);
-    try {
-      await cache.saveCache([cacheDir], cacheKey);
-    } catch (err) {
-      core.info(
-        `Failed to save ArmFlang installation to cache: ${(err as Error).message}`,
-      );
-    }
+    if (inputs.cache) await stageInstallationForCache(cacheDir);
+    await saveCompilerCache(inputs.cache, [cacheDir], cacheKey);
   }
 
   for (const binary of [fc, cc, cxx]) {
@@ -484,5 +485,6 @@ export async function installDebian(
     fc,
     cc,
     cxx,
+    cacheHit: isCacheValid,
   };
 }

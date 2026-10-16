@@ -20,6 +20,7 @@ describe("installDarwin (gfortran)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 

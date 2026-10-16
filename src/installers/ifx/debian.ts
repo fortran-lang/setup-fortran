@@ -1,11 +1,11 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { Arch, type InstallationResult, type Inputs } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import { scopedSourceListOptions } from "../../apt_sources";
 import {
+  restoreCompilerCache,
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
@@ -77,7 +77,11 @@ export async function installDebian(
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    cachePaths,
+    cacheKey,
+  );
   const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
   const cacheValid = cacheHit
     ? await validateRestoredCompilerCache(
@@ -125,7 +129,7 @@ export async function installDebian(
       cppPkg,
     ]);
 
-    await saveCompilerCache(cachePaths, cacheKey);
+    await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
   } else {
     core.info(`Cache hit for ${cacheKey}, skipping installation...`);
   }
@@ -164,6 +168,7 @@ export async function installDebian(
     fc: "ifx",
     cc: "icx",
     cxx: "icpx",
+    cacheHit: cacheValid,
   };
 }
 

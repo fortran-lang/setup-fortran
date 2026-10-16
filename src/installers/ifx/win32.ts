@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import {
   Arch,
@@ -17,7 +16,10 @@ import {
 } from "../../intel_windows_env";
 import { fortranComponentArgs } from "../../intel_windows_installer";
 import { verifyIntelAuthenticode } from "../../verify_download";
-import { saveCompilerCache } from "../../cache_validation";
+import {
+  restoreCompilerCache,
+  saveCompilerCache,
+} from "../../cache_validation";
 
 // Only versions with a known installer URL are listed.
 // LATEST resolves to the first entry.
@@ -167,7 +169,7 @@ export async function installWin32(
   let cacheHit: string | undefined;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      cacheHit = await cache.restoreCache(cachePaths, cacheKey); // Sometimes fails
+      cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey); // Sometimes fails
       break;
     } catch (err) {
       if (attempt === 3) {
@@ -218,7 +220,7 @@ export async function installWin32(
     await runInstallerWithRetry(installerPath, componentArgs);
 
     core.info("Saving installation to cache...");
-    await saveCompilerCache(cachePaths, cacheKey);
+    await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
   }
 
   await captureIntelWindowsEnvironment(SETVARS_BAT, "setvars_and_dump.bat");
@@ -236,6 +238,7 @@ export async function installWin32(
     fc: "ifx",
     cc: "cl",
     cxx: "cl",
+    cacheHit: cacheValid,
   };
   return result;
 }

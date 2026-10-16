@@ -39,6 +39,12 @@ inputs:
       `false`. Defaults to `true`.
     required: false
     default: "true"
+  cache:
+    description: >-
+      Whether to restore and save the compiler installation with the GitHub
+      Actions cache. Accepts `true` or `false`. Defaults to `true`.
+    required: false
+    default: "true"
 
 outputs:
   version:
@@ -49,6 +55,9 @@ outputs:
     description: The C compiler command or path.
   cxx:
     description: The C++ compiler command or path.
+  cache-hit:
+    description: >-
+      `true` if a cached installation was restored and used, otherwise `false`.
 
 runs:
   using: node24

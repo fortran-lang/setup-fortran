@@ -118,6 +118,7 @@ jobs:
         with:
           compiler: ${{ matrix.first.compiler }}
           version: ${{ matrix.first.version }}
+          cache: false
         timeout-minutes: 30
 
       - name: Verify first installation env vars (baseline)
@@ -183,6 +184,7 @@ jobs:
         with:
           compiler: ${{ matrix.second.compiler }}
           version: ${{ matrix.second.version }}
+          cache: false
         timeout-minutes: 30
 
       - name: Verify second installation took precedence
@@ -272,6 +274,46 @@ jobs:
       - name: Run integration tests for final state
         run: npm run integration-test
         timeout-minutes: 5
+
+  cache-save:
+    name: cache save (ifx, ubuntu-24.04)
+    needs: [validation]
+    runs-on: ubuntu-24.04
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ifx
+        uses: ./
+        with:
+          compiler: ifx
+        timeout-minutes: 30
+
+  cache-restore:
+    name: cache restore (ifx, ubuntu-22.04)
+    needs: [cache-save]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ifx
+        id: setup
+        uses: ./
+        with:
+          compiler: ifx
+        timeout-minutes: 30
+
+      - name: Assert cache hit
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          echo "cache-hit=$CACHE_HIT"
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::Expected cache-hit to be true, got '$CACHE_HIT'"
+            exit 1
+          fi
+          "$FC" --version
 
   canary-report:
     name: Weekly Canary Report

@@ -1,12 +1,15 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as tc from "@actions/tool-cache";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
 import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
+import {
+  restoreCompilerCache,
+  saveCompilerCache,
+} from "../../cache_validation";
 import type { Inputs } from "../../types";
 
 // Matches the timeout options every other Debian-based installer sets on its
@@ -93,7 +96,11 @@ export async function installDebian(
 
   const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
   const tempInstallDir = path.posix.join(os.homedir(), ".aocc-cache");
-  const cacheHit = await cache.restoreCache([tempInstallDir], cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    [tempInstallDir],
+    cacheKey,
+  );
 
   if (cacheHit) {
     core.info("Restored from cache, moving to /opt...");
@@ -120,16 +127,23 @@ export async function installDebian(
       await aptGetInstallWithRetry(["install", "-f", "-y"], "install -f");
     }
 
-    core.info(`Saving AOCC ${version} to cache...`);
-    await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
-    await exec.exec("sudo", ["cp", "-rT", metadata.installDir, tempInstallDir]);
-    await exec.exec("sudo", [
-      "chown",
-      "-R",
-      os.userInfo().username,
-      tempInstallDir,
-    ]);
-    await cache.saveCache([tempInstallDir], cacheKey);
+    if (inputs.cache) {
+      core.info(`Saving AOCC ${version} to cache...`);
+      await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
+      await exec.exec("sudo", [
+        "cp",
+        "-rT",
+        metadata.installDir,
+        tempInstallDir,
+      ]);
+      await exec.exec("sudo", [
+        "chown",
+        "-R",
+        os.userInfo().username,
+        tempInstallDir,
+      ]);
+    }
+    await saveCompilerCache(inputs.cache, [tempInstallDir], cacheKey);
   } else {
     core.info(
       `AOCC ${version} already installed at ${metadata.installDir}, skipping download.`,
@@ -170,6 +184,7 @@ export async function installDebian(
     fc: "flang",
     cc: "clang",
     cxx: "clang++",
+    cacheHit: Boolean(cacheHit),
   };
   return result;
 }

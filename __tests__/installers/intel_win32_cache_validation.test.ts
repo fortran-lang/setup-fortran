@@ -54,6 +54,7 @@ function inputsFor(compiler: Compiler, version: string): Inputs {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 }

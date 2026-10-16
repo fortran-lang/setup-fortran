@@ -162,6 +162,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          cache: false
         timeout-minutes: 45
 
       - name: Verify installation

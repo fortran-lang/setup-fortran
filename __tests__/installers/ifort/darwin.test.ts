@@ -38,6 +38,7 @@ describe("installDarwin (ifort)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -287,6 +288,7 @@ describe("installDarwin (ifort)", () => {
       fc: "ifort",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: true,
     });
   });
 });

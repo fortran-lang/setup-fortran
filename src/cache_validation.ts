@@ -40,10 +40,27 @@ export async function validateRestoredCompilerCache(
   return false;
 }
 
+export async function restoreCompilerCache(
+  enabled: boolean,
+  paths: string[],
+  key: string,
+): Promise<string | undefined> {
+  if (!enabled) {
+    core.info(`Caching disabled; skipping restore of ${key}.`);
+    return undefined;
+  }
+  return cache.restoreCache(paths, key);
+}
+
 export async function saveCompilerCache(
+  enabled: boolean,
   paths: string[],
   key: string,
 ): Promise<void> {
+  if (!enabled) {
+    core.info(`Caching disabled; skipping save of ${key}.`);
+    return;
+  }
   try {
     await cache.saveCache(paths, key);
   } catch (error) {

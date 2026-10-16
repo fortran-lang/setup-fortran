@@ -43,6 +43,7 @@ describe("installDebian (AOCC)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -255,6 +256,34 @@ describe("installDebian (AOCC)", () => {
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
 
+  it("skips restore, staging, and save when caching is disabled", async () => {
+    const result = await installDebian({ ...baseInputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["cp"]),
+    );
+    expect(result.cacheHit).toBe(false);
+  });
+
+  it.each([
+    ["a cache hit", "hit", false, true],
+    ["a cache miss", undefined, false, false],
+    ["an existing installation", undefined, true, false],
+  ])(
+    "reports cacheHit for %s",
+    async (_case, restored, installed, expected) => {
+      mockedCache.restoreCache.mockResolvedValue(restored);
+      mockedFs.existsSync.mockReturnValue(installed);
+
+      const result = await installDebian(baseInputs);
+
+      expect(result.cacheHit).toBe(expected);
+    },
+  );
+
   it("sources setenv script and exports variables", async () => {
     await installDebian(baseInputs);
 
@@ -275,6 +304,7 @@ describe("installDebian (AOCC)", () => {
       fc: "flang",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 
@@ -286,6 +316,7 @@ describe("installDebian (AOCC)", () => {
       fc: "flang",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
     expect(mockedDownloadTool).toHaveBeenCalledWith(
       expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),

@@ -39,6 +39,7 @@ export interface Inputs {
   msystem: Msystem;
   cleanupDisk: boolean;
   updateEnvironment: boolean;
+  cache: boolean;
 }
 
 export const LATEST = "latest" as const;
@@ -49,4 +50,5 @@ export interface InstallationResult {
   fc: string;
   cc: string;
   cxx: string;
+  cacheHit?: boolean;
 }
