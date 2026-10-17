@@ -9,6 +9,7 @@ import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+import { oneApiLinuxCacheKey } from "../../intel_linux_cache";
 
 const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
@@ -73,7 +74,7 @@ export async function installDebian(
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheKey = `oneapi-ifort-validated-v1-${inputs.arch}-${bundle}`;
+  const cacheKey = oneApiLinuxCacheKey(inputs.arch, bundle);
   const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
   const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
   const cacheValid = cacheHit

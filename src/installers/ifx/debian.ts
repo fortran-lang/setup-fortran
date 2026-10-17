@@ -9,6 +9,7 @@ import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+import { oneApiLinuxCacheKey } from "../../intel_linux_cache";
 
 const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
@@ -69,7 +70,7 @@ export async function installDebian(
   core.info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
 
   const ONEAPI_ROOT = "/opt/intel/oneapi";
-  const cacheKey = `oneapi-ifx-validated-v1-${inputs.arch}-${version}`;
+  const cacheKey = oneApiLinuxCacheKey(inputs.arch, version);
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {

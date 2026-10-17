@@ -99939,7 +99939,13 @@ async function saveCompilerCache(paths, key) {
     }
 }
 
+;// CONCATENATED MODULE: ./src/intel_linux_cache.ts
+function oneApiLinuxCacheKey(arch, bundle) {
+    return `oneapi-validated-v2-${arch}-${bundle}`;
+}
+
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
+
 
 
 
@@ -100000,7 +100006,7 @@ async function debian_installDebian(inputs) {
     });
     info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
     const ONEAPI_ROOT = "/opt/intel/oneapi";
-    const cacheKey = `oneapi-ifx-validated-v1-${inputs.arch}-${version}`;
+    const cacheKey = oneApiLinuxCacheKey(inputs.arch, version);
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
@@ -100655,6 +100661,7 @@ async function installIFX(inputs) {
 
 
 
+
 const debian_ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -100706,7 +100713,7 @@ async function ifort_debian_installDebian(inputs) {
     if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
-    const cacheKey = `oneapi-ifort-validated-v1-${inputs.arch}-${bundle}`;
+    const cacheKey = oneApiLinuxCacheKey(inputs.arch, bundle);
     const cacheHit = await restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
     const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
     const cacheValid = cacheHit
