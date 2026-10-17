@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -18,10 +19,15 @@ export const SUPPORTED_VERSIONS = {
 
 const CACHE_SCHEMA_VERSION = "v2";
 
-function aptCacheKey(inputs: Inputs, version: string): string {
+function aptCacheKey(
+  inputs: Inputs,
+  version: string,
+  revision: string,
+): string {
   return [
     "apt-gfortran",
     CACHE_SCHEMA_VERSION,
+    revision,
     inputs.osVersion,
     inputs.arch,
     version,
@@ -66,18 +72,6 @@ export async function installDebian(
   const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
   const cacheDir = aptCacheDir(inputs, version);
   const cachePaths = [cacheDir];
-  const cacheKey = aptCacheKey(inputs, version);
-
-  // APT expects this directory to exist beneath its archive directory.
-  fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
-  let cacheHit: string | undefined;
-  try {
-    cacheHit = await cache.restoreCache(cachePaths, cacheKey);
-  } catch (err) {
-    core.info(
-      `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
-    );
-  }
 
   const ppaAdded = needsPpa(version, inputs.osVersion);
   if (ppaAdded) {
@@ -87,8 +81,32 @@ export async function installDebian(
 
   await aptGetUpdateWithRetry(ppaAdded);
 
+  // APT expects this directory to exist beneath its archive directory.
+  fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
+
+  const revision = await candidateVersion(`gfortran-${version}`);
+  const fingerprint = await downloadFingerprint(packages, cacheDir);
+  const cacheKey =
+    revision && fingerprint
+      ? aptCacheKey(inputs, version, `${revision}-${fingerprint}`)
+      : undefined;
+  let cacheHit: string | undefined;
+  if (cacheKey) {
+    try {
+      cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+    } catch (err) {
+      core.info(
+        `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
+      );
+    }
+  } else {
+    core.info(
+      `Could not determine the GFortran ${version} packages to download; skipping the package cache.`,
+    );
+  }
+
   if (cacheHit) {
-    core.info(`Cache hit for ${cacheKey}, installing from cache...`);
+    core.info(`Cache hit for ${cacheHit}, installing from cache...`);
     try {
       await aptGetInstallFromCache(packages, cacheDir);
       await verifyInstalledToolchain(version);
@@ -103,11 +121,13 @@ export async function installDebian(
   } else {
     await aptGetInstallWithRetry(packages, cacheDir);
     await verifyInstalledToolchain(version);
-    try {
-      await prepareCacheForSave(cacheDir);
-      await cache.saveCache(cachePaths, cacheKey);
-    } catch (err) {
-      core.info(`Could not save the GFortran package cache: ${String(err)}`);
+    if (cacheKey) {
+      try {
+        await prepareCacheForSave(cacheDir);
+        await cache.saveCache(cachePaths, cacheKey);
+      } catch (err) {
+        core.info(`Could not save the GFortran package cache: ${String(err)}`);
+      }
     }
   }
 
@@ -239,6 +259,57 @@ async function aptGetUpdateWithRetry(
     );
     await new Promise((res) => setTimeout(res, attempt * 10_000));
   }
+}
+
+async function candidateVersion(pkg: string): Promise<string | undefined> {
+  let output = "";
+  const exitCode = await exec.exec("apt-cache", ["policy", pkg], {
+    ignoreReturnCode: true,
+    silent: true,
+    listeners: {
+      stdout: (data: Buffer) => {
+        output += data.toString();
+      },
+    },
+  });
+  if (exitCode !== 0) return undefined;
+  const candidate = /^\s*Candidate:\s*(\S+)/m.exec(output)?.[1];
+  return candidate === "(none)" ? undefined : candidate;
+}
+
+async function downloadFingerprint(
+  packages: string[],
+  cacheDir: string,
+): Promise<string | undefined> {
+  let output = "";
+  const exitCode = await exec.exec(
+    "sudo",
+    [
+      "apt-get",
+      "install",
+      "-y",
+      "-qq",
+      "--print-uris",
+      ...aptCacheOptions(cacheDir),
+      ...packages,
+    ],
+    {
+      ignoreReturnCode: true,
+      silent: true,
+      listeners: {
+        stdout: (data: Buffer) => {
+          output += data.toString();
+        },
+      },
+    },
+  );
+  if (exitCode !== 0) return undefined;
+  const files = [...output.matchAll(/^'[^']*'\s+(\S+)/gm)].map((m) => m[1]);
+  return crypto
+    .createHash("sha256")
+    .update(files.sort().join("\n"))
+    .digest("hex")
+    .slice(0, 8);
 }
 
 async function aptGetInstallFromCache(

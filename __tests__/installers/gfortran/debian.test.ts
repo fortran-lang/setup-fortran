@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -39,7 +40,41 @@ describe("GFortran Debian Installer", () => {
     "x64",
     "14",
   );
-  const cacheKey = "apt-gfortran-v2-20.04.6-x64-14";
+  const revision = "14.2.0-4ubuntu2~24.04";
+  const debs = [
+    `gfortran-14_${revision}_amd64.deb`,
+    `gcc-14_${revision}_amd64.deb`,
+  ];
+  const fingerprintOf = (files: string[]): string =>
+    crypto
+      .createHash("sha256")
+      .update([...files].sort().join("\n"))
+      .digest("hex")
+      .slice(0, 8);
+  const cacheKey = `apt-gfortran-v2-${revision}-${fingerprintOf(debs)}-20.04.6-x64-14`;
+  const printUris = (files: string[]): string =>
+    files
+      .map(
+        (f) => `'http://archive.ubuntu.com/pool/${f}' ${f} 1234 SHA512:abc\n`,
+      )
+      .join("");
+
+  const emitCandidate = (
+    commandLine: string,
+    args?: string[],
+    options?: exec.ExecOptions,
+  ): void => {
+    if (commandLine === "apt-cache" && args?.[0] === "policy") {
+      options?.listeners?.stdout?.(
+        Buffer.from(
+          `${args[1]}:\n  Installed: (none)\n  Candidate: ${revision}\n`,
+        ),
+      );
+    }
+    if (commandLine === "sudo" && args?.includes("--print-uris")) {
+      options?.listeners?.stdout?.(Buffer.from(printUris(debs)));
+    }
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,6 +82,7 @@ describe("GFortran Debian Installer", () => {
     process.env.RUNNER_TEMP = testRunnerTemp;
     mockedCache.restoreCache.mockResolvedValue(undefined);
     mockedExec.mockImplementation(async (commandLine, args, options) => {
+      emitCandidate(commandLine, args, options);
       if (commandLine === "gfortran" && args?.[0] === "--version") {
         if (options?.listeners?.stdout) {
           options.listeners.stdout(
@@ -276,6 +312,7 @@ describe("GFortran Debian Installer", () => {
 
       let updateAttempts = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
         if (commandLine === "gfortran" && args?.[0] === "--version") {
           options?.listeners?.stdout?.(
             Buffer.from("GNU Fortran (Ubuntu) 16.0.0"),
@@ -409,9 +446,80 @@ describe("GFortran Debian Installer", () => {
 
       expect(mockedCache.restoreCache).toHaveBeenCalledWith(
         [expect.stringContaining(path.join("arm64", "14"))],
-        "apt-gfortran-v2-20.04.6-arm64-14",
+        `apt-gfortran-v2-${revision}-${fingerprintOf(debs)}-20.04.6-arm64-14`,
       );
     });
+
+    it("reads the candidate and restores the cache after apt-get update", async () => {
+      await installDebian(baseInputs);
+
+      const updateCall = mockedExec.mock.calls.findIndex(
+        ([cmd, args]) => cmd === "sudo" && args?.includes("update"),
+      );
+      const policyCall = mockedExec.mock.calls.findIndex(
+        ([cmd]) => cmd === "apt-cache",
+      );
+      const updateOrder = mockedExec.mock.invocationCallOrder[updateCall];
+      expect(mockedExec.mock.invocationCallOrder[policyCall]).toBeGreaterThan(
+        updateOrder,
+      );
+      expect(
+        mockedCache.restoreCache.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(updateOrder);
+    });
+
+    it("changes the key when the files to download change", async () => {
+      const newerDebs = [...debs, "libgcc-s1_16-20260315-1_amd64.deb"];
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "sudo" && args?.includes("--print-uris")) {
+          options?.listeners?.stdout?.(Buffer.from(printUris(newerDebs)));
+          return 0;
+        }
+        emitCandidate(commandLine, args, options);
+        return 0;
+      });
+
+      await installDebian(baseInputs);
+
+      expect(fingerprintOf(newerDebs)).not.toBe(fingerprintOf(debs));
+      expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+        [cacheDir],
+        `apt-gfortran-v2-${revision}-${fingerprintOf(newerDebs)}-20.04.6-x64-14`,
+      );
+    });
+
+    it.each([
+      ["package has no candidate", "gfortran-14:\n  Candidate: (none)\n", 0, 0],
+      ["package cannot be queried", "", 100, 0],
+      [
+        "download list cannot be read",
+        `gfortran-14:\n  Candidate: ${revision}\n`,
+        0,
+        100,
+      ],
+    ])(
+      "skips the cache when the %s",
+      async (_name, policyOutput, policyExitCode, printUrisExitCode) => {
+        mockedExec.mockImplementation(async (commandLine, args, options) => {
+          if (commandLine === "apt-cache") {
+            options?.listeners?.stdout?.(Buffer.from(policyOutput));
+            return policyExitCode;
+          }
+          if (commandLine === "sudo" && args?.includes("--print-uris")) {
+            return printUrisExitCode;
+          }
+          return 0;
+        });
+
+        await installDebian(baseInputs);
+
+        expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+        expect(mockedCache.saveCache).not.toHaveBeenCalled();
+        expect(core.info).toHaveBeenCalledWith(
+          expect.stringContaining("skipping the package cache"),
+        );
+      },
+    );
 
     it("installs from cache on cache hit", async () => {
       mockedCache.restoreCache.mockResolvedValue("hit");
@@ -457,6 +565,7 @@ describe("GFortran Debian Installer", () => {
     it("falls back to an online install when cached packages are incomplete", async () => {
       mockedCache.restoreCache.mockResolvedValue("hit");
       mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
         if (commandLine === "sudo" && args?.includes("--no-download")) {
           throw new Error("Cached package is missing");
         }
@@ -504,6 +613,7 @@ describe("GFortran Debian Installer", () => {
       mockedCache.restoreCache.mockResolvedValue("hit");
       let validationAttempts = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
         if (commandLine === "gcc-14" && args?.[0] === "--version") {
           validationAttempts++;
           if (validationAttempts === 1) {
@@ -546,7 +656,8 @@ describe("GFortran Debian Installer", () => {
           cmd === "sudo" &&
           args?.includes("apt-get") &&
           args?.includes("install") &&
-          !args?.includes("--no-download")
+          !args?.includes("--no-download") &&
+          !args?.includes("--print-uris")
         ) {
           attempts++;
           if (attempts === 1) throw new Error("Apt failure");
