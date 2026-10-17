@@ -85,10 +85,10 @@ export async function installDebian(
   fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
 
   const revision = await candidateVersion(`gfortran-${version}`);
-  const fingerprint = await downloadFingerprint(packages, cacheDir);
+  const plan = await downloadPlan(packages, cacheDir);
   const cacheKey =
-    revision && fingerprint
-      ? aptCacheKey(inputs, version, `${revision}-${fingerprint}`)
+    revision && plan && plan.files > 0
+      ? aptCacheKey(inputs, version, `${revision}-${plan.fingerprint}`)
       : undefined;
   let cacheHit: string | undefined;
   if (cacheKey) {
@@ -99,9 +99,24 @@ export async function installDebian(
         `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
       );
     }
-  } else {
+    // restoreCache also returns prefix matches, so a hit is not necessarily the
+    // entry we asked for. Installing from another revision's packages can only
+    // fail, so drop it and start from an empty directory.
+    if (cacheHit && cacheHit !== cacheKey) {
+      core.info(
+        `Cache restored ${cacheHit} instead of ${cacheKey}; ignoring it.`,
+      );
+      fs.rmSync(cacheDir, { recursive: true, force: true });
+      fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
+      cacheHit = undefined;
+    }
+  } else if (!revision || !plan) {
     core.info(
       `Could not determine the GFortran ${version} packages to download; skipping the package cache.`,
+    );
+  } else {
+    core.info(
+      `GFortran ${version} is already installed with nothing to download; skipping the package cache.`,
     );
   }
 
@@ -277,10 +292,19 @@ async function candidateVersion(pkg: string): Promise<string | undefined> {
   return candidate === "(none)" ? undefined : candidate;
 }
 
-async function downloadFingerprint(
+interface DownloadPlan {
+  files: number;
+  fingerprint: string;
+}
+
+// What apt-get would download for these packages, as a short hash of the file
+// names (they carry the package versions, so a dependency bump changes the
+// hash). Returns undefined when apt-get cannot report the list; an empty plan
+// means there is nothing to download because the packages are already installed.
+async function downloadPlan(
   packages: string[],
   cacheDir: string,
-): Promise<string | undefined> {
+): Promise<DownloadPlan | undefined> {
   let output = "";
   const exitCode = await exec.exec(
     "sudo",
@@ -305,11 +329,12 @@ async function downloadFingerprint(
   );
   if (exitCode !== 0) return undefined;
   const files = [...output.matchAll(/^'[^']*'\s+(\S+)/gm)].map((m) => m[1]);
-  return crypto
+  const fingerprint = crypto
     .createHash("sha256")
     .update(files.sort().join("\n"))
     .digest("hex")
     .slice(0, 8);
+  return { files: files.length, fingerprint };
 }
 
 async function aptGetInstallFromCache(

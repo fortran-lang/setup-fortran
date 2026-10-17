@@ -98433,9 +98433,9 @@ async function installDebian(inputs) {
     // APT expects this directory to exist beneath its archive directory.
     external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
     const revision = await candidateVersion(`gfortran-${version}`);
-    const fingerprint = await downloadFingerprint(packages, cacheDir);
-    const cacheKey = revision && fingerprint
-        ? aptCacheKey(inputs, version, `${revision}-${fingerprint}`)
+    const plan = await downloadPlan(packages, cacheDir);
+    const cacheKey = revision && plan && plan.files > 0
+        ? aptCacheKey(inputs, version, `${revision}-${plan.fingerprint}`)
         : undefined;
     let cacheHit;
     if (cacheKey) {
@@ -98445,9 +98445,21 @@ async function installDebian(inputs) {
         catch (err) {
             info(`Could not restore the GFortran package cache; proceeding without it: ${String(err)}`);
         }
+        // restoreCache also returns prefix matches, so a hit is not necessarily the
+        // entry we asked for. Installing from another revision's packages can only
+        // fail, so drop it and start from an empty directory.
+        if (cacheHit && cacheHit !== cacheKey) {
+            info(`Cache restored ${cacheHit} instead of ${cacheKey}; ignoring it.`);
+            external_fs_namespaceObject.rmSync(cacheDir, { recursive: true, force: true });
+            external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
+            cacheHit = undefined;
+        }
+    }
+    else if (!revision || !plan) {
+        info(`Could not determine the GFortran ${version} packages to download; skipping the package cache.`);
     }
     else {
-        info(`Could not determine the GFortran ${version} packages to download; skipping the package cache.`);
+        info(`GFortran ${version} is already installed with nothing to download; skipping the package cache.`);
     }
     if (cacheHit) {
         info(`Cache hit for ${cacheHit}, installing from cache...`);
@@ -98596,7 +98608,11 @@ async function candidateVersion(pkg) {
     const candidate = /^\s*Candidate:\s*(\S+)/m.exec(output)?.[1];
     return candidate === "(none)" ? undefined : candidate;
 }
-async function downloadFingerprint(packages, cacheDir) {
+// What apt-get would download for these packages, as a short hash of the file
+// names (they carry the package versions, so a dependency bump changes the
+// hash). Returns undefined when apt-get cannot report the list; an empty plan
+// means there is nothing to download because the packages are already installed.
+async function downloadPlan(packages, cacheDir) {
     let output = "";
     const exitCode = await exec_exec("sudo", [
         "apt-get",
@@ -98618,10 +98634,11 @@ async function downloadFingerprint(packages, cacheDir) {
     if (exitCode !== 0)
         return undefined;
     const files = [...output.matchAll(/^'[^']*'\s+(\S+)/gm)].map((m) => m[1]);
-    return external_crypto_namespaceObject.createHash("sha256")
+    const fingerprint = external_crypto_namespaceObject.createHash("sha256")
         .update(files.sort().join("\n"))
         .digest("hex")
         .slice(0, 8);
+    return { files: files.length, fingerprint };
 }
 async function aptGetInstallFromCache(packages, cacheDir) {
     await exec_exec("sudo", [
