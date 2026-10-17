@@ -322,20 +322,16 @@ describe("installWin32 (Flang)", () => {
   });
 
   describe("MSYS2", () => {
-    it("calls setupMSYS2 and exports variables", async () => {
+    it("rejects UCRT64", async () => {
       const inputs = {
         ...baseInputs,
         version: "latest",
         msystem: Msystem.UCRT64,
       };
-      await installWin32(inputs);
-
-      // llvm-openmp is required for -fopenmp; the flang package only lists it
-      // as an optional dependency.
-      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.UCRT64, [
-        "flang",
-        "llvm-openmp",
-      ]);
+      await expect(installWin32(inputs)).rejects.toThrow(
+        /"ucrt64" is not supported/,
+      );
+      expect(mockedSetupMSYS2).not.toHaveBeenCalled();
     });
 
     it("calls setupMSYS2 with Clang64 and exports variables", async () => {

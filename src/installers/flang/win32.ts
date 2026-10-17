@@ -33,16 +33,17 @@ import { verifySha256 } from "../../verify_download";
 //   `msiexec /a` administrative install because 7-Zip cannot resolve the
 //   WiX file table (it only exposes the embedded cabinet with mangled names).
 //
-// UCRT64 (MSYS2/pacman rolling release):
+// CLANG64 (MSYS2/pacman rolling release):
 //   x64 only — MSYS2 does not support ARM64.
 //   Version is always LATEST since pacman tracks the rolling release.
+//   MSYS2 stopped building flang for UCRT64 with LLVM 23.
 //
 // Only major versions are listed for Native. Full patch versions (e.g. "23.1.0")
 // are validated by extracting the major and checking it against this table.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: ["23", "22"],
-    [Msystem.UCRT64]: [LATEST],
+    [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: [LATEST],
   },
   [Arch.ARM64]: {
@@ -335,7 +336,7 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
 async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
   const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
   core.info(
-    `Installing Flang ${version} on Windows (MSYS2/UCRT64, rolling release)...`,
+    `Installing Flang ${version} on Windows (MSYS2/${inputs.msystem}, rolling release)...`,
   );
 
   // The MSYS2 flang package only lists llvm-openmp as an optional dependency;
