@@ -11,7 +11,7 @@
  * `latest` at a stale release.
  */
 
-import { LATEST } from "../src/types";
+import { Arch, LATEST, Msystem } from "../src/types";
 import {
   compareVersions,
   isVersionListDescending,
@@ -798,17 +798,28 @@ const README_COMPILERS = [
 interface ReadmeTable {
   versions: Set<string>; // concrete advertised versions (any checkmark)
   hasLatest: boolean; // a README "latest" row is present for this compiler
+  columns: string[]; // platform headers, in table order
+  claims: Array<{ column: string; version: string }>; // one per checkmark
 }
 
 // Parse the README "Compiler Support" markdown tables into
 // {compiler -> ReadmeTable}. Only `### \`compiler\`` sections are read; rows
 // with no checkmark and non-table lines are ignored. The `latest` row is
 // recorded in `hasLatest` (it is structurally satisfiable; see Test C comment).
+// Each checkmark is also recorded as a (column, version) claim so Test D can
+// bind it to the platform it advertises.
 function parseReadmeTables(md: string): Record<string, ReadmeTable> {
   const tables: Record<string, ReadmeTable> = {};
   let current: string | undefined;
   const begin = (name: string): ReadmeTable => {
-    if (!tables[name]) tables[name] = { versions: new Set(), hasLatest: false };
+    if (!tables[name]) {
+      tables[name] = {
+        versions: new Set(),
+        hasLatest: false,
+        columns: [],
+        claims: [],
+      };
+    }
     return tables[name];
   };
   for (const raw of md.split(/\r?\n/)) {
@@ -824,16 +835,56 @@ function parseReadmeTables(md: string): Record<string, ReadmeTable> {
     if (!row) continue; // only markdown table rows carry a version claim
     const cols = row[1].split("|").map((c) => c.trim());
     const [first] = cols;
-    if (!first || first === "---" || first.toLowerCase() === "version")
-      continue;
-    if (first.toLowerCase() === "latest") {
-      begin(current).hasLatest = true;
+    if (!first || /^-+$/.test(first)) continue;
+    const table = begin(current);
+    if (first.toLowerCase() === "version") {
+      table.columns = cols.slice(1);
       continue;
     }
-    if (cols.slice(1).some((c) => c.includes("✓")))
-      begin(current).versions.add(first);
+    const cells = cols.slice(1);
+    cells.forEach((cell, i) => {
+      if (cell.includes("✓") && table.columns[i]) {
+        table.claims.push({ column: table.columns[i], version: first });
+      }
+    });
+    if (first.toLowerCase() === "latest") {
+      table.hasLatest = true;
+      continue;
+    }
+    if (cells.some((c) => c.includes("✓"))) table.versions.add(first);
   }
   return tables;
+}
+
+const TABLE_BY_MODULE = new Map<string, unknown>(
+  VERSION_TABLES.map((entry) => [entry.module, entry.table]),
+);
+
+// Which versions the action can install on the platform a README column names.
+// The column gives an image, optionally with an MSYS2 environment in
+// parentheses; that selects the installer for the OS, then the architecture,
+// then the environment where the table has one.
+//   "windows-2022 (ucrt64)" -> flang versions available for MSYS2 ucrt64
+//   "macos-26-intel"        -> flang versions available on Intel macOS
+// Returns undefined when nothing supports that platform, which is the stale
+// column this guards against.
+function columnVersions(
+  compiler: string,
+  column: string,
+): readonly string[] | undefined {
+  const m = /^([a-z0-9.-]+?)(?:\s*\(([a-z0-9]+)\))?$/i.exec(column);
+  if (!m) return undefined;
+  const cls = classifyImage(m[1]);
+  if (!cls) return undefined;
+  const mod =
+    cls.os === "linux" ? "debian" : cls.os === "macos" ? "darwin" : "win32";
+  const table = TABLE_BY_MODULE.get(`${compiler}/${mod}`) as
+    Record<string, unknown> | undefined;
+  const byArch = table?.[cls.arch];
+  if (Array.isArray(byArch)) return byArch as readonly string[];
+  return (
+    byArch as Record<string, readonly string[] | undefined> | undefined
+  )?.[m[2] ?? "native"];
 }
 
 describe("README compatibility tables match SUPPORTED_VERSIONS (Test C)", () => {
@@ -898,6 +949,88 @@ describe("README compatibility tables match SUPPORTED_VERSIONS (Test C)", () => 
     }
   });
 
+  // (c) Platform fidelity: a column is a claim that the action supports that
+  // platform, and every checkmark in it a claim about one version. The
+  // version-set checks above see neither claim break (dropping flang from
+  // MSYS2's ucrt64 repository while leaving the README columns behind is the
+  // case this exists for), so each column — blank or not — must still name a
+  // platform something can be installed on, and each checkmark must match what
+  // can be installed there.
+  it("every README platform column is actually supported", () => {
+    const problems: string[] = [];
+    for (const compiler of README_COMPILERS) {
+      const table = advertised[compiler];
+      if (!table) continue;
+      // A missing or renamed header row would leave no columns and silently
+      // disable every check below, so treat it as a failure of its own.
+      if (table.columns.length === 0) {
+        problems.push(`${compiler}: the table has no column headers`);
+      }
+      for (const column of table.columns) {
+        // A column names a platform. Even an all-blank one is a stale claim
+        // once the action stops supporting that platform (dropping flang from
+        // MSYS2's ucrt64 repository is the case this guards), so the platform
+        // itself must still be supported regardless of whether any version is
+        // checked off in it.
+        const supported = columnVersions(compiler, column);
+        if (!supported || supported.length === 0) {
+          problems.push(
+            `${compiler}: the "${column}" column is stale — ` +
+              "nothing supports that platform any more",
+          );
+          continue;
+        }
+
+        const claimed = table.claims
+          .filter((c) => c.column === column)
+          .map((c) => c.version);
+        if (claimed.length === 0) continue;
+
+        const unsupported = claimed.filter(
+          (version) =>
+            version.toLowerCase() !== "latest" &&
+            !versionFamilyCovered(version, new Set(supported)),
+        );
+        if (unsupported.length > 0) {
+          problems.push(
+            `${compiler}: the "${column}" column advertises ` +
+              `${unsupported.join(", ")}, but only ${supported.join(", ")} ` +
+              "is supported there",
+          );
+        }
+      }
+    }
+    if (problems.length > 0) {
+      throw new Error(
+        "The README advertises platforms that are no longer supported:\n" +
+          problems.map((p) => `  - ${p}`).join("\n"),
+      );
+    }
+  });
+
+  it("maps a README column to the versions it advertises", () => {
+    // Image name alone => the versions without an MSYS2 environment.
+    expect(columnVersions("gfortran", "windows-2025")).toEqual(
+      gfortranWin32[Arch.X64][Msystem.Native],
+    );
+    // Parenthesised environment => that environment's versions.
+    expect(columnVersions("gfortran", "windows-2025 (ucrt64)")).toEqual([
+      LATEST,
+    ]);
+    // A platform nothing supports resolves to nothing, so a checkmark fails.
+    expect(
+      columnVersions("gfortran", "windows-2025 (clang64)"),
+    ).toBeUndefined();
+    expect(columnVersions("gfortran", "plan9-mips")).toBeUndefined();
+    // Intel Mac runners are x64, Apple Silicon ones arm64.
+    expect(columnVersions("gfortran", "macos-26-intel")).toEqual(
+      gfortranDarwin[Arch.X64],
+    );
+    expect(columnVersions("gfortran", "macos-26")).toEqual(
+      gfortranDarwin[Arch.ARM64],
+    );
+  });
+
   // Negative cases for the README parser itself, so a future README edit that
   // breaks table structure is caught here rather than as a silent no-coverage
   // false-pass.
@@ -918,7 +1051,16 @@ describe("README compatibility tables match SUPPORTED_VERSIONS (Test C)", () => 
       "some prose | not | a | table",
     ].join("\n");
     expect(parseReadmeTables(md)).toEqual({
-      flang: { versions: new Set(["16"]), hasLatest: true },
+      flang: {
+        versions: new Set(["16"]),
+        hasLatest: true,
+        columns: ["windows-2025 (ucrt64)", "windows-2022 (ucrt64)"],
+        claims: [
+          { column: "windows-2025 (ucrt64)", version: "latest" },
+          { column: "windows-2022 (ucrt64)", version: "latest" },
+          { column: "windows-2022 (ucrt64)", version: "16" },
+        ],
+      },
     });
   });
 });
