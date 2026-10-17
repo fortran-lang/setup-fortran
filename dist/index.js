@@ -102865,9 +102865,11 @@ async function flang_win32_installWin32(inputs) {
     switch (inputs.msystem) {
         case Msystem.Native:
             return await win32_installNative(inputs);
-        case Msystem.UCRT64:
         case Msystem.Clang64:
             return await win32_installMSYS2(inputs);
+        case Msystem.UCRT64:
+            throw new Error("Flang is not available in MSYS2 UCRT64: MSYS2 dropped the package " +
+                "with LLVM 23. Use msystem: clang64 (x64 only) or native instead.");
     }
 }
 async function win32_installNative(inputs) {

@@ -322,14 +322,14 @@ describe("installWin32 (Flang)", () => {
   });
 
   describe("MSYS2", () => {
-    it("rejects UCRT64", async () => {
+    it("rejects UCRT64 with an actionable message", async () => {
       const inputs = {
         ...baseInputs,
         version: "latest",
         msystem: Msystem.UCRT64,
       };
       await expect(installWin32(inputs)).rejects.toThrow(
-        /"ucrt64" is not supported/,
+        /not available in MSYS2 UCRT64.*clang64/,
       );
       expect(mockedSetupMSYS2).not.toHaveBeenCalled();
     });
