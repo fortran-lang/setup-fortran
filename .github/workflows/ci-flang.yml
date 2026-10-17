@@ -73,10 +73,6 @@ jobs:
           - image: windows-11-arm
             toolchain: { compiler: flang, version: "20" }
           - image: windows-2025
-            toolchain: { compiler: flang, msystem: ucrt64 } # only latest version available from Pacman
-          - image: windows-2022
-            toolchain: { compiler: flang, msystem: ucrt64 } # only latest version available from Pacman
-          - image: windows-2025
             toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
           - image: windows-2022
             toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
