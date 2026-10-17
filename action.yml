@@ -124,6 +124,10 @@ runs:
             read -r CC CXX <<< "$(win_intel_cc_cxx "${VERSION:-2023.2.0}" true)"
             echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           fi
+          if [[ "${{ inputs.compiler }}" == intel* ]] && [[ -z "$CC" || -z "$CXX" ]]; then
+            echo "Could not determine CC/CXX for ${{ inputs.compiler }} ${VERSION}"
+            exit 1
+          fi
         fi
 
         if [[ "${{ inputs.update-environment }}" == "true" ]]; then
