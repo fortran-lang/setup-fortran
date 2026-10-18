@@ -223,16 +223,16 @@ describe("installDebian (Flang)", () => {
     },
   );
 
-  it("accepts LLVM 21, the oldest release published for Ubuntu 26.04", async () => {
+  it("accepts LLVM 22, the oldest complete release for Ubuntu 26.04", async () => {
     await installDebian({
       ...baseInputs,
-      version: "21",
+      version: "22",
       osVersion: "ubuntu26",
     });
 
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
-      expect.arrayContaining(["clang-21", "flang-21"]),
+      expect.arrayContaining(["clang-22", "flang-22"]),
       expect.objectContaining({ ignoreReturnCode: true }),
     );
   });
@@ -246,11 +246,11 @@ describe("installDebian (Flang)", () => {
     expect(mockedExec).not.toHaveBeenCalled();
   });
 
-  it("rejects LLVM 20 and older on Ubuntu 26.04 with an actionable error", async () => {
-    const inputs = { ...baseInputs, version: "20", osVersion: "ubuntu26" };
+  it("rejects LLVM 21 and older on Ubuntu 26.04 with an actionable error", async () => {
+    const inputs = { ...baseInputs, version: "21", osVersion: "ubuntu26" };
 
     await expect(installDebian(inputs)).rejects.toThrow(
-      /Flang 20 is not available on Ubuntu 26\.04 \(resolute\)/,
+      /Flang 21 is not available on Ubuntu 26\.04 \(resolute\)/,
     );
     // The guard fires before any repository configuration or download.
     expect(mockedExec).not.toHaveBeenCalled();
