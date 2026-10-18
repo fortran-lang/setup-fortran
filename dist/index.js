@@ -98516,7 +98516,7 @@ async function aptGetInstallWithRetry(packages, cacheDir, maxAttempts = 3) {
                 "timeout",
                 "--signal=TERM",
                 "--kill-after=30s",
-                "15m",
+                "10m",
                 "apt-get",
                 "install",
                 "-y",
