@@ -48,6 +48,7 @@ jobs:
       - name: Install ArmFlang ${{ matrix.toolchain.version }}
         id: setup
         uses: ./
+        timeout-minutes: 30
         with:
           compiler: armflang
           version: ${{ matrix.toolchain.version }}
