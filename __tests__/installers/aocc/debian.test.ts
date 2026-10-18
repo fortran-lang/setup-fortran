@@ -103,7 +103,7 @@ describe("installDebian (AOCC)", () => {
       "timeout",
       "--signal=TERM",
       "--kill-after=30s",
-      "15m",
+      "10m",
       "apt-get",
       "install",
       "-f",

@@ -102189,7 +102189,7 @@ async function aocc_debian_aptGetInstallWithRetry(args, label, maxAttempts = 3) 
                 "timeout",
                 "--signal=TERM",
                 "--kill-after=30s",
-                "15m",
+                "10m",
                 "apt-get",
                 ...args,
                 ...aocc_debian_APT_TIMEOUT_OPTS,

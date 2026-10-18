@@ -230,7 +230,7 @@ async function aptGetInstallWithRetry(
         "timeout",
         "--signal=TERM",
         "--kill-after=30s",
-        "15m",
+        "10m",
         "apt-get",
         ...args,
         ...APT_TIMEOUT_OPTS,
