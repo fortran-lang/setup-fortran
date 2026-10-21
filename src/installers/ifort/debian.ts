@@ -9,6 +9,11 @@ import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+import {
+  hasClassicCpp,
+  intelLinuxCacheKey,
+  intelLinuxPackages,
+} from "../../intel_linux";
 
 const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
@@ -73,7 +78,7 @@ export async function installDebian(
     fs.mkdirSync(ONEAPI_ROOT, { recursive: true });
   }
 
-  const cacheKey = `oneapi-ifort-validated-v1-${inputs.arch}-${bundle}`;
+  const cacheKey = intelLinuxCacheKey(inputs.arch, bundle);
   const cacheHit = await cache.restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
   const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
   const cacheValid = cacheHit
@@ -99,15 +104,7 @@ export async function installDebian(
 
     await aptGetUpdateWithRetry();
 
-    // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-    // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
-    // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
-    // which also provides classic icc/icpc.
-    const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
-    const cppPkgBase = bundle.startsWith("2024")
-      ? "intel-oneapi-compiler-dpcpp-cpp"
-      : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
-    const cppPkg = `${cppPkgBase}-${bundle}`;
+    const [fortranPkg, cppPkg] = intelLinuxPackages(bundle);
 
     core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
     await aptGetInstallWithRetry([fortranPkg, cppPkg]);
@@ -157,15 +154,11 @@ export async function installDebian(
 
   const resolvedVersion = await resolveInstalledVersion();
   core.info(`ifort ${resolvedVersion} installed successfully.`);
-  // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
-  // instead of the classic icc/icpc, which were discontinued. Earlier bundles
-  // (<=2023) still provide classic icc/icpc alongside icx.
-  const bundleIs2024 = bundle.startsWith("2024");
   const result = {
     version: resolvedVersion,
     fc: "ifort",
-    cc: bundleIs2024 ? "icx" : "icc",
-    cxx: bundleIs2024 ? "icpx" : "icpc",
+    cc: hasClassicCpp(bundle) ? "icc" : "icx",
+    cxx: hasClassicCpp(bundle) ? "icpc" : "icpx",
   };
   return result;
 }

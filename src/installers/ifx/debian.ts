@@ -9,6 +9,7 @@ import {
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
+import { intelLinuxCacheKey, intelLinuxPackages } from "../../intel_linux";
 
 const ONEAPI_SOURCE_LIST_FILE = "oneAPI.list";
 
@@ -69,7 +70,7 @@ export async function installDebian(
   core.info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
 
   const ONEAPI_ROOT = "/opt/intel/oneapi";
-  const cacheKey = `oneapi-ifx-validated-v1-${inputs.arch}-${version}`;
+  const cacheKey = intelLinuxCacheKey(inputs.arch, version);
   const cachePaths = [ONEAPI_ROOT];
 
   if (!fs.existsSync(ONEAPI_ROOT)) {
@@ -111,14 +112,7 @@ export async function installDebian(
 
     await aptGetUpdateWithRetry();
 
-    const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
-    const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
-    const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) =>
-      version.startsWith(y),
-    )
-      ? "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic"
-      : "intel-oneapi-compiler-dpcpp-cpp";
-    const cppPkg = `${cppPkgBase}-${version}`;
+    const [fortranPkg, cppPkg] = intelLinuxPackages(version);
 
     core.info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
 

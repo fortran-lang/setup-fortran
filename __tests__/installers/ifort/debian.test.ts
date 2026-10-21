@@ -3,6 +3,7 @@ import * as exec from "@actions/exec";
 import * as cache from "@actions/cache";
 import * as fs from "fs";
 import { installDebian } from "../../../src/installers/ifort/debian";
+import { installDebian as installIfxDebian } from "../../../src/installers/ifx/debian";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -103,7 +104,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-validated-v1-x64-2023.2.4",
+      "oneapi-linux-validated-v2-x64-2023.2.4",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -129,7 +130,7 @@ describe("installDebian (ifort)", () => {
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-validated-v1-x64-2023.2.4",
+      "oneapi-linux-validated-v2-x64-2023.2.4",
     );
   });
 
@@ -241,6 +242,13 @@ describe("installDebian (ifort)", () => {
     expect(result.fc).toBe("ifort");
     expect(result.cc).toBe("icx");
     expect(result.cxx).toBe("icpx");
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "intel-oneapi-compiler-fortran-2024.2",
+        "intel-oneapi-compiler-dpcpp-cpp-2024.2",
+      ]),
+    );
   });
 
   it("installs the 2021.1.2 legacy spelling as oneAPI 2021.1.2 packages", async () => {
@@ -249,7 +257,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-validated-v1-x64-2021.1.2",
+      "oneapi-linux-validated-v2-x64-2021.1.2",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -281,7 +289,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-ifort-validated-v1-x64-2022.2.1",
+      "oneapi-linux-validated-v2-x64-2022.2.1",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -305,5 +313,25 @@ describe("installDebian (ifort)", () => {
       "intel-oneapi-compiler-fortran-2022.2.1",
       "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic-2022.2.1",
     ]);
+  });
+
+  it("shares the cache key with ifx for the same oneAPI bundle", async () => {
+    await installDebian({ ...baseInputs, version: "2021.11" });
+    await installIfxDebian({
+      ...baseInputs,
+      compiler: Compiler.IFX,
+      version: "2024.0",
+    });
+
+    expect(mockedCache.restoreCache).toHaveBeenNthCalledWith(
+      1,
+      ["/opt/intel/oneapi"],
+      "oneapi-linux-validated-v2-x64-2024.0",
+    );
+    expect(mockedCache.restoreCache).toHaveBeenNthCalledWith(
+      2,
+      ["/opt/intel/oneapi"],
+      "oneapi-linux-validated-v2-x64-2024.0",
+    );
   });
 });
