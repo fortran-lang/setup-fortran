@@ -99939,9 +99939,20 @@ async function saveCompilerCache(paths, key) {
     }
 }
 
-;// CONCATENATED MODULE: ./src/intel_linux_cache.ts
-function oneApiLinuxCacheKey(arch, bundle) {
-    return `oneapi-validated-v2-${arch}-${bundle}`;
+;// CONCATENATED MODULE: ./src/intel_linux.ts
+// Intel dropped classic icc/icpc after oneAPI 2023.
+const CLASSIC_CPP_YEARS = ["2021", "2022", "2023"];
+function hasClassicCpp(bundle) {
+    return CLASSIC_CPP_YEARS.some((y) => bundle.startsWith(y));
+}
+function intelLinuxPackages(bundle) {
+    const cpp = hasClassicCpp(bundle)
+        ? "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic"
+        : "intel-oneapi-compiler-dpcpp-cpp";
+    return [`intel-oneapi-compiler-fortran-${bundle}`, `${cpp}-${bundle}`];
+}
+function intelLinuxCacheKey(arch, bundle) {
+    return `oneapi-linux-validated-v2-${arch}-${bundle}`;
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
@@ -100006,7 +100017,7 @@ async function debian_installDebian(inputs) {
     });
     info(`Installing ifx ${version} on Linux (${inputs.arch})...`);
     const ONEAPI_ROOT = "/opt/intel/oneapi";
-    const cacheKey = oneApiLinuxCacheKey(inputs.arch, version);
+    const cacheKey = intelLinuxCacheKey(inputs.arch, version);
     const cachePaths = [ONEAPI_ROOT];
     if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
@@ -100038,12 +100049,7 @@ async function debian_installDebian(inputs) {
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${ONEAPI_SOURCE_LIST_FILE}`,
         ]);
         await debian_aptGetUpdateWithRetry();
-        const fortranPkg = `intel-oneapi-compiler-fortran-${version}`;
-        const LEGACY_CPP_PKG_VERSIONS = ["2021", "2022", "2023"];
-        const cppPkgBase = LEGACY_CPP_PKG_VERSIONS.some((y) => version.startsWith(y))
-            ? "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic"
-            : "intel-oneapi-compiler-dpcpp-cpp";
-        const cppPkg = `${cppPkgBase}-${version}`;
+        const [fortranPkg, cppPkg] = intelLinuxPackages(version);
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
         await aptInstallWithRetry([
             "install",
@@ -100713,7 +100719,7 @@ async function ifort_debian_installDebian(inputs) {
     if (!external_fs_namespaceObject.existsSync(ONEAPI_ROOT)) {
         external_fs_namespaceObject.mkdirSync(ONEAPI_ROOT, { recursive: true });
     }
-    const cacheKey = oneApiLinuxCacheKey(inputs.arch, bundle);
+    const cacheKey = intelLinuxCacheKey(inputs.arch, bundle);
     const cacheHit = await restoreCache(ONEAPI_CACHE_PATHS, cacheKey);
     const setVarsScript = `${ONEAPI_ROOT}/setvars.sh`;
     const cacheValid = cacheHit
@@ -100731,15 +100737,7 @@ async function ifort_debian_installDebian(inputs) {
             `echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/${debian_ONEAPI_SOURCE_LIST_FILE}`,
         ]);
         await ifort_debian_aptGetUpdateWithRetry();
-        // The versioned package names follow the intel-oneapi-compiler-<component>-<version> scheme.
-        // Intel oneAPI 2024+ bundles ship the LLVM-based dpcpp-cpp package, which provides
-        // the icx/icpx C/C++ drivers; earlier bundles (<=2023) ship dpcpp-cpp-and-cpp-classic,
-        // which also provides classic icc/icpc.
-        const fortranPkg = `intel-oneapi-compiler-fortran-${bundle}`;
-        const cppPkgBase = bundle.startsWith("2024")
-            ? "intel-oneapi-compiler-dpcpp-cpp"
-            : "intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic";
-        const cppPkg = `${cppPkgBase}-${bundle}`;
+        const [fortranPkg, cppPkg] = intelLinuxPackages(bundle);
         info(`Installing apt packages ${fortranPkg} and ${cppPkg}...`);
         await debian_aptGetInstallWithRetry([fortranPkg, cppPkg]);
         await saveCompilerCache(ONEAPI_CACHE_PATHS, cacheKey);
@@ -100776,15 +100774,11 @@ async function ifort_debian_installDebian(inputs) {
     }
     const resolvedVersion = await ifort_debian_resolveInstalledVersion();
     info(`ifort ${resolvedVersion} installed successfully.`);
-    // Intel oneAPI 2024+ bundles ship the LLVM-based C/C++ drivers (icx/icpx)
-    // instead of the classic icc/icpc, which were discontinued. Earlier bundles
-    // (<=2023) still provide classic icc/icpc alongside icx.
-    const bundleIs2024 = bundle.startsWith("2024");
     const result = {
         version: resolvedVersion,
         fc: "ifort",
-        cc: bundleIs2024 ? "icx" : "icc",
-        cxx: bundleIs2024 ? "icpx" : "icpc",
+        cc: hasClassicCpp(bundle) ? "icc" : "icx",
+        cxx: hasClassicCpp(bundle) ? "icpc" : "icpx",
     };
     return result;
 }

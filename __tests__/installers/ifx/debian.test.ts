@@ -63,7 +63,7 @@ describe("installDebian ifx", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2023.2.0",
+      "oneapi-linux-validated-v2-x64-2023.2.0",
     );
     expect(mockedExec).toHaveBeenCalledWith(
       "sudo",
@@ -93,7 +93,7 @@ describe("installDebian ifx", () => {
     );
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2023.2.0",
+      "oneapi-linux-validated-v2-x64-2023.2.0",
     );
   });
 

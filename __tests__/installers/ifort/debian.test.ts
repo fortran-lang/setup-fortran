@@ -104,7 +104,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2023.2.4",
+      "oneapi-linux-validated-v2-x64-2023.2.4",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -130,7 +130,7 @@ describe("installDebian (ifort)", () => {
     ]);
     expect(mockedCache.saveCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2023.2.4",
+      "oneapi-linux-validated-v2-x64-2023.2.4",
     );
   });
 
@@ -242,6 +242,13 @@ describe("installDebian (ifort)", () => {
     expect(result.fc).toBe("ifort");
     expect(result.cc).toBe("icx");
     expect(result.cxx).toBe("icpx");
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining([
+        "intel-oneapi-compiler-fortran-2024.2",
+        "intel-oneapi-compiler-dpcpp-cpp-2024.2",
+      ]),
+    );
   });
 
   it("installs the 2021.1.2 legacy spelling as oneAPI 2021.1.2 packages", async () => {
@@ -250,7 +257,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2021.1.2",
+      "oneapi-linux-validated-v2-x64-2021.1.2",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -282,7 +289,7 @@ describe("installDebian (ifort)", () => {
 
     expect(mockedCache.restoreCache).toHaveBeenCalledWith(
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2022.2.1",
+      "oneapi-linux-validated-v2-x64-2022.2.1",
     );
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "timeout",
@@ -319,12 +326,12 @@ describe("installDebian (ifort)", () => {
     expect(mockedCache.restoreCache).toHaveBeenNthCalledWith(
       1,
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2024.0",
+      "oneapi-linux-validated-v2-x64-2024.0",
     );
     expect(mockedCache.restoreCache).toHaveBeenNthCalledWith(
       2,
       ["/opt/intel/oneapi"],
-      "oneapi-validated-v2-x64-2024.0",
+      "oneapi-linux-validated-v2-x64-2024.0",
     );
   });
 });
