@@ -23,8 +23,8 @@ import { verifySha256 } from "../../verify_download";
 //   - ARM64: LLVM 15/16 have no noble (24.04) repo and broken jammy (22.04)
 //     packaging. 17 is the effective floor on arm64.
 //   - X64: LLVM 15/16 are available on jammy (22.04) only; no noble repo.
-//   - Ubuntu 26.04 (resolute): apt.llvm.org only publishes LLVM 21 and newer,
-//     so 16–20 are rejected with an explicit error in installDebian.
+//   - Ubuntu 26.04 (resolute): apt.llvm.org's LLVM 21 repo is incomplete, so
+//     16-21 are rejected with an explicit error in installDebian.
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: ["23", "22", "21", "20", "19", "18", "17", "16"],
   [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
@@ -166,14 +166,14 @@ export async function installDebian(
   const major = parseInt(version, 10);
   const codename = ubuntuCodename(inputs.osVersion);
 
-  if (major < 21 && codename === "resolute") {
-    // LLVM 16 is jammy-only (no noble repo); 17-20 are published for both.
+  if (major < 22 && codename === "resolute") {
+    // LLVM 16 is jammy-only (no noble repo); 17-21 are published for both.
     const alternativeRunners =
       major >= 17 ? "ubuntu-22.04 or ubuntu-24.04" : "ubuntu-22.04";
     throw new Error(
       `Flang ${version} is not available on Ubuntu 26.04 (resolute): the LLVM ` +
-        `apt repository only publishes LLVM 21 and newer for resolute. ` +
-        `Use an ${alternativeRunners} runner, or request Flang 21 or newer.`,
+        `apt repository only provides a complete Flang 22 and newer for resolute. ` +
+        `Use an ${alternativeRunners} runner, or request Flang 22 or newer.`,
     );
   }
 
