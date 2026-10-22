@@ -491,13 +491,17 @@ install_flang_apt()
     | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
   sudo_wrapper apt-get update
 
-  # flang links through clang, and -fopenmp needs LLVM's OpenMP runtime
+  # clang is the matching C and C++ compiler, and -fopenmp needs LLVM's
+  # OpenMP runtime, which flang does not depend on
   sudo_wrapper apt-get install -y \
     flang-${major} clang-${major} libomp-${major}-dev libclang-rt-${major}-dev
 
   local bindir=/usr/lib/llvm-${major}/bin
   export PATH="$bindir:$PATH"
   echo "$bindir" >> $GITHUB_PATH
+
+  export CC="clang"
+  export CXX="clang++"
 }
 
 install_flang_brew()
@@ -507,12 +511,20 @@ install_flang_brew()
   # The flang formula is unversioned: it provides the latest LLVM release
   brew install flang
 
+  # latest takes whatever Homebrew provides, which may be newer than the
+  # version pinned in latest-versions.sh
   local installed
   installed=$(flang --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
-  if [[ "${installed%%.*}" != "$major" ]]; then
+  if [[ "$version" != "latest" && "${installed%%.*}" != "$major" ]]; then
     echo "LLVM Flang $major is not available on macOS: Homebrew provides $installed"
     exit 1
   fi
+
+  # Homebrew's LLVM is keg-only: use its clang, not Apple's
+  local bindir
+  bindir="$(brew --prefix llvm)/bin"
+  export CC="$bindir/clang"
+  export CXX="$bindir/clang++"
 }
 
 install_flang()
@@ -545,8 +557,6 @@ install_flang()
   esac
 
   export FC="flang"
-  export CC="clang"
-  export CXX="clang++"
 
   echo "The LLVM Flang installed is:"
   flang --version

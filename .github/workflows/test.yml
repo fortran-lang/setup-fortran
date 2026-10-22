@@ -224,6 +224,10 @@ jobs:
             compiler: nvidia-hpc
           - os: ubuntu-24.04
             compiler: aocc
+          - os: ubuntu-24.04
+            compiler: flang
+          - os: macos-26
+            compiler: flang
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -260,6 +264,9 @@ jobs:
             nvidia-hpc)
               actual_version=$(nvfortran --version 2>&1 | awk '/nvfortran/ {print $2}' | cut -d'-' -f1)
               ;;
+            flang)
+              actual_version=$(flang --version | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | cut -d. -f1)
+              ;;
             *)
               echo "Unknown compiler: ${{ matrix.compiler }}"
               exit 1
@@ -276,6 +283,17 @@ jobs:
               echo "Expected version: $expected_version"
               if [[ "$actual_version" == "$expected_version" ]]; then
                 echo "Version matches expected"
+              else
+                echo "Version mismatch: expected $expected_version, got $actual_version"
+                exit 1
+              fi
+              ;;
+            flang)
+              # Homebrew's flang is unversioned: on macOS, latest is whatever it provides
+              expected_version=$(resolve_latest_version "flang" "$platform")
+              echo "Expected version: $expected_version"
+              if [[ "$actual_version" == "$expected_version" || "$platform" == "darwin" ]]; then
+                echo "Version accepted: $actual_version"
               else
                 echo "Version mismatch: expected $expected_version, got $actual_version"
                 exit 1
