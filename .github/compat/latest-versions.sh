@@ -4,6 +4,12 @@
 # Latest supported aocc versions by runner
 LATEST_aocc_ubuntu_24_04="5.2.0"
 
+# Latest supported flang versions by runner
+LATEST_flang_macos_15="23"
+LATEST_flang_macos_26="23"
+LATEST_flang_ubuntu_22_04="23"
+LATEST_flang_ubuntu_24_04="23"
+
 # Latest supported gcc versions by runner
 LATEST_gcc_macos_14="15"
 LATEST_gcc_macos_15="15"
