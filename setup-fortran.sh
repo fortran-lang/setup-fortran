@@ -187,6 +187,13 @@ install_gcc_brew()
     resolved_version=$(resolve_latest_version "gcc" "darwin")
   fi
 
+  # Homebrew builds no Intel macOS bottles for gcc 16 and newer: fail instead
+  # of building gcc from source, which takes hours
+  if [[ "$(uname -m)" == "x86_64" ]] && [[ "$resolved_version" -ge 16 ]]; then
+    echo "GCC $resolved_version is not available on Intel macOS: Homebrew has no bottle for it"
+    exit 1
+  fi
+
   brew install --force gcc@${resolved_version}
   gcc_version=$resolved_version
 
@@ -196,6 +203,16 @@ install_gcc_brew()
   ln -fs ${bindir}/gfortran-${gcc_version} /usr/local/bin/gfortran
   ln -fs ${bindir}/gcc-${gcc_version} /usr/local/bin/gcc
   ln -fs ${bindir}/g++-${gcc_version} /usr/local/bin/g++
+}
+
+# Whether apt offers a released gcc-<version> package. Release package versions
+# start with the full version (16.2.0-3ubuntu1), pre-release snapshots with the
+# major version and a date (16-20260315-1ubuntu1).
+apt_has_gcc_release()
+{
+  local candidate
+  candidate=$(apt-cache policy gcc-$1 2>/dev/null | awk '/Candidate:/ {print $2}')
+  [[ "$candidate" =~ ^$1\.[0-9]+ ]]
 }
 
 install_gcc_apt()
@@ -247,6 +264,23 @@ install_gcc_choco()
     mv /c/mingw64 "$RUNNER_TEMP/"
     # ...and install selected version
     case $resolved_version in
+      16)
+        # Chocolatey only has the MinGW-Builds gcc 16.1.0, whose fpm build
+        # fails fpm's unit tests: use the winlibs build of gcc 16.1.0 instead
+        (
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o winlibs.zip https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r1.zip
+          echo "325771f545e89f62c0e1fafdbf0066cc49e3321aeca7b704c8d065e97a72f2fb  winlibs.zip" | sha256sum -c -
+          unzip -q winlibs.zip -d winlibs
+          rm winlibs.zip
+        )
+        # hide Strawberry compilers and add the winlibs bin dir to PATH
+        mkdir "$RUNNER_TEMP/strawberry"
+        mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
+        mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
+        mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
+        echo "$RUNNER_TEMP\winlibs\mingw64\bin" >> $GITHUB_PATH
+        ;;
       15)
         choco install mingw --version 15.2.0 --force
         # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
@@ -293,7 +327,7 @@ install_gcc_choco()
         choco install mingw --version 8.5.0 --force
         ;;
       *)
-        echo "Unsupported version: $version (choose 8-15, or latest)"
+        echo "Unsupported version: $version (choose 8-16, or latest)"
         exit 1
         ;;
     esac
@@ -328,10 +362,11 @@ install_gcc()
       fi
 
       # Add PPA for additional GCC versions, then probe apt availability.
-      # GCC versions not in apt (e.g. gcc-15 on ubuntu-22.04/24.04) fall back to brew.
+      # GCC versions not in apt, or only available there as a pre-release
+      # snapshot (e.g. gcc-16 16-20260315 on ubuntu-22.04/24.04), fall back to brew.
       sudo_wrapper add-apt-repository --yes ppa:ubuntu-toolchain-r/test
       sudo_wrapper apt-get update -q
-      if apt-cache show gcc-${resolved_version} &>/dev/null; then
+      if apt_has_gcc_release "$resolved_version"; then
         install_gcc_apt "$resolved_version"
       else
         install_gcc_brew_linux "$resolved_version"
