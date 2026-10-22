@@ -275,8 +275,8 @@ jobs:
         run: npm run integration-test
         timeout-minutes: 5
 
-  cache-save:
-    name: cache save (ifx, ubuntu-24.04)
+  cache:
+    name: cache save and restore (ifx, ubuntu-24.04)
     needs: [validation]
     runs-on: ubuntu-24.04
     if: github.actor != 'dependabot[bot]'
@@ -289,14 +289,10 @@ jobs:
           compiler: ifx
         timeout-minutes: 30
 
-  cache-restore:
-    name: cache restore (ifx, ubuntu-22.04)
-    needs: [cache-save]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v7
+      - name: Remove the installation
+        run: sudo rm -rf /opt/intel/oneapi
 
-      - name: Install ifx
+      - name: Install ifx from the cache
         id: setup
         uses: ./
         with:
