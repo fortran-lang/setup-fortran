@@ -35,8 +35,6 @@ jobs:
           - { compiler: flang, version: "17" }
         exclude:
           - image: ubuntu-26.04
-            toolchain: { compiler: flang, version: "21" }
-          - image: ubuntu-26.04
             toolchain: { compiler: flang, version: "20" }
           - image: ubuntu-26.04
             toolchain: { compiler: flang, version: "19" }
@@ -44,8 +42,6 @@ jobs:
             toolchain: { compiler: flang, version: "18" }
           - image: ubuntu-26.04
             toolchain: { compiler: flang, version: "17" }
-          - image: ubuntu-26.04-arm
-            toolchain: { compiler: flang, version: "21" }
           - image: ubuntu-26.04-arm
             toolchain: { compiler: flang, version: "20" }
           - image: ubuntu-26.04-arm
