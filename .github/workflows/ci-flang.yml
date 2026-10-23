@@ -16,7 +16,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm, ubuntu-22.04-arm]
+        image:
+          [
+            ubuntu-26.04,
+            ubuntu-24.04,
+            ubuntu-22.04,
+            ubuntu-26.04-arm,
+            ubuntu-24.04-arm,
+            ubuntu-22.04-arm,
+          ]
         toolchain:
           - { compiler: flang, version: "23" }
           - { compiler: flang, version: "22" }
@@ -25,6 +33,28 @@ jobs:
           - { compiler: flang, version: "19" }
           - { compiler: flang, version: "18" }
           - { compiler: flang, version: "17" }
+        exclude:
+          # flang on resolute needs LLVM 22 or newer
+          - image: ubuntu-26.04
+            toolchain: { compiler: flang, version: "21" }
+          - image: ubuntu-26.04
+            toolchain: { compiler: flang, version: "20" }
+          - image: ubuntu-26.04
+            toolchain: { compiler: flang, version: "19" }
+          - image: ubuntu-26.04
+            toolchain: { compiler: flang, version: "18" }
+          - image: ubuntu-26.04
+            toolchain: { compiler: flang, version: "17" }
+          - image: ubuntu-26.04-arm
+            toolchain: { compiler: flang, version: "21" }
+          - image: ubuntu-26.04-arm
+            toolchain: { compiler: flang, version: "20" }
+          - image: ubuntu-26.04-arm
+            toolchain: { compiler: flang, version: "19" }
+          - image: ubuntu-26.04-arm
+            toolchain: { compiler: flang, version: "18" }
+          - image: ubuntu-26.04-arm
+            toolchain: { compiler: flang, version: "17" }
         include:
           - image: ubuntu-22.04
             toolchain: { compiler: flang, version: "16" }
