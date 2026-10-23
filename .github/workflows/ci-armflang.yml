@@ -22,7 +22,6 @@ jobs:
           - { compiler: armflang, version: "21.1" }
           - { compiler: armflang, version: "20.1" }
         exclude:
-          # Arm publishes no resolute packages for these releases
           - image: ubuntu-26.04-arm
             toolchain: { compiler: armflang, version: "22.1" }
           - image: ubuntu-26.04-arm

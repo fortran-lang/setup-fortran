@@ -34,7 +34,6 @@ jobs:
           - { compiler: flang, version: "18" }
           - { compiler: flang, version: "17" }
         exclude:
-          # flang on resolute needs LLVM 22 or newer
           - image: ubuntu-26.04
             toolchain: { compiler: flang, version: "21" }
           - image: ubuntu-26.04
