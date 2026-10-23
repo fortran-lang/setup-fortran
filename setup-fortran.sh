@@ -477,6 +477,91 @@ install_aocc()
   esac
 }
 
+install_flang_apt()
+{
+  local major=$1
+  local codename
+  codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+
+  # LLVM apt repository (https://apt.llvm.org)
+  require_fetch
+  $fetch https://apt.llvm.org/llvm-snapshot.gpg.key \
+    | sudo_wrapper tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+  echo "deb http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${major} main" \
+    | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
+  sudo_wrapper apt-get update
+
+  # clang is the matching C and C++ compiler, and -fopenmp needs LLVM's
+  # OpenMP runtime, which flang does not depend on
+  sudo_wrapper apt-get install -y \
+    flang-${major} clang-${major} libomp-${major}-dev libclang-rt-${major}-dev
+
+  local bindir=/usr/lib/llvm-${major}/bin
+  export PATH="$bindir:$PATH"
+  echo "$bindir" >> $GITHUB_PATH
+
+  export CC="clang"
+  export CXX="clang++"
+}
+
+install_flang_brew()
+{
+  local major=$1
+
+  # The flang formula is unversioned: it provides the latest LLVM release
+  brew install flang
+
+  # latest takes whatever Homebrew provides, which may be newer than the
+  # version pinned in latest-versions.sh
+  local installed
+  installed=$(flang --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+  if [[ "$version" != "latest" && "${installed%%.*}" != "$major" ]]; then
+    echo "LLVM Flang $major is not available on macOS: Homebrew provides $installed"
+    exit 1
+  fi
+
+  # Homebrew's LLVM is keg-only: use its clang, not Apple's
+  local bindir
+  bindir="$(brew --prefix llvm)/bin"
+  export CC="$bindir/clang"
+  export CXX="$bindir/clang++"
+}
+
+install_flang()
+{
+  local platform=$1
+  local major=$version
+  if [[ "$version" == "latest" ]]; then
+    major=$(resolve_latest_version "flang" "$platform")
+  fi
+
+  # Only the major version selects a release: apt.llvm.org and Homebrew
+  # always provide its latest patch release
+  major=${major%%.*}
+  if ! [[ "$major" =~ ^[0-9]+$ ]] || (( major < 20 )); then
+    echo "Unsupported LLVM Flang version: $version (20 or newer is required)"
+    exit 1
+  fi
+
+  case $platform in
+    linux*)
+      install_flang_apt $major
+      ;;
+    darwin*)
+      install_flang_brew $major
+      ;;
+    *)
+      echo "Unsupported platform: $platform"
+      exit 1
+      ;;
+  esac
+
+  export FC="flang"
+
+  echo "The LLVM Flang installed is:"
+  flang --version
+}
+
 export_intel_vars()
 {
   cat >> $GITHUB_ENV <<EOF

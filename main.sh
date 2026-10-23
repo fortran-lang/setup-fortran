@@ -34,6 +34,10 @@ case $compiler in
     version=${VERSION:-latest}
     install_aocc $platform
     ;;
+  flang)
+    version=${VERSION:-latest}
+    install_flang $platform
+    ;;
   lfortran)
     version=${VERSION:-latest}
     install_lfortran $platform
