@@ -54,6 +54,10 @@ jobs:
           - image: windows-2025
             toolchain: { compiler: ifx, version: "2025.3" } # make sure that minor is resolved to latest patch
           - image: windows-2025
+            toolchain: { compiler: ifx, version: "2026.2.0" }
+          - image: windows-2022
+            toolchain: { compiler: ifx, version: "2026.2.0" }
+          - image: windows-2025
             toolchain: { compiler: ifx, version: "2026.1.1" }
           - image: windows-2022
             toolchain: { compiler: ifx, version: "2026.1.1" }

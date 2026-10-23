@@ -100418,6 +100418,10 @@ async function fortranComponentArgs(installerPath, oneApiRelease, url) {
 // LATEST resolves to the first entry.
 const IFX_RELEASES = [
     {
+        version: "2026.2.0",
+        url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/3b453507-718a-4d49-8ec3-55ae43b44de4/intel-fortran-compiler-2026.2.0.605_offline.exe",
+    },
+    {
         version: "2026.1.1",
         url: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/a43777b7-be5a-4fb6-97f9-bf4ae49eeb33/intel-fortran-compiler-2026.1.1.20_offline.exe",
     },

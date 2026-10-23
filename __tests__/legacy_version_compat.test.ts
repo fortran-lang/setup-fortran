@@ -173,6 +173,7 @@ const IFX_LINUX = [
 ] as const;
 
 const IFX_WINDOWS = [
+  "2026.2.0",
   "2026.1.1",
   "2026.1.0",
   "2026.0.0",
