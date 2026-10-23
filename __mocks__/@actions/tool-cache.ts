@@ -1,0 +1,14 @@
+/// <reference types="jest" />
+export const find = jest.fn();
+export const findAllVersions = jest.fn();
+export const downloadTool = jest.fn();
+export const cacheDir = jest.fn();
+export const cacheFile = jest.fn();
+export const extractZip = jest.fn();
+export const extractTar = jest.fn();
+export const extract7z = jest.fn();
+export const extractXar = jest.fn();
+export const getManifestFromRepo = jest.fn();
+export const findFromManifest = jest.fn();
+export const isExplicitVersion = jest.fn();
+export const evaluateVersions = jest.fn();
