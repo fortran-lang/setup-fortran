@@ -20,10 +20,8 @@ jobs:
           [
             ubuntu-26.04,
             ubuntu-24.04,
-            ubuntu-22.04,
             ubuntu-26.04-arm,
             ubuntu-24.04-arm,
-            ubuntu-22.04-arm,
           ]
         toolchain:
           - { compiler: nvfortran, version: "26.9" }
@@ -66,6 +64,10 @@ jobs:
           - { compiler: nvfortran, version: "20.9" }
           - { compiler: nvfortran, version: "20.7" }
         include:
+          - image: ubuntu-22.04
+            toolchain: { compiler: nvfortran, version: "26.9" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: nvfortran, version: "26.9" }
           - image: ubuntu-24.04-arm
             toolchain: { compiler: nvidia-hpc } # test compatibility alias
 

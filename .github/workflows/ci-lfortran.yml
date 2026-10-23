@@ -20,7 +20,6 @@ jobs:
           [
             ubuntu-26.04,
             ubuntu-24.04,
-            ubuntu-22.04,
             macos-26,
             macos-26-intel,
             macos-15,
@@ -46,25 +45,21 @@ jobs:
             toolchain: { compiler: lfortran, version: "0.67.0" }
           - image: ubuntu-24.04-arm
             toolchain: { compiler: lfortran, version: "0.67.0" }
+          - image: ubuntu-22.04
+            toolchain: { compiler: lfortran, version: "0.67.0" }
           - image: ubuntu-22.04-arm
             toolchain: { compiler: lfortran, version: "0.67.0" }
           - image: ubuntu-26.04-arm
             toolchain: { compiler: lfortran, version: "0.66.0" }
           - image: ubuntu-24.04-arm
             toolchain: { compiler: lfortran, version: "0.66.0" }
-          - image: ubuntu-22.04-arm
-            toolchain: { compiler: lfortran, version: "0.66.0" }
           - image: ubuntu-26.04-arm
             toolchain: { compiler: lfortran, version: "0.65.0" }
           - image: ubuntu-24.04-arm
             toolchain: { compiler: lfortran, version: "0.65.0" }
-          - image: ubuntu-22.04-arm
-            toolchain: { compiler: lfortran, version: "0.65.0" }
           - image: ubuntu-26.04-arm
             toolchain: { compiler: lfortran, version: "0.64.0" }
           - image: ubuntu-24.04-arm
-            toolchain: { compiler: lfortran, version: "0.64.0" }
-          - image: ubuntu-22.04-arm
             toolchain: { compiler: lfortran, version: "0.64.0" }
           - image: windows-2025
             toolchain: { compiler: lfortran, msystem: ucrt64 } # only latest version available from Pacman

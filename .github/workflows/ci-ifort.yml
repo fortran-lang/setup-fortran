@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-26.04, ubuntu-24.04, ubuntu-22.04]
+        image: [ubuntu-26.04, ubuntu-24.04]
         toolchain:
           - { compiler: ifort, version: "2021.13" }
           - { compiler: ifort, version: "2021.12" }
@@ -34,6 +34,8 @@ jobs:
           - { compiler: ifort, version: "2021.1.2" }
           - { compiler: ifort, version: "2021.1" }
         include:
+          - image: ubuntu-22.04
+            toolchain: { compiler: ifort, version: "2021.13" }
           - image: macos-26-intel
             toolchain: { compiler: intel-classic, version: "2021.10" } # test compatibility alias
           - image: macos-26-intel
