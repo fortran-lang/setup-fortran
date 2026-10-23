@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-26.04, ubuntu-24.04, ubuntu-22.04]
+        image: [ubuntu-26.04, ubuntu-24.04]
         toolchain:
           - { compiler: ifx, version: "2026.2" }
           - { compiler: ifx, version: "2026.1" }
@@ -47,6 +47,8 @@ jobs:
           - { compiler: ifx, version: "2021.1.2" }
           - { compiler: ifx, version: "2021.1.1" }
         include:
+          - image: ubuntu-22.04
+            toolchain: { compiler: ifx, version: "2026.2" }
           - image: windows-2022
             toolchain: { compiler: intel } # test compatibility alias
           - image: ubuntu-24.04

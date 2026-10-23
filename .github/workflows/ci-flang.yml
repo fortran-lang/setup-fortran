@@ -20,10 +20,8 @@ jobs:
           [
             ubuntu-26.04,
             ubuntu-24.04,
-            ubuntu-22.04,
             ubuntu-26.04-arm,
             ubuntu-24.04-arm,
-            ubuntu-22.04-arm,
           ]
         toolchain:
           - { compiler: flang, version: "23" }
@@ -58,6 +56,14 @@ jobs:
         include:
           - image: ubuntu-22.04
             toolchain: { compiler: flang, version: "16" }
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "23" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: flang, version: "23" }
+          - image: ubuntu-22.04
+            toolchain: { compiler: flang, version: "22" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: flang, version: "22" }
           - image: macos-26
             toolchain: { compiler: flang } # only latest version available from brew
           - image: macos-26-intel
