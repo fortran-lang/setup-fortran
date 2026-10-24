@@ -9,6 +9,7 @@ import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { indexFetchFailed } from "../../apt_sources";
 import {
+  cacheKeySuffix,
   restoreCompilerCache,
   saveCompilerCache,
 } from "../../cache_validation";
@@ -27,7 +28,7 @@ function aptCacheKey(
   version: string,
   revision: string,
 ): string {
-  return [
+  const key = [
     "apt-gfortran",
     CACHE_SCHEMA_VERSION,
     revision,
@@ -35,6 +36,7 @@ function aptCacheKey(
     inputs.arch,
     version,
   ].join("-");
+  return key + cacheKeySuffix();
 }
 
 function aptCacheDir(inputs: Inputs, version: string): string {

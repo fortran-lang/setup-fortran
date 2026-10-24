@@ -40,6 +40,10 @@ export async function validateRestoredCompilerCache(
   return false;
 }
 
+export function cacheKeySuffix(): string {
+  return process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX ?? "";
+}
+
 export async function restoreCompilerCache(
   enabled: boolean,
   paths: string[],
