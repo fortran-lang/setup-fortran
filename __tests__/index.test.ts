@@ -77,6 +77,7 @@ describe("action invocation", () => {
         fc: "fc",
         cc: "cc",
         cxx: "cxx",
+        cacheHit: false,
       };
       parseInputs.mockReturnValue(inputs);
       installer.mockResolvedValue(result);
@@ -118,6 +119,7 @@ describe("action invocation", () => {
       fc: "gfortran-14",
       cc: "gcc-14",
       cxx: "g++-14",
+      cacheHit: false,
     };
     parseInputs.mockReturnValue(inputs);
     installGFortran.mockResolvedValue(result);
@@ -165,6 +167,7 @@ describe("action invocation", () => {
       fc: "gfortran-14",
       cc: "gcc-14",
       cxx: "g++-14",
+      cacheHit: false,
     };
     parseInputs.mockReturnValue(inputs);
     installGFortran.mockResolvedValue(result);

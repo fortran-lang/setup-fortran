@@ -171,6 +171,7 @@ describe("installDebian (LFortran)", () => {
       fc: "lfortran",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 });

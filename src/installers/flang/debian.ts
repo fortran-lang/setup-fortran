@@ -249,6 +249,7 @@ export async function installDebian(
     // darwin installer.
     cc: `${llvmBinDir}/clang`,
     cxx: `${llvmBinDir}/clang++`,
+    cacheHit: false,
   };
   const resolvedVersion = result.version;
   core.info(`Flang ${resolvedVersion} installed successfully.`);

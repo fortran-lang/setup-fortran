@@ -333,6 +333,7 @@ async function installNative(inputs: Inputs): Promise<InstallationResult> {
     fc: flangExe,
     cc: clangExe,
     cxx: clangPPExe,
+    cacheHit: false,
   };
   return result;
 }
@@ -364,6 +365,7 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     fc: flangExe,
     cc: clangExe,
     cxx: clangPPExe,
+    cacheHit: false,
   };
   return result;
 }

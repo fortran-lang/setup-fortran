@@ -117,6 +117,7 @@ export async function installDebian(
     fc: "lfortran",
     cc: "clang",
     cxx: "clang++",
+    cacheHit: false,
   };
   return result;
 }
