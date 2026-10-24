@@ -121,6 +121,7 @@ describe("installDarwin (LFortran)", () => {
       fc: expect.stringContaining("lfortran"),
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 });

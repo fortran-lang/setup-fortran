@@ -183,6 +183,7 @@ describe("installDarwin (Flang)", () => {
       fc: "/usr/local/opt/flang/bin/flang",
       cc: "/usr/local/opt/llvm/bin/clang",
       cxx: "/usr/local/opt/llvm/bin/clang++",
+      cacheHit: false,
     });
   });
 

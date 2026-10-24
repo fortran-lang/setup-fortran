@@ -392,6 +392,7 @@ describe("installDebian (Flang)", () => {
       fc: "flang-new-18",
       cc: "/usr/lib/llvm-18/bin/clang",
       cxx: "/usr/lib/llvm-18/bin/clang++",
+      cacheHit: false,
     });
   });
 

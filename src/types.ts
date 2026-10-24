@@ -50,5 +50,5 @@ export interface InstallationResult {
   fc: string;
   cc: string;
   cxx: string;
-  cacheHit?: boolean;
+  cacheHit: boolean;
 }

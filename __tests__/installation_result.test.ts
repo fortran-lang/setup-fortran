@@ -14,6 +14,7 @@ describe("installation result helpers", () => {
     fc: "fortran",
     cc: "c",
     cxx: "cxx",
+    cacheHit: false,
   };
 
   beforeEach(() => {
