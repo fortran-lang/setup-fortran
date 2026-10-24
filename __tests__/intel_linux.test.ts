@@ -33,4 +33,15 @@ describe("intel_linux", () => {
       "oneapi-linux-validated-v2-x64-2024.2",
     );
   });
+
+  it("appends the CI cache key suffix when set", () => {
+    process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX = "-123-1";
+    try {
+      expect(intelLinuxCacheKey(Arch.X64, "2024.2")).toBe(
+        "oneapi-linux-validated-v2-x64-2024.2-123-1",
+      );
+    } finally {
+      delete process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX;
+    }
+  });
 });

@@ -280,14 +280,28 @@ jobs:
     needs: [validation]
     runs-on: ubuntu-24.04
     if: github.actor != 'dependabot[bot]'
+    env:
+      SETUP_FORTRAN_CACHE_KEY_SUFFIX: -${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Install ifx
+        id: first
         uses: ./
         with:
           compiler: ifx
         timeout-minutes: 30
+
+      - name: Assert cache miss
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.first.outputs.cache-hit }}
+        run: |
+          echo "cache-hit=$CACHE_HIT"
+          if [ "$CACHE_HIT" != "false" ]; then
+            echo "::error::Expected cache-hit to be false, got '$CACHE_HIT'"
+            exit 1
+          fi
 
       - name: Remove the installation
         run: sudo rm -rf /opt/intel/oneapi

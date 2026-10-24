@@ -1,4 +1,5 @@
 import type { Arch } from "./types";
+import { cacheKeySuffix } from "./cache_validation";
 
 // Intel dropped classic icc/icpc after oneAPI 2023.
 const CLASSIC_CPP_YEARS = ["2021", "2022", "2023"];
@@ -15,5 +16,5 @@ export function intelLinuxPackages(bundle: string): [string, string] {
 }
 
 export function intelLinuxCacheKey(arch: Arch, bundle: string): string {
-  return `oneapi-linux-validated-v2-${arch}-${bundle}`;
+  return `oneapi-linux-validated-v2-${arch}-${bundle}${cacheKeySuffix()}`;
 }

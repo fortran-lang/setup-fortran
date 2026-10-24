@@ -451,6 +451,20 @@ describe("GFortran Debian Installer", () => {
       );
     });
 
+    it("appends the CI cache key suffix when set", async () => {
+      process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX = "-123-1";
+      try {
+        await installDebian(baseInputs);
+      } finally {
+        delete process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX;
+      }
+
+      expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+        [cacheDir],
+        `${cacheKey}-123-1`,
+      );
+    });
+
     it("reads the candidate and restores the cache after apt-get update", async () => {
       await installDebian(baseInputs);
 
