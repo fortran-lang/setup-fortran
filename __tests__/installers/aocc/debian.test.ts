@@ -43,6 +43,7 @@ describe("installDebian (AOCC)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -231,6 +232,7 @@ describe("installDebian (AOCC)", () => {
 
   it("skips download and restores from cache on cache hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedFs.existsSync.mockReturnValue(true);
     await installDebian(baseInputs);
 
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
@@ -238,8 +240,38 @@ describe("installDebian (AOCC)", () => {
       tempInstallDir,
       "/opt/AMD/aocc-compiler-5.1.0",
     ]);
+    expect(mockedExec).toHaveBeenCalledWith(
+      "bash",
+      [
+        "-c",
+        'source "/opt/AMD/aocc-compiler-5.1.0/setenv_AOCC.sh" && "/opt/AMD/aocc-compiler-5.1.0/bin/flang" --version',
+      ],
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
     expect(mockedExec).not.toHaveBeenCalledWith("curl", expect.anything());
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
+  });
+
+  it("reinstalls and reports no cache hit when the restored install fails validation", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedFs.existsSync.mockImplementation(
+      (p) => String(p) !== "/opt/AMD/aocc-compiler-5.1.0",
+    );
+    const defaultExec = mockedExec.getMockImplementation();
+    mockedExec.mockImplementation(async (commandLine, args, options) => {
+      if (options?.silent && args?.[1]?.endsWith("--version")) return 1;
+      return defaultExec!(commandLine, args, options);
+    });
+
+    const result = await installDebian(baseInputs);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "rm",
+      "-rf",
+      "/opt/AMD/aocc-compiler-5.1.0",
+    ]);
+    expect(mockedDownloadTool).toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
   });
 
   it("skips download when already installed on disk but cache miss", async () => {
@@ -254,6 +286,34 @@ describe("installDebian (AOCC)", () => {
     ]);
     expect(mockedCache.saveCache).not.toHaveBeenCalled();
   });
+
+  it("skips restore, staging, and save when caching is disabled", async () => {
+    const result = await installDebian({ ...baseInputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["cp"]),
+    );
+    expect(result.cacheHit).toBe(false);
+  });
+
+  it.each([
+    ["a cache hit", "hit", true, true],
+    ["a cache miss", undefined, false, false],
+    ["an existing installation", undefined, true, false],
+  ])(
+    "reports cacheHit for %s",
+    async (_case, restored, installed, expected) => {
+      mockedCache.restoreCache.mockResolvedValue(restored);
+      mockedFs.existsSync.mockReturnValue(installed);
+
+      const result = await installDebian(baseInputs);
+
+      expect(result.cacheHit).toBe(expected);
+    },
+  );
 
   it("sources setenv script and exports variables", async () => {
     await installDebian(baseInputs);
@@ -275,6 +335,7 @@ describe("installDebian (AOCC)", () => {
       fc: "flang",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 
@@ -286,6 +347,7 @@ describe("installDebian (AOCC)", () => {
       fc: "flang",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
     expect(mockedDownloadTool).toHaveBeenCalledWith(
       expect.stringContaining("aocc-compiler-5.1.0_1_amd64.deb"),

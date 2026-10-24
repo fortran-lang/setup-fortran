@@ -54,6 +54,7 @@ function inputsFor(compiler: Compiler, version: string): Inputs {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 }
@@ -96,6 +97,36 @@ describe.each(COMPILERS)(
         true,
       );
       expect(mockedDownloadTool).not.toHaveBeenCalled();
+    });
+
+    it("reports a cache hit when the restored install validates", async () => {
+      const result = await install(inputsFor(compiler, version));
+
+      expect(result.cacheHit).toBe(true);
+    });
+
+    it("reinstalls and reports no cache hit when validation fails", async () => {
+      mockedExec.mockImplementation(async (_commandLine, args, options) => {
+        if (isValidation(args)) return 1;
+        options?.listeners?.stdout?.(Buffer.from("PATH=C:\\bin"));
+        return 0;
+      });
+
+      const result = await install(inputsFor(compiler, version));
+
+      expect(mockedDownloadTool).toHaveBeenCalled();
+      expect(result.cacheHit).toBe(false);
+    });
+
+    it("skips restore and save when caching is disabled", async () => {
+      const result = await install({
+        ...inputsFor(compiler, version),
+        cache: false,
+      });
+
+      expect(cache.restoreCache).not.toHaveBeenCalled();
+      expect(cache.saveCache).not.toHaveBeenCalled();
+      expect(result.cacheHit).toBe(false);
     });
   },
 );

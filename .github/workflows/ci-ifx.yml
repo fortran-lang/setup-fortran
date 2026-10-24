@@ -184,6 +184,7 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
+          cache: false
 
       - name: Verify installation
         shell: bash
@@ -222,6 +223,7 @@ jobs:
         uses: ./
         with:
           compiler: intel
+          cache: false
         continue-on-error: true
         timeout-minutes: 20
 

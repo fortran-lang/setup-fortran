@@ -29,6 +29,7 @@ describe("installDebian (LFortran)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -170,6 +171,7 @@ describe("installDebian (LFortran)", () => {
       fc: "lfortran",
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 });

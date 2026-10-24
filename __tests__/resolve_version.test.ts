@@ -21,6 +21,7 @@ const baseInputs: Inputs = {
   msystem: Msystem.Native,
   cleanupDisk: false,
   updateEnvironment: true,
+  cache: true,
 };
 
 const SUPPORTED: Record<string, readonly string[]> = {
@@ -296,6 +297,7 @@ describe("resolveVersion / resolveWindowsVersion error paths", () => {
     msystem: Msystem.Native,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
   };
 
   it("throws when the requested arch has no supported-versions entry", () => {

@@ -121,6 +121,7 @@ export async function installDarwin(
     fc: gfortranBinary,
     cc: gccBinary,
     cxx: gxxBinary,
+    cacheHit: false,
   };
   return result;
 }

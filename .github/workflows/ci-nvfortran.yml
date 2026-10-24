@@ -99,6 +99,7 @@ jobs:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
           cleanup-disk: true
+          cache: false
         timeout-minutes: 45
 
       - name: Verify installation

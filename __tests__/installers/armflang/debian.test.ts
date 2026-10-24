@@ -39,6 +39,7 @@ describe("installDebian (ArmFlang)", () => {
     msystem: Msystem.Native,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
   };
 
   beforeEach(() => {
@@ -229,11 +230,26 @@ describe("installDebian (ArmFlang)", () => {
     );
   });
 
+  it("skips restore, staging, and save when caching is disabled", async () => {
+    const result = await installDebian({ ...inputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+      "cp",
+      "-a",
+      "/opt/arm/.",
+      "/home/user/.armflang-cache",
+    ]);
+    expect(result.cacheHit).toBe(false);
+  });
+
   it("restores the toolchain and skips all network work on a cache hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("cache-key");
 
-    await installDebian(inputs);
+    const result = await installDebian(inputs);
 
+    expect(result.cacheHit).toBe(true);
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "cp",
       "-a",
@@ -278,8 +294,9 @@ describe("installDebian (ArmFlang)", () => {
       return 0;
     });
 
-    await installDebian(inputs);
+    const result = await installDebian(inputs);
 
+    expect(result.cacheHit).toBe(false);
     expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining("binaries were incomplete"),
     );
@@ -391,6 +408,7 @@ describe("installDebian (ArmFlang)", () => {
       fc: "/opt/arm/arm-toolchain-for-linux/bin/armflang",
       cc: "/opt/arm/arm-toolchain-for-linux/bin/armclang",
       cxx: "/opt/arm/arm-toolchain-for-linux/bin/armclang++",
+      cacheHit: false,
     });
   });
 

@@ -27,6 +27,7 @@ describe("GFortran Debian Installer", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -450,6 +451,20 @@ describe("GFortran Debian Installer", () => {
       );
     });
 
+    it("appends the CI cache key suffix when set", async () => {
+      process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX = "-123-1";
+      try {
+        await installDebian(baseInputs);
+      } finally {
+        delete process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX;
+      }
+
+      expect(mockedCache.restoreCache).toHaveBeenCalledWith(
+        [cacheDir],
+        `${cacheKey}-123-1`,
+      );
+    });
+
     it("reads the candidate and restores the cache after apt-get update", async () => {
       await installDebian(baseInputs);
 
@@ -558,10 +573,23 @@ describe("GFortran Debian Installer", () => {
       expect(mockedCache.saveCache).toHaveBeenCalledWith([cacheDir], cacheKey);
     });
 
+    it("skips restore, cache preparation, and save when caching is disabled", async () => {
+      const result = await installDebian({ ...baseInputs, cache: false });
+
+      expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+      expect(mockedCache.saveCache).not.toHaveBeenCalled();
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        "sudo",
+        expect.arrayContaining(["chown"]),
+      );
+      expect(result.cacheHit).toBe(false);
+    });
+
     it("installs from cache on cache hit", async () => {
       mockedCache.restoreCache.mockResolvedValue(cacheKey);
-      await installDebian(baseInputs);
+      const result = await installDebian(baseInputs);
 
+      expect(result.cacheHit).toBe(true);
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
         "apt-get",
         "install",
@@ -665,8 +693,9 @@ describe("GFortran Debian Installer", () => {
         return 0;
       });
 
-      await installDebian(baseInputs);
+      const result = await installDebian(baseInputs);
 
+      expect(result.cacheHit).toBe(false);
       expect(validationAttempts).toBe(2);
       expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("incomplete or invalid"),

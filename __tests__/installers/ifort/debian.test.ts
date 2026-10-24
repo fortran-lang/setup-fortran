@@ -31,6 +31,7 @@ describe("installDebian (ifort)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -184,10 +185,33 @@ describe("installDebian (ifort)", () => {
     expect(installAttempts).toBe(2); // failed once, succeeded on retry
   });
 
+  it("reinstalls and reports no cache hit when the restored install is incomplete", async () => {
+    mockedCache.restoreCache.mockResolvedValue("hit");
+    mockedFs.existsSync.mockReturnValue(false);
+
+    const result = await installDebian(baseInputs);
+
+    expect(mockedExec).toHaveBeenCalledWith("sudo", [
+      "rm",
+      "-rf",
+      "/opt/intel/oneapi",
+    ]);
+    expect(result.cacheHit).toBe(false);
+  });
+
+  it("skips restore and save when caching is disabled", async () => {
+    const result = await installDebian({ ...baseInputs, cache: false });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
+  });
+
   it("skips installation and restores from cache on hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
-    await installDebian(baseInputs);
+    const result = await installDebian(baseInputs);
 
+    expect(result.cacheHit).toBe(true);
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
       "apt-get",
       "install",
@@ -232,6 +256,7 @@ describe("installDebian (ifort)", () => {
       fc: "ifort",
       cc: "icc",
       cxx: "icpc",
+      cacheHit: false,
     });
   });
 

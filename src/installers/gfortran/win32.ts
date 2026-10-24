@@ -132,6 +132,7 @@ async function installNative(
     fc: gfortranPath,
     cc: gccPath,
     cxx: gxxPath,
+    cacheHit: false,
   };
   return result;
 }
@@ -159,6 +160,7 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     fc: gfortranPath,
     cc: gccPath,
     cxx: gxxPath,
+    cacheHit: false,
   };
   return result;
 }

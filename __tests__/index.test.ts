@@ -70,12 +70,14 @@ describe("action invocation", () => {
         msystem: Msystem.Native,
         cleanupDisk: false,
         updateEnvironment: true,
+        cache: true,
       };
       const result: InstallationResult = {
         version: "1.2.3",
         fc: "fc",
         cc: "cc",
         cxx: "cxx",
+        cacheHit: false,
       };
       parseInputs.mockReturnValue(inputs);
       installer.mockResolvedValue(result);
@@ -110,12 +112,14 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     };
     const result: InstallationResult = {
       version: "14.2.0",
       fc: "gfortran-14",
       cc: "gcc-14",
       cxx: "g++-14",
+      cacheHit: false,
     };
     parseInputs.mockReturnValue(inputs);
     installGFortran.mockResolvedValue(result);
@@ -156,12 +160,14 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: false,
+      cache: true,
     };
     const result: InstallationResult = {
       version: "14.2.0",
       fc: "gfortran-14",
       cc: "gcc-14",
       cxx: "g++-14",
+      cacheHit: false,
     };
     parseInputs.mockReturnValue(inputs);
     installGFortran.mockResolvedValue(result);
@@ -201,6 +207,7 @@ describe("action invocation", () => {
       msystem: Msystem.Native,
       cleanupDisk: false,
       updateEnvironment: true,
+      cache: true,
     };
     parseInputs.mockReturnValue(inputs);
     installIFX.mockRejectedValue(
@@ -271,6 +278,7 @@ describe("action invocation", () => {
         msystem: Msystem.Native,
         cleanupDisk: false,
         updateEnvironment: true,
+        cache: true,
       };
       parseInputs.mockReturnValue(inputs);
       installer.mockRejectedValue(new Error(expectedMessage));
