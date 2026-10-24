@@ -98512,6 +98512,9 @@ async function validateRestoredCompilerCache(label, requiredPaths, command, args
     }
     return false;
 }
+function cacheKeySuffix() {
+    return process.env.SETUP_FORTRAN_CACHE_KEY_SUFFIX ?? "";
+}
 async function restoreCompilerCache(enabled, paths, key) {
     if (!enabled) {
         info(`Caching disabled; skipping restore of ${key}.`);
@@ -98524,6 +98527,7 @@ async function saveCompilerCache(enabled, paths, key) {
         info(`Caching disabled; skipping save of ${key}.`);
         return;
     }
+    info(`Saving ${key} to cache...`);
     try {
         await cache_saveCache(paths, key);
     }
@@ -98551,7 +98555,7 @@ const SUPPORTED_VERSIONS = {
 };
 const CACHE_SCHEMA_VERSION = "v2";
 function aptCacheKey(inputs, version, revision) {
-    return [
+    const key = [
         "apt-gfortran",
         CACHE_SCHEMA_VERSION,
         revision,
@@ -98559,6 +98563,7 @@ function aptCacheKey(inputs, version, revision) {
         inputs.arch,
         version,
     ].join("-");
+    return key + cacheKeySuffix();
 }
 function aptCacheDir(inputs, version) {
     return external_path_namespaceObject.join(process.env.RUNNER_TEMP ?? external_os_.tmpdir(), "setup-fortran", "apt", "gfortran", inputs.osVersion, inputs.arch, version);
@@ -98958,6 +98963,7 @@ async function installDarwin(inputs) {
         fc: gfortranBinary,
         cc: gccBinary,
         cxx: gxxBinary,
+        cacheHit: false,
     };
     return result;
 }
@@ -99999,6 +100005,7 @@ async function installNative(inputs, version) {
         fc: gfortranPath,
         cc: gccPath,
         cxx: gxxPath,
+        cacheHit: false,
     };
     return result;
 }
@@ -100022,6 +100029,7 @@ async function installMSYS2(inputs) {
         fc: gfortranPath,
         cc: gccPath,
         cxx: gxxPath,
+        cacheHit: false,
     };
     return result;
 }
@@ -100080,6 +100088,7 @@ async function installGFortran(inputs) {
 }
 
 ;// CONCATENATED MODULE: ./src/intel_linux.ts
+
 // Intel dropped classic icc/icpc after oneAPI 2023.
 const CLASSIC_CPP_YEARS = ["2021", "2022", "2023"];
 function hasClassicCpp(bundle) {
@@ -100092,7 +100101,7 @@ function intelLinuxPackages(bundle) {
     return [`intel-oneapi-compiler-fortran-${bundle}`, `${cpp}-${bundle}`];
 }
 function intelLinuxCacheKey(arch, bundle) {
-    return `oneapi-linux-validated-v2-${arch}-${bundle}`;
+    return `oneapi-linux-validated-v2-${arch}-${bundle}${cacheKeySuffix()}`;
 }
 
 ;// CONCATENATED MODULE: ./src/installers/ifx/debian.ts
@@ -100700,7 +100709,6 @@ async function win32_installWin32(inputs) {
         info("Running silent install...");
         const componentArgs = await fortranComponentArgs(installerPath, version, release.url);
         await runInstallerWithRetry(installerPath, componentArgs);
-        info("Saving installation to cache...");
         await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     }
     await captureIntelWindowsEnvironment(SETVARS_BAT, "setvars_and_dump.bat");
@@ -101434,7 +101442,6 @@ async function darwin_installDarwin(inputs) {
             }
             info(`Running silent install via ${installScript}...`);
             await runInstaller(installScript);
-            info("Saving installation to cache...");
             await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
         }
         finally {
@@ -101600,7 +101607,6 @@ async function ifort_win32_installWin32(inputs) {
             "-p=NEED_VS2022_INTEGRATION=0",
             ...componentArgs,
         ]);
-        info("Saving installation to cache...");
         await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     }
     await captureIntelWindowsEnvironment(win32_SETVARS_BAT, "setvars_ifort_dump.bat");
@@ -102050,7 +102056,6 @@ async function nvfortran_debian_installDebian(inputs) {
         }
         info("Cleaning up apt archives...");
         await exec_exec("sudo", ["apt-get", "clean"]);
-        info(`Saving nvhpc ${version} to cache...`);
         await saveCompilerCache(inputs.cache, [installDir], cacheKey);
     }
     info(`Adding ${binDir} to PATH...`);
@@ -102205,11 +102210,21 @@ async function aocc_debian_installDebian(inputs) {
     const cacheKey = `aocc-${version}-${inputs.arch}-${inputs.osVersion}`;
     const tempInstallDir = external_path_namespaceObject.posix.join(external_os_.homedir(), ".aocc-cache");
     const cacheHit = await restoreCompilerCache(inputs.cache, [tempInstallDir], cacheKey);
+    const setenvScript = external_path_namespaceObject.posix.join(metadata.installDir, "setenv_AOCC.sh");
+    const flangBinary = external_path_namespaceObject.posix.join(metadata.installDir, "bin", "flang");
+    let cacheValid = false;
     if (cacheHit) {
         info("Restored from cache, moving to /opt...");
         await exec_exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
         await exec_exec("sudo", ["rm", "-rf", metadata.installDir]);
         await exec_exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
+        cacheValid = await validateRestoredCompilerCache(`AOCC ${version}`, [setenvScript, flangBinary], "bash", ["-c", `source "${setenvScript}" && "${flangBinary}" --version`]);
+        if (!cacheValid) {
+            await exec_exec("sudo", ["rm", "-rf", metadata.installDir]);
+        }
+    }
+    if (cacheValid) {
+        info(`Using AOCC ${version} from cache.`);
     }
     else if (!external_fs_namespaceObject.existsSync(metadata.installDir)) {
         const debPath = external_path_namespaceObject.posix.join(external_os_.tmpdir(), metadata.deb);
@@ -102229,7 +102244,6 @@ async function aocc_debian_installDebian(inputs) {
             await aocc_debian_aptGetInstallWithRetry(["install", "-f", "-y"], "install -f");
         }
         if (inputs.cache) {
-            info(`Saving AOCC ${version} to cache...`);
             await exec_exec("sudo", ["mkdir", "-p", tempInstallDir]);
             await exec_exec("sudo", [
                 "cp",
@@ -102249,7 +102263,6 @@ async function aocc_debian_installDebian(inputs) {
     else {
         info(`AOCC ${version} already installed at ${metadata.installDir}, skipping download.`);
     }
-    const setenvScript = external_path_namespaceObject.posix.join(metadata.installDir, "setenv_AOCC.sh");
     info(`Sourcing ${setenvScript} and exporting environment...`);
     let envOutput = "";
     await exec_exec("bash", ["-c", `source "${setenvScript}" && env`], {
@@ -102279,7 +102292,7 @@ async function aocc_debian_installDebian(inputs) {
         fc: "flang",
         cc: "clang",
         cxx: "clang++",
-        cacheHit: Boolean(cacheHit),
+        cacheHit: cacheValid,
     };
     return result;
 }
@@ -102589,6 +102602,7 @@ async function flang_debian_installDebian(inputs) {
         // darwin installer.
         cc: `${llvmBinDir}/clang`,
         cxx: `${llvmBinDir}/clang++`,
+        cacheHit: false,
     };
     const resolvedVersion = result.version;
     info(`Flang ${resolvedVersion} installed successfully.`);
@@ -102774,6 +102788,7 @@ async function installBrew(inputs) {
         fc: flangBin,
         cc: external_path_namespaceObject.posix.join(llvmBinDir, "clang"),
         cxx: external_path_namespaceObject.posix.join(llvmBinDir, "clang++"),
+        cacheHit: false,
     };
     return result;
 }
@@ -102846,6 +102861,7 @@ async function installFromGitHub(inputs, major, patch, expectedSha256) {
         fc: flangBin,
         cc: external_path_namespaceObject.posix.join(binDir, "clang"),
         cxx: external_path_namespaceObject.posix.join(binDir, "clang++"),
+        cacheHit: false,
     };
     return result;
 }
@@ -103151,6 +103167,7 @@ async function win32_installNative(inputs) {
         fc: flangExe,
         cc: clangExe,
         cxx: clangPPExe,
+        cacheHit: false,
     };
     return result;
 }
@@ -103174,6 +103191,7 @@ async function win32_installMSYS2(inputs) {
         fc: flangExe,
         cc: clangExe,
         cxx: clangPPExe,
+        cacheHit: false,
     };
     return result;
 }
@@ -103453,6 +103471,7 @@ async function lfortran_debian_installDebian(inputs) {
         fc: "lfortran",
         cc: "clang",
         cxx: "clang++",
+        cacheHit: false,
     };
     return result;
 }
@@ -103611,6 +103630,7 @@ async function lfortran_darwin_installDarwin(inputs) {
         fc: environment.lfortran,
         cc: "clang",
         cxx: "clang++",
+        cacheHit: false,
     };
     return result;
 }
@@ -103781,6 +103801,7 @@ async function installConda(inputs) {
         fc: environment.lfortran,
         cc: "clang",
         cxx: "clang++",
+        cacheHit: false,
     };
     return result;
 }
@@ -103817,6 +103838,7 @@ async function lfortran_win32_installMSYS2(inputs) {
         fc: lfortranExe,
         cc: external_path_namespaceObject.win32.join(msysBin, "clang.exe"),
         cxx: external_path_namespaceObject.win32.join(msysBin, "clang++.exe"),
+        cacheHit: false,
     };
     return result;
 }
@@ -104264,7 +104286,7 @@ function setInstallationOutputs(result) {
     setOutput("fc", result.fc);
     setOutput("cc", result.cc);
     setOutput("cxx", result.cxx);
-    setOutput("cache-hit", String(result.cacheHit ?? false));
+    setOutput("cache-hit", String(result.cacheHit));
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
