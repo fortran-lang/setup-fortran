@@ -769,6 +769,32 @@ intel_version_map_w()
   fi
 }
 
+version_ge()
+{
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+}
+
+# Print "CC CXX" for the Windows Intel toolchain at the requested version.
+intel_win_cc_cxx()
+{
+  local version
+  local classic=$2
+  intel_version_map_w "$1" "$classic"
+  if $classic; then
+    if version_ge "$version" 2024.0.0; then
+      echo "cl cl"
+    else
+      echo "icl cl"
+    fi
+  elif version_ge "$version" 2025.3.0; then
+    echo "cl cl"
+  elif version_ge "$version" 2025.0.0; then
+    echo "icx icx"
+  else
+    echo "icx cl"
+  fi
+}
+
 install_intel_apt()
 {
   local version=$1
