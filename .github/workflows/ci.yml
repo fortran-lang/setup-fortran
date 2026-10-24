@@ -275,7 +275,7 @@ jobs:
         run: npm run integration-test
         timeout-minutes: 5
 
-  cache:
+  cache-ifx:
     name: cache save and restore (ifx, ubuntu-24.04)
     needs: [validation]
     runs-on: ubuntu-24.04
@@ -325,6 +325,66 @@ jobs:
           fi
           "$FC" --version
 
+  cache-gfortran-save:
+    name: cache save (gfortran 11, ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    if: github.actor != 'dependabot[bot]'
+    outputs:
+      key-suffix: -${{ github.run_id }}-${{ github.run_attempt }}
+    env:
+      SETUP_FORTRAN_CACHE_KEY_SUFFIX: -${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install gfortran 11
+        id: setup
+        uses: ./
+        with:
+          compiler: gfortran
+          version: "11"
+        timeout-minutes: 30
+
+      - name: Assert cache miss
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          echo "cache-hit=$CACHE_HIT ImageVersion=$ImageVersion"
+          if [ "$CACHE_HIT" != "false" ]; then
+            echo "::error::Expected cache-hit to be false, got '$CACHE_HIT'"
+            exit 1
+          fi
+
+  cache-gfortran-restore:
+    name: cache restore (gfortran 11, ubuntu-24.04)
+    needs: [cache-gfortran-save]
+    runs-on: ubuntu-24.04
+    if: github.actor != 'dependabot[bot]'
+    env:
+      SETUP_FORTRAN_CACHE_KEY_SUFFIX: ${{ needs.cache-gfortran-save.outputs.key-suffix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install gfortran 11
+        id: setup
+        uses: ./
+        with:
+          compiler: gfortran
+          version: "11"
+        timeout-minutes: 30
+
+      - name: Assert cache hit
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          echo "cache-hit=$CACHE_HIT ImageVersion=$ImageVersion"
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::Expected cache-hit to be true, got '$CACHE_HIT'"
+            exit 1
+          fi
+          "$FC" --version
+
   canary-report:
     name: Weekly Canary Report
     needs:
@@ -339,7 +399,9 @@ jobs:
         lfortran,
         nvfortran,
         two-invocations,
-        cache,
+        cache-ifx,
+        cache-gfortran-save,
+        cache-gfortran-restore,
       ]
     if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
@@ -359,7 +421,9 @@ jobs:
           LFORTRAN: ${{ needs.lfortran.result }}
           NVFORTRAN: ${{ needs.nvfortran.result }}
           TWO_INVOCATIONS: ${{ needs.two-invocations.result }}
-          CACHE: ${{ needs.cache.result }}
+          CACHE_IFX: ${{ needs.cache-ifx.result }}
+          CACHE_GFORTRAN_SAVE: ${{ needs.cache-gfortran-save.result }}
+          CACHE_GFORTRAN_RESTORE: ${{ needs.cache-gfortran-restore.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           script: |
@@ -373,7 +437,9 @@ jobs:
               'LFortran': process.env.LFORTRAN,
               'NVFORTRAN': process.env.NVFORTRAN,
               'Sequential installations': process.env.TWO_INVOCATIONS,
-              'Cache save and restore': process.env.CACHE,
+              'Cache (ifx)': process.env.CACHE_IFX,
+              'Cache save (gfortran)': process.env.CACHE_GFORTRAN_SAVE,
+              'Cache restore (gfortran)': process.env.CACHE_GFORTRAN_RESTORE,
             };
             const failed = Object.entries(jobs)
               .filter(([, result]) => result === 'failure')
