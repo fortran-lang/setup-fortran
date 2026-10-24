@@ -223,6 +223,7 @@ jobs:
         uses: ./
         with:
           compiler: intel
+          cache: false
         continue-on-error: true
         timeout-minutes: 20
 
