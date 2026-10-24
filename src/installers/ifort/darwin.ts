@@ -229,7 +229,6 @@ export async function installDarwin(
       core.info(`Running silent install via ${installScript}...`);
       await runInstaller(installScript);
 
-      core.info("Saving installation to cache...");
       await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
     } finally {
       core.info("Unmounting DMG...");
