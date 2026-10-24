@@ -128,7 +128,6 @@ export async function installDebian(
     }
 
     if (inputs.cache) {
-      core.info(`Saving AOCC ${version} to cache...`);
       await exec.exec("sudo", ["mkdir", "-p", tempInstallDir]);
       await exec.exec("sudo", [
         "cp",

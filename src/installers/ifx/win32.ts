@@ -219,7 +219,6 @@ export async function installWin32(
     );
     await runInstallerWithRetry(installerPath, componentArgs);
 
-    core.info("Saving installation to cache...");
     await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
   }
 

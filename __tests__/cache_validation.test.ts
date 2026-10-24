@@ -130,11 +130,13 @@ describe("cache gating", () => {
   it("saves when caching is enabled", async () => {
     await saveCompilerCache(true, ["/compiler"], "key");
     expect(mockedSave).toHaveBeenCalledWith(["/compiler"], "key");
+    expect(core.info).toHaveBeenCalledWith("Saving key to cache...");
   });
 
   it("does not save when caching is disabled", async () => {
     await saveCompilerCache(false, ["/compiler"], "key");
     expect(mockedSave).not.toHaveBeenCalled();
+    expect(core.info).not.toHaveBeenCalledWith("Saving key to cache...");
     expect(core.info).toHaveBeenCalledWith(
       "Caching disabled; skipping save of key.",
     );

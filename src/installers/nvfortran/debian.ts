@@ -476,7 +476,6 @@ export async function installDebian(
     core.info("Cleaning up apt archives...");
     await exec.exec("sudo", ["apt-get", "clean"]);
 
-    core.info(`Saving nvhpc ${version} to cache...`);
     await saveCompilerCache(inputs.cache, [installDir], cacheKey);
   }
 

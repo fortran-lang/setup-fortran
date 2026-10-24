@@ -61,6 +61,7 @@ export async function saveCompilerCache(
     core.info(`Caching disabled; skipping save of ${key}.`);
     return;
   }
+  core.info(`Saving ${key} to cache...`);
   try {
     await cache.saveCache(paths, key);
   } catch (error) {
