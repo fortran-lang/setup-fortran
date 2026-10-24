@@ -9,6 +9,7 @@ import { resolveVersion } from "../../resolve_version";
 import {
   restoreCompilerCache,
   saveCompilerCache,
+  validateRestoredCompilerCache,
 } from "../../cache_validation";
 import type { Inputs } from "../../types";
 
@@ -102,11 +103,27 @@ export async function installDebian(
     cacheKey,
   );
 
+  const setenvScript = path.posix.join(metadata.installDir, "setenv_AOCC.sh");
+  const flangBinary = path.posix.join(metadata.installDir, "bin", "flang");
+  let cacheValid = false;
   if (cacheHit) {
     core.info("Restored from cache, moving to /opt...");
     await exec.exec("sudo", ["mkdir", "-p", "/opt/AMD"]);
     await exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
     await exec.exec("sudo", ["mv", tempInstallDir, metadata.installDir]);
+    cacheValid = await validateRestoredCompilerCache(
+      `AOCC ${version}`,
+      [setenvScript, flangBinary],
+      "bash",
+      ["-c", `source "${setenvScript}" && "${flangBinary}" --version`],
+    );
+    if (!cacheValid) {
+      await exec.exec("sudo", ["rm", "-rf", metadata.installDir]);
+    }
+  }
+
+  if (cacheValid) {
+    core.info(`Using AOCC ${version} from cache.`);
   } else if (!fs.existsSync(metadata.installDir)) {
     const debPath = path.posix.join(os.tmpdir(), metadata.deb);
 
@@ -149,7 +166,6 @@ export async function installDebian(
     );
   }
 
-  const setenvScript = path.posix.join(metadata.installDir, "setenv_AOCC.sh");
   core.info(`Sourcing ${setenvScript} and exporting environment...`);
 
   let envOutput = "";
@@ -183,7 +199,7 @@ export async function installDebian(
     fc: "flang",
     cc: "clang",
     cxx: "clang++",
-    cacheHit: Boolean(cacheHit),
+    cacheHit: cacheValid,
   };
   return result;
 }
