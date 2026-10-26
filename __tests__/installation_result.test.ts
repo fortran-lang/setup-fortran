@@ -14,6 +14,7 @@ describe("installation result helpers", () => {
     fc: "fortran",
     cc: "c",
     cxx: "cxx",
+    cacheHit: false,
   };
 
   beforeEach(() => {
@@ -27,6 +28,16 @@ describe("installation result helpers", () => {
     expect(core.setOutput).toHaveBeenCalledWith("fc", "fortran");
     expect(core.setOutput).toHaveBeenCalledWith("cc", "c");
     expect(core.setOutput).toHaveBeenCalledWith("cxx", "cxx");
+    expect(core.setOutput).toHaveBeenCalledWith("cache-hit", "false");
+  });
+
+  it.each([
+    [true, "true"],
+    [false, "false"],
+  ])("sets cache-hit from cacheHit=%s", (cacheHit, expected) => {
+    setInstallationOutputs({ ...result, cacheHit });
+
+    expect(core.setOutput).toHaveBeenCalledWith("cache-hit", expected);
   });
 
   it.each([

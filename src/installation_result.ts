@@ -38,4 +38,5 @@ export function setInstallationOutputs(result: InstallationResult): void {
   core.setOutput("fc", result.fc);
   core.setOutput("cc", result.cc);
   core.setOutput("cxx", result.cxx);
+  core.setOutput("cache-hit", String(result.cacheHit));
 }

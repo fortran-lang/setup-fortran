@@ -213,6 +213,7 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
     fc: environment.lfortran,
     cc: "clang",
     cxx: "clang++",
+    cacheHit: false,
   };
   return result;
 }
@@ -267,6 +268,7 @@ async function installMSYS2(inputs: Inputs): Promise<InstallationResult> {
     fc: lfortranExe,
     cc: path.win32.join(msysBin, "clang.exe"),
     cxx: path.win32.join(msysBin, "clang++.exe"),
+    cacheHit: false,
   };
   return result;
 }

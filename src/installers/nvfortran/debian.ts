@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -10,6 +9,7 @@ import type { Inputs } from "../../types";
 import { scopedSourceListOptions } from "../../apt_sources";
 import { verifySha256 } from "../../verify_download";
 import {
+  restoreCompilerCache,
   saveCompilerCache,
   validateRestoredCompilerCache,
 } from "../../cache_validation";
@@ -371,7 +371,11 @@ export async function installDebian(
   const binDir = `${installDir}/compilers/bin`;
   const cacheKey = `nvhpc-validated-v1-${version}-${inputs.arch}-${inputs.osVersion}`;
 
-  const cacheHit = await cache.restoreCache([installDir], cacheKey);
+  const cacheHit = await restoreCompilerCache(
+    inputs.cache,
+    [installDir],
+    cacheKey,
+  );
   const compilerPaths = ["nvfortran", "nvc", "nvc++"].map(
     (compiler) => `${binDir}/${compiler}`,
   );
@@ -472,8 +476,7 @@ export async function installDebian(
     core.info("Cleaning up apt archives...");
     await exec.exec("sudo", ["apt-get", "clean"]);
 
-    core.info(`Saving nvhpc ${version} to cache...`);
-    await saveCompilerCache([installDir], cacheKey);
+    await saveCompilerCache(inputs.cache, [installDir], cacheKey);
   }
 
   core.info(`Adding ${binDir} to PATH...`);
@@ -493,6 +496,7 @@ export async function installDebian(
     fc: "nvfortran",
     cc: "nvc",
     cxx: "nvc++",
+    cacheHit: cacheValid,
   };
 }
 

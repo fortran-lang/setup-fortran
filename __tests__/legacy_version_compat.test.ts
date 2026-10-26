@@ -315,6 +315,7 @@ function buildInputs(
     arch: arch === "arm64" ? Arch.ARM64 : Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 }

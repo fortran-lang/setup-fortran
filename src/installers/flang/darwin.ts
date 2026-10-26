@@ -139,6 +139,7 @@ async function installBrew(inputs: Inputs): Promise<InstallationResult> {
     fc: flangBin,
     cc: path.posix.join(llvmBinDir, "clang"),
     cxx: path.posix.join(llvmBinDir, "clang++"),
+    cacheHit: false,
   };
   return result;
 }
@@ -245,6 +246,7 @@ async function installFromGitHub(
     fc: flangBin,
     cc: path.posix.join(binDir, "clang"),
     cxx: path.posix.join(binDir, "clang++"),
+    cacheHit: false,
   };
   return result;
 }

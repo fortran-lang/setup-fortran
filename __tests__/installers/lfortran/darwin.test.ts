@@ -28,6 +28,7 @@ describe("installDarwin (LFortran)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -156,6 +157,7 @@ describe("installDarwin (LFortran)", () => {
       fc: expect.stringContaining("lfortran"),
       cc: "clang",
       cxx: "clang++",
+      cacheHit: false,
     });
   });
 });

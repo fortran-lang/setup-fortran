@@ -180,6 +180,7 @@ export async function installDarwin(
     fc: environment.lfortran,
     cc: "clang",
     cxx: "clang++",
+    cacheHit: false,
   };
   return result;
 }

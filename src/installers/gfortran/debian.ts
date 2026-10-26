@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as cache from "@actions/cache";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
@@ -9,6 +8,11 @@ import { Arch, type InstallationResult } from "../../types";
 import { resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { indexFetchFailed } from "../../apt_sources";
+import {
+  cacheKeySuffix,
+  restoreCompilerCache,
+  saveCompilerCache,
+} from "../../cache_validation";
 
 // Make sure the versions are always in descending order. The first one will be
 // used as the default if no version was specified by the user.
@@ -24,7 +28,7 @@ function aptCacheKey(
   version: string,
   revision: string,
 ): string {
-  return [
+  const key = [
     "apt-gfortran",
     CACHE_SCHEMA_VERSION,
     revision,
@@ -32,6 +36,7 @@ function aptCacheKey(
     inputs.arch,
     version,
   ].join("-");
+  return key + cacheKeySuffix();
 }
 
 function aptCacheDir(inputs: Inputs, version: string): string {
@@ -93,7 +98,7 @@ export async function installDebian(
   let cacheHit: string | undefined;
   if (cacheKey) {
     try {
-      cacheHit = await cache.restoreCache(cachePaths, cacheKey);
+      cacheHit = await restoreCompilerCache(inputs.cache, cachePaths, cacheKey);
     } catch (err) {
       core.info(
         `Could not restore the GFortran package cache; proceeding without it: ${String(err)}`,
@@ -120,11 +125,13 @@ export async function installDebian(
     );
   }
 
+  let cacheUsed = false;
   if (cacheHit) {
     core.info(`Cache hit for ${cacheHit}, installing from cache...`);
     try {
       await aptGetInstallFromCache(packages, cacheDir);
       await verifyInstalledToolchain(version);
+      cacheUsed = true;
     } catch (err) {
       core.info(
         `Cached GFortran packages were incomplete or invalid; ` +
@@ -138,8 +145,8 @@ export async function installDebian(
     await verifyInstalledToolchain(version);
     if (cacheKey) {
       try {
-        await prepareCacheForSave(cacheDir);
-        await cache.saveCache(cachePaths, cacheKey);
+        if (inputs.cache) await prepareCacheForSave(cacheDir);
+        await saveCompilerCache(inputs.cache, cachePaths, cacheKey);
       } catch (err) {
         core.info(`Could not save the GFortran package cache: ${String(err)}`);
       }
@@ -166,6 +173,7 @@ export async function installDebian(
     fc: `gfortran-${version}`,
     cc: `gcc-${version}`,
     cxx: `g++-${version}`,
+    cacheHit: cacheUsed,
   };
   return result;
 }

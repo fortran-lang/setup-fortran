@@ -27,6 +27,7 @@ describe("installDebian ifx", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -100,8 +101,9 @@ describe("installDebian ifx", () => {
   it("skips installation and restores from cache on hit", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
     const inputs = { ...baseInputs, version: "2023.2.0" };
-    await installDebian(inputs);
+    const result = await installDebian(inputs);
 
+    expect(result.cacheHit).toBe(true);
     expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
       "apt-get",
       "install",
@@ -119,12 +121,25 @@ describe("installDebian ifx", () => {
     );
   });
 
+  it("skips restore and save when caching is disabled", async () => {
+    const result = await installDebian({
+      ...baseInputs,
+      version: "2023.2.0",
+      cache: false,
+    });
+
+    expect(mockedCache.restoreCache).not.toHaveBeenCalled();
+    expect(mockedCache.saveCache).not.toHaveBeenCalled();
+    expect(result.cacheHit).toBe(false);
+  });
+
   it("reinstalls when the restored cache is incomplete", async () => {
     mockedCache.restoreCache.mockResolvedValue("hit");
     mockedFs.existsSync.mockReturnValue(false);
 
-    await installDebian({ ...baseInputs, version: "2023.2.0" });
+    const result = await installDebian({ ...baseInputs, version: "2023.2.0" });
 
+    expect(result.cacheHit).toBe(false);
     expect(mockedExec).toHaveBeenCalledWith("sudo", [
       "rm",
       "-rf",

@@ -35,6 +35,7 @@ describe("installDebian (Flang)", () => {
     arch: Arch.X64,
     cleanupDisk: false,
     updateEnvironment: true,
+    cache: true,
     msystem: Msystem.Native,
   };
 
@@ -391,6 +392,7 @@ describe("installDebian (Flang)", () => {
       fc: "flang-new-18",
       cc: "/usr/lib/llvm-18/bin/clang",
       cxx: "/usr/lib/llvm-18/bin/clang++",
+      cacheHit: false,
     });
   });
 
