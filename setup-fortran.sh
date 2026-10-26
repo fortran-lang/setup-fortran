@@ -265,21 +265,14 @@ install_gcc_choco()
     # ...and install selected version
     case $resolved_version in
       16)
-        # Chocolatey only has the MinGW-Builds gcc 16.1.0, whose fpm build
-        # fails fpm's unit tests: use the winlibs build of gcc 16.1.0 instead
-        (
-          cd "$RUNNER_TEMP"
-          curl -fsSL -o winlibs.zip https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r1.zip
-          echo "325771f545e89f62c0e1fafdbf0066cc49e3321aeca7b704c8d065e97a72f2fb  winlibs.zip" | sha256sum -c -
-          unzip -q winlibs.zip -d winlibs
-          rm winlibs.zip
-        )
-        # hide Strawberry compilers and add the winlibs bin dir to PATH
+        choco install mingw --version 16.1.0 --force
+        # mingw 13+ on Windows doesn't create shims (http://disq.us/p/2w5c5tj)
+        # so hide Strawberry compilers and manually add mingw bin dir to PATH
         mkdir "$RUNNER_TEMP/strawberry"
         mv /c/Strawberry/c/bin/gfortran "$RUNNER_TEMP/strawberry/gfortran"
         mv /c/Strawberry/c/bin/gcc "$RUNNER_TEMP/strawberry/gcc"
         mv /c/Strawberry/c/bin/g++ "$RUNNER_TEMP/strawberry/g++"
-        echo "$RUNNER_TEMP\winlibs\mingw64\bin" >> $GITHUB_PATH
+        echo "C:\ProgramData\mingw64\mingw64\bin" >> $GITHUB_PATH
         ;;
       15)
         choco install mingw --version 15.2.0 --force
