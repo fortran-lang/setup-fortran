@@ -1,6 +1,9 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import { condaCreateWithRetry } from "../src/lfortran_environment";
+import {
+  applyMiniforgeTimeoutEnv,
+  condaCreateWithRetry,
+} from "../src/lfortran_environment";
 
 jest.mock("@actions/core");
 jest.mock("@actions/exec");
@@ -117,5 +120,62 @@ describe("condaCreateWithRetry", () => {
 
     expect(mockedExec).toHaveBeenCalledTimes(1);
     expect(mockedInfo).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyMiniforgeTimeoutEnv", () => {
+  const NETWORK_ENV_KEYS = [
+    "MAMBA_REMOTE_CONNECT_TIMEOUT_SECS",
+    "MAMBA_REMOTE_MAX_RETRIES",
+    "MAMBA_REMOTE_BACKOFF_FACTOR",
+    "MAMBA_NO_LOW_SPEED_LIMIT",
+    "CONDA_REMOTE_CONNECT_TIMEOUT_SECS",
+    "CONDA_REMOTE_READ_TIMEOUT_SECS",
+    "CONDA_REMOTE_MAX_RETRIES",
+    "CONDA_REMOTE_BACKOFF_FACTOR",
+  ] as const;
+  let savedEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    savedEnv = {};
+    for (const key of NETWORK_ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    for (const key of NETWORK_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  });
+
+  it("sets network settings for both micromamba and conda", () => {
+    applyMiniforgeTimeoutEnv();
+
+    expect(process.env.MAMBA_REMOTE_CONNECT_TIMEOUT_SECS).toBe("120");
+    expect(process.env.MAMBA_REMOTE_MAX_RETRIES).toBe("5");
+    expect(process.env.MAMBA_REMOTE_BACKOFF_FACTOR).toBe("2");
+    expect(process.env.MAMBA_NO_LOW_SPEED_LIMIT).toBe("1");
+    expect(process.env.CONDA_REMOTE_CONNECT_TIMEOUT_SECS).toBe("120");
+    expect(process.env.CONDA_REMOTE_READ_TIMEOUT_SECS).toBe("300");
+    expect(process.env.CONDA_REMOTE_MAX_RETRIES).toBe("5");
+    expect(process.env.CONDA_REMOTE_BACKOFF_FACTOR).toBe("2");
+  });
+
+  it("does not override values already set by the user", () => {
+    process.env.MAMBA_REMOTE_CONNECT_TIMEOUT_SECS = "42";
+    process.env.CONDA_REMOTE_READ_TIMEOUT_SECS = "99";
+
+    applyMiniforgeTimeoutEnv();
+
+    expect(process.env.MAMBA_REMOTE_CONNECT_TIMEOUT_SECS).toBe("42");
+    expect(process.env.CONDA_REMOTE_READ_TIMEOUT_SECS).toBe("99");
+    expect(process.env.MAMBA_REMOTE_MAX_RETRIES).toBe("5");
   });
 });

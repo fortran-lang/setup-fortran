@@ -11,6 +11,7 @@ import {
   condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
+  applyMiniforgeTimeoutEnv,
   lfortranEnvironment,
   resetLFortranEnvironment,
 } from "../../lfortran_environment";
@@ -60,42 +61,63 @@ export async function installDebian(
   if (await isReusableLFortranEnvironment(environment, version)) {
     core.info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
   } else {
-    resetLFortranEnvironment(environment);
-    const tempDir = createInstallerTempDir();
-    const miniforgeInstaller = path.posix.join(tempDir, "miniforge.sh");
-    try {
-      core.info(`Downloading pinned Miniforge from ${miniforge.url}...`);
-      await exec.exec("curl", [
-        "-fsSL",
-        "--retry",
-        "3",
-        "--retry-all-errors",
-        "--retry-delay",
-        "15",
-        "-o",
-        miniforgeInstaller,
-        miniforge.url,
-      ]);
-      await verifySha256(miniforgeInstaller, miniforge.sha256);
-      await exec.exec("bash", [
-        miniforgeInstaller,
-        "-b",
-        "-p",
-        environment.miniforgePrefix,
-      ]);
-      await condaCreateWithRetry(environment.conda, [
-        "create",
-        "-y",
-        "-p",
-        environment.envPrefix,
-        "-c",
-        "conda-forge",
-        "--strict-channel-priority",
-        `lfortran==${version}`,
-      ]);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+    applyMiniforgeTimeoutEnv();
+    // Miniforge's own (libmamba) downloads can fail transiently on slow
+    // runners, so retry the whole installer download+install a few times.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      resetLFortranEnvironment(environment);
+      const tempDir = createInstallerTempDir();
+      const miniforgeInstaller = path.posix.join(tempDir, "miniforge.sh");
+      try {
+        core.info(
+          `Downloading pinned Miniforge from ${miniforge.url} (attempt ${attempt.toString()}/3)...`,
+        );
+        await exec.exec("curl", [
+          "-fsSL",
+          "--retry",
+          "3",
+          "--retry-all-errors",
+          "--retry-delay",
+          "15",
+          "-o",
+          miniforgeInstaller,
+          miniforge.url,
+        ]);
+        await verifySha256(miniforgeInstaller, miniforge.sha256);
+        await exec.exec("bash", [
+          miniforgeInstaller,
+          "-b",
+          "-p",
+          environment.miniforgePrefix,
+        ]);
+        break;
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+        const delaySeconds = attempt * 15;
+        core.info(
+          `Miniforge install failed (attempt ${attempt.toString()}/3): ${String(error)}. ` +
+            `Retrying in ${delaySeconds.toString()}s...`,
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, delaySeconds * 1000),
+        );
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
     }
+
+    await condaCreateWithRetry(environment.conda, [
+      "create",
+      "-y",
+      "-p",
+      environment.envPrefix,
+      "-c",
+      "conda-forge",
+      "--strict-channel-priority",
+      `lfortran==${version}`,
+    ]);
   }
 
   if (!fs.existsSync(environment.lfortran)) {

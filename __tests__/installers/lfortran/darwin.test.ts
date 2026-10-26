@@ -31,29 +31,35 @@ describe("installDarwin (LFortran)", () => {
     msystem: Msystem.Native,
   };
 
+  const defaultExecImplementation = async (
+    commandLine: string,
+    args?: string[],
+    options?: exec.ExecOptions,
+  ): Promise<number> => {
+    if (args?.[0] === "create") environmentCreated = true;
+    if (
+      commandLine.includes("conda") &&
+      args?.[0] === "run" &&
+      args?.[3] === "lfortran" &&
+      args?.[4] === "--version"
+    ) {
+      if (options?.listeners?.stdout) {
+        options.listeners.stdout(Buffer.from("LFortran version 0.63.0"));
+      }
+    }
+    if (commandLine === "xcrun" && args?.[0] === "--show-sdk-path") {
+      if (options?.listeners?.stdout) {
+        options.listeners.stdout(Buffer.from("/path/to/SDK"));
+      }
+    }
+    return 0;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     environmentCreated = false;
     mockedFs.existsSync.mockImplementation(() => environmentCreated);
-    mockedExec.mockImplementation(async (commandLine, args, options) => {
-      if (args?.[0] === "create") environmentCreated = true;
-      if (
-        commandLine.includes("conda") &&
-        args?.[0] === "run" &&
-        args?.[3] === "lfortran" &&
-        args?.[4] === "--version"
-      ) {
-        if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("LFortran version 0.63.0"));
-        }
-      }
-      if (commandLine === "xcrun" && args?.[0] === "--show-sdk-path") {
-        if (options?.listeners?.stdout) {
-          options.listeners.stdout(Buffer.from("/path/to/SDK"));
-        }
-      }
-      return 0;
-    });
+    mockedExec.mockImplementation(defaultExecImplementation);
   });
 
   it("downloads and installs Miniforge", async () => {
@@ -76,6 +82,36 @@ describe("installDarwin (LFortran)", () => {
       "-p",
       expect.stringContaining("miniforge"),
     ]);
+  });
+
+  it("retries the Miniforge install after a transient failure", async () => {
+    jest.useFakeTimers();
+    try {
+      let bashAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "bash") {
+          bashAttempts++;
+          if (bashAttempts === 1) {
+            throw new Error("Resolving timed out after 30000 milliseconds");
+          }
+        }
+        return defaultExecImplementation(commandLine, args, options);
+      });
+
+      const installation = installDarwin(baseInputs);
+      await jest.advanceTimersByTimeAsync(15_000);
+      await installation;
+
+      expect(bashAttempts).toBe(2);
+      expect(
+        mockedExec.mock.calls.filter(([command]) => command === "curl"),
+      ).toHaveLength(2);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("Miniforge install failed (attempt 1/3)"),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("installs lfortran via conda", async () => {

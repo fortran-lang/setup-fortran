@@ -95,6 +95,26 @@ export function resetLFortranEnvironment(
   fs.mkdirSync(path.dirname(environment.root), { recursive: true });
 }
 
+// Make network operations more tolerant of slow/unstable runner networks.
+// The Miniforge installer bootstraps with micromamba, which only reads
+// MAMBA_* variables; the conda binary it installs reads CONDA_* variables
+// for the subsequent `conda create`. The default connect/resolve timeout is
+// too short on some GitHub-hosted runners (especially macOS), causing
+// intermittent "Resolving timed out after 30000 milliseconds" failures.
+// Mutating process.env (instead of passing an explicit env to exec) keeps
+// the exec call signatures unchanged for callers/tests.
+export function applyMiniforgeTimeoutEnv(): void {
+  process.env.MAMBA_REMOTE_CONNECT_TIMEOUT_SECS ??= "120";
+  process.env.MAMBA_REMOTE_MAX_RETRIES ??= "5";
+  process.env.MAMBA_REMOTE_BACKOFF_FACTOR ??= "2";
+  process.env.MAMBA_NO_LOW_SPEED_LIMIT ??= "1";
+
+  process.env.CONDA_REMOTE_CONNECT_TIMEOUT_SECS ??= "120";
+  process.env.CONDA_REMOTE_READ_TIMEOUT_SECS ??= "300";
+  process.env.CONDA_REMOTE_MAX_RETRIES ??= "5";
+  process.env.CONDA_REMOTE_BACKOFF_FACTOR ??= "2";
+}
+
 export function createInstallerTempDir(): string {
   const runnerTemp = process.env.RUNNER_TEMP ?? os.tmpdir();
   fs.mkdirSync(runnerTemp, { recursive: true });

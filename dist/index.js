@@ -103302,6 +103302,24 @@ function resetLFortranEnvironment(environment) {
     }
     external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.dirname(environment.root), { recursive: true });
 }
+// Make network operations more tolerant of slow/unstable runner networks.
+// The Miniforge installer bootstraps with micromamba, which only reads
+// MAMBA_* variables; the conda binary it installs reads CONDA_* variables
+// for the subsequent `conda create`. The default connect/resolve timeout is
+// too short on some GitHub-hosted runners (especially macOS), causing
+// intermittent "Resolving timed out after 30000 milliseconds" failures.
+// Mutating process.env (instead of passing an explicit env to exec) keeps
+// the exec call signatures unchanged for callers/tests.
+function applyMiniforgeTimeoutEnv() {
+    process.env.MAMBA_REMOTE_CONNECT_TIMEOUT_SECS ??= "120";
+    process.env.MAMBA_REMOTE_MAX_RETRIES ??= "5";
+    process.env.MAMBA_REMOTE_BACKOFF_FACTOR ??= "2";
+    process.env.MAMBA_NO_LOW_SPEED_LIMIT ??= "1";
+    process.env.CONDA_REMOTE_CONNECT_TIMEOUT_SECS ??= "120";
+    process.env.CONDA_REMOTE_READ_TIMEOUT_SECS ??= "300";
+    process.env.CONDA_REMOTE_MAX_RETRIES ??= "5";
+    process.env.CONDA_REMOTE_BACKOFF_FACTOR ??= "2";
+}
 function createInstallerTempDir() {
     const runnerTemp = process.env.RUNNER_TEMP ?? external_os_.tmpdir();
     external_fs_namespaceObject.mkdirSync(runnerTemp, { recursive: true });
@@ -103378,43 +103396,58 @@ async function lfortran_debian_installDebian(inputs) {
         info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
     else {
-        resetLFortranEnvironment(environment);
-        const tempDir = createInstallerTempDir();
-        const miniforgeInstaller = external_path_namespaceObject.posix.join(tempDir, "miniforge.sh");
-        try {
-            info(`Downloading pinned Miniforge from ${miniforge.url}...`);
-            await exec_exec("curl", [
-                "-fsSL",
-                "--retry",
-                "3",
-                "--retry-all-errors",
-                "--retry-delay",
-                "15",
-                "-o",
-                miniforgeInstaller,
-                miniforge.url,
-            ]);
-            await verifySha256(miniforgeInstaller, miniforge.sha256);
-            await exec_exec("bash", [
-                miniforgeInstaller,
-                "-b",
-                "-p",
-                environment.miniforgePrefix,
-            ]);
-            await condaCreateWithRetry(environment.conda, [
-                "create",
-                "-y",
-                "-p",
-                environment.envPrefix,
-                "-c",
-                "conda-forge",
-                "--strict-channel-priority",
-                `lfortran==${version}`,
-            ]);
+        applyMiniforgeTimeoutEnv();
+        // Miniforge's own (libmamba) downloads can fail transiently on slow
+        // runners, so retry the whole installer download+install a few times.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            resetLFortranEnvironment(environment);
+            const tempDir = createInstallerTempDir();
+            const miniforgeInstaller = external_path_namespaceObject.posix.join(tempDir, "miniforge.sh");
+            try {
+                info(`Downloading pinned Miniforge from ${miniforge.url} (attempt ${attempt.toString()}/3)...`);
+                await exec_exec("curl", [
+                    "-fsSL",
+                    "--retry",
+                    "3",
+                    "--retry-all-errors",
+                    "--retry-delay",
+                    "15",
+                    "-o",
+                    miniforgeInstaller,
+                    miniforge.url,
+                ]);
+                await verifySha256(miniforgeInstaller, miniforge.sha256);
+                await exec_exec("bash", [
+                    miniforgeInstaller,
+                    "-b",
+                    "-p",
+                    environment.miniforgePrefix,
+                ]);
+                break;
+            }
+            catch (error) {
+                if (attempt === 3) {
+                    throw error;
+                }
+                const delaySeconds = attempt * 15;
+                info(`Miniforge install failed (attempt ${attempt.toString()}/3): ${String(error)}. ` +
+                    `Retrying in ${delaySeconds.toString()}s...`);
+                await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+            }
+            finally {
+                external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
+            }
         }
-        finally {
-            external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
-        }
+        await condaCreateWithRetry(environment.conda, [
+            "create",
+            "-y",
+            "-p",
+            environment.envPrefix,
+            "-c",
+            "conda-forge",
+            "--strict-channel-priority",
+            `lfortran==${version}`,
+        ]);
     }
     if (!external_fs_namespaceObject.existsSync(environment.lfortran)) {
         throw new Error(`lfortran binary not found at expected path: ${environment.lfortran}`);
@@ -103502,42 +103535,56 @@ async function lfortran_darwin_installDarwin(inputs) {
         info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
     else {
-        resetLFortranEnvironment(environment);
-        const tempDir = createInstallerTempDir();
-        const miniforgeInstaller = external_path_namespaceObject.join(tempDir, "miniforge.sh");
-        try {
-            await exec_exec("curl", [
-                "-fsSL",
-                "--retry",
-                "3",
-                "--retry-all-errors",
-                "--retry-delay",
-                "15",
-                "-o",
-                miniforgeInstaller,
-                miniforge.url,
-            ]);
-            await verifySha256(miniforgeInstaller, miniforge.sha256);
-            await exec_exec("bash", [
-                miniforgeInstaller,
-                "-b",
-                "-p",
-                environment.miniforgePrefix,
-            ]);
-            await condaCreateWithRetry(environment.conda, [
-                "create",
-                "-y",
-                "-p",
-                environment.envPrefix,
-                "-c",
-                "conda-forge",
-                "--strict-channel-priority",
-                `lfortran==${version}`,
-            ]);
+        applyMiniforgeTimeoutEnv();
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            resetLFortranEnvironment(environment);
+            const tempDir = createInstallerTempDir();
+            const miniforgeInstaller = external_path_namespaceObject.join(tempDir, "miniforge.sh");
+            try {
+                info(`Downloading pinned Miniforge from ${miniforge.url} (attempt ${attempt.toString()}/3)...`);
+                await exec_exec("curl", [
+                    "-fsSL",
+                    "--retry",
+                    "3",
+                    "--retry-all-errors",
+                    "--retry-delay",
+                    "15",
+                    "-o",
+                    miniforgeInstaller,
+                    miniforge.url,
+                ]);
+                await verifySha256(miniforgeInstaller, miniforge.sha256);
+                await exec_exec("bash", [
+                    miniforgeInstaller,
+                    "-b",
+                    "-p",
+                    environment.miniforgePrefix,
+                ]);
+                break;
+            }
+            catch (error) {
+                if (attempt === 3) {
+                    throw error;
+                }
+                const delaySeconds = attempt * 15;
+                info(`Miniforge install failed (attempt ${attempt.toString()}/3): ${String(error)}. ` +
+                    `Retrying in ${delaySeconds.toString()}s...`);
+                await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+            }
+            finally {
+                external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
+            }
         }
-        finally {
-            external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
-        }
+        await condaCreateWithRetry(environment.conda, [
+            "create",
+            "-y",
+            "-p",
+            environment.envPrefix,
+            "-c",
+            "conda-forge",
+            "--strict-channel-priority",
+            `lfortran==${version}`,
+        ]);
     }
     if (!external_fs_namespaceObject.existsSync(environment.lfortran)) {
         throw new Error(`lfortran binary not found at expected path: ${environment.lfortran}`);
@@ -103675,41 +103722,55 @@ async function installConda(inputs) {
         info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
     }
     else {
-        resetLFortranEnvironment(environment);
-        const tempDir = createInstallerTempDir();
-        const miniforgeInstaller = external_path_namespaceObject.win32.join(tempDir, "miniforge-install.exe");
-        try {
-            await exec_exec("curl", [
-                "-fsSL",
-                "--retry",
-                "3",
-                "--retry-all-errors",
-                "--retry-delay",
-                "15",
-                "-o",
-                miniforgeInstaller,
-                miniforge.url,
-            ]);
-            await verifySha256(miniforgeInstaller, miniforge.sha256);
-            await exec_exec(miniforgeInstaller, [
-                "/S",
-                `/D=${environment.miniforgePrefix}`,
-            ]);
-            await condaCreateWithRetry(environment.conda, [
-                "create",
-                "-y",
-                "-p",
-                environment.envPrefix,
-                "-c",
-                "conda-forge",
-                "--solver=classic",
-                `lfortran==${version}`,
-                "lld",
-            ]);
+        applyMiniforgeTimeoutEnv();
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            resetLFortranEnvironment(environment);
+            const tempDir = createInstallerTempDir();
+            const miniforgeInstaller = external_path_namespaceObject.win32.join(tempDir, "miniforge-install.exe");
+            try {
+                info(`Downloading pinned Miniforge from ${miniforge.url} (attempt ${attempt.toString()}/3)...`);
+                await exec_exec("curl", [
+                    "-fsSL",
+                    "--retry",
+                    "3",
+                    "--retry-all-errors",
+                    "--retry-delay",
+                    "15",
+                    "-o",
+                    miniforgeInstaller,
+                    miniforge.url,
+                ]);
+                await verifySha256(miniforgeInstaller, miniforge.sha256);
+                await exec_exec(miniforgeInstaller, [
+                    "/S",
+                    `/D=${environment.miniforgePrefix}`,
+                ]);
+                break;
+            }
+            catch (error) {
+                if (attempt === 3) {
+                    throw error;
+                }
+                const delaySeconds = attempt * 15;
+                info(`Miniforge install failed (attempt ${attempt.toString()}/3): ${String(error)}. ` +
+                    `Retrying in ${delaySeconds.toString()}s...`);
+                await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+            }
+            finally {
+                external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
+            }
         }
-        finally {
-            external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
-        }
+        await condaCreateWithRetry(environment.conda, [
+            "create",
+            "-y",
+            "-p",
+            environment.envPrefix,
+            "-c",
+            "conda-forge",
+            "--solver=classic",
+            `lfortran==${version}`,
+            "lld",
+        ]);
     }
     if (!external_fs_namespaceObject.existsSync(environment.lfortran)) {
         throw new Error(`lfortran.exe not found at expected path: ${environment.lfortran}`);

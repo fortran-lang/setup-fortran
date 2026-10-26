@@ -18,6 +18,7 @@ import {
   condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
+  applyMiniforgeTimeoutEnv,
   lfortranEnvironment,
   resetLFortranEnvironment,
 } from "../../lfortran_environment";
@@ -95,43 +96,63 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
   if (await isReusableLFortranEnvironment(environment, version)) {
     core.info(`Reusing LFortran ${version} from ${environment.envPrefix}.`);
   } else {
-    resetLFortranEnvironment(environment);
-    const tempDir = createInstallerTempDir();
-    const miniforgeInstaller = path.win32.join(
-      tempDir,
-      "miniforge-install.exe",
-    );
-    try {
-      await exec.exec("curl", [
-        "-fsSL",
-        "--retry",
-        "3",
-        "--retry-all-errors",
-        "--retry-delay",
-        "15",
-        "-o",
-        miniforgeInstaller,
-        miniforge.url,
-      ]);
-      await verifySha256(miniforgeInstaller, miniforge.sha256);
-      await exec.exec(miniforgeInstaller, [
-        "/S",
-        `/D=${environment.miniforgePrefix}`,
-      ]);
-      await condaCreateWithRetry(environment.conda, [
-        "create",
-        "-y",
-        "-p",
-        environment.envPrefix,
-        "-c",
-        "conda-forge",
-        "--solver=classic",
-        `lfortran==${version}`,
-        "lld",
-      ]);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+    applyMiniforgeTimeoutEnv();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      resetLFortranEnvironment(environment);
+      const tempDir = createInstallerTempDir();
+      const miniforgeInstaller = path.win32.join(
+        tempDir,
+        "miniforge-install.exe",
+      );
+      try {
+        core.info(
+          `Downloading pinned Miniforge from ${miniforge.url} (attempt ${attempt.toString()}/3)...`,
+        );
+        await exec.exec("curl", [
+          "-fsSL",
+          "--retry",
+          "3",
+          "--retry-all-errors",
+          "--retry-delay",
+          "15",
+          "-o",
+          miniforgeInstaller,
+          miniforge.url,
+        ]);
+        await verifySha256(miniforgeInstaller, miniforge.sha256);
+        await exec.exec(miniforgeInstaller, [
+          "/S",
+          `/D=${environment.miniforgePrefix}`,
+        ]);
+        break;
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+        const delaySeconds = attempt * 15;
+        core.info(
+          `Miniforge install failed (attempt ${attempt.toString()}/3): ${String(error)}. ` +
+            `Retrying in ${delaySeconds.toString()}s...`,
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, delaySeconds * 1000),
+        );
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
     }
+
+    await condaCreateWithRetry(environment.conda, [
+      "create",
+      "-y",
+      "-p",
+      environment.envPrefix,
+      "-c",
+      "conda-forge",
+      "--solver=classic",
+      `lfortran==${version}`,
+      "lld",
+    ]);
   }
 
   if (!fs.existsSync(environment.lfortran)) {
