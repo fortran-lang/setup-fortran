@@ -9,6 +9,8 @@ import { addIntelCompilerBinFromPath, addMsvcBinFromPath } from "./setup_msvc";
 const CAPTURED_ENV_KEY_PATTERN =
   /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
 
+const PATH_LENGTH_WARNING_THRESHOLD = 4096;
+
 function intelEnvironmentBatchLines(setvarsBat: string): string[] {
   return [
     `@echo off`,
@@ -91,6 +93,11 @@ export async function captureIntelWindowsEnvironment(
           return true;
         })
         .join(";");
+      if (filteredPath.length > PATH_LENGTH_WARNING_THRESHOLD) {
+        core.warning(
+          `PATH is ${String(filteredPath.length)} characters. Do not re-run setvars.bat or vcvarsall.bat after this action; the environment is already set, and re-running can exceed the cmd.exe line limit of 8191 characters ("The input line is too long").`,
+        );
+      }
       core.exportVariable("PATH", filteredPath);
       addMsvcBinFromPath(filteredPath);
       addIntelCompilerBinFromPath(filteredPath);
