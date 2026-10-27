@@ -2,6 +2,7 @@ runner,compiler,version,support
 macos-14,gcc,13,&check;
 macos-14,gcc,14,&check;
 macos-14,gcc,15,&check;
+macos-14,gcc,16,&check;
 macos-14,intel-classic,2021.1.2,
 macos-14,intel-classic,2021.1,&check;
 macos-14,intel-classic,2021.10,&check;
@@ -20,6 +21,7 @@ macos-14,lfortran,0.58.0,&check;
 macos-15-intel,gcc,13,&check;
 macos-15-intel,gcc,14,&check;
 macos-15-intel,gcc,15,&check;
+macos-15-intel,gcc,16,
 macos-15-intel,intel-classic,2021.1.2,
 macos-15-intel,intel-classic,2021.1,&check;
 macos-15-intel,intel-classic,2021.10,&check;
@@ -57,6 +59,7 @@ macos-15,flang,23,&check;
 macos-15,gcc,13,&check;
 macos-15,gcc,14,&check;
 macos-15,gcc,15,&check;
+macos-15,gcc,16,&check;
 macos-15,intel-classic,2021.1.2,
 macos-15,intel-classic,2021.1,&check;
 macos-15,intel-classic,2021.10,&check;
@@ -75,6 +78,7 @@ macos-15,lfortran,0.58.0,&check;
 macos-26-intel,gcc,13,&check;
 macos-26-intel,gcc,14,&check;
 macos-26-intel,gcc,15,&check;
+macos-26-intel,gcc,16,
 macos-26-intel,intel-classic,2021.1.2,
 macos-26-intel,intel-classic,2021.1,&check;
 macos-26-intel,intel-classic,2021.10,&check;
@@ -112,6 +116,7 @@ macos-26,flang,23,&check;
 macos-26,gcc,13,&check;
 macos-26,gcc,14,&check;
 macos-26,gcc,15,&check;
+macos-26,gcc,16,&check;
 macos-26,intel-classic,2021.1.2,
 macos-26,intel-classic,2021.1,&check;
 macos-26,intel-classic,2021.10,&check;
@@ -134,6 +139,7 @@ ubuntu-22.04,flang,23,&check;
 ubuntu-22.04,gcc,13,&check;
 ubuntu-22.04,gcc,14,&check;
 ubuntu-22.04,gcc,15,&check;
+ubuntu-22.04,gcc,16,&check;
 ubuntu-22.04,intel-classic,2021.1.2,&check;
 ubuntu-22.04,intel-classic,2021.1,&check;
 ubuntu-22.04,intel-classic,2021.10,&check;
@@ -190,6 +196,7 @@ ubuntu-24.04,flang,23,&check;
 ubuntu-24.04,gcc,13,&check;
 ubuntu-24.04,gcc,14,&check;
 ubuntu-24.04,gcc,15,&check;
+ubuntu-24.04,gcc,16,&check;
 ubuntu-24.04,intel-classic,2021.1.2,&check;
 ubuntu-24.04,intel-classic,2021.1,&check;
 ubuntu-24.04,intel-classic,2021.10,&check;
@@ -241,9 +248,11 @@ ubuntu-24.04,nvidia-hpc,26.1,&check;
 windows-11-arm,gcc,13,
 windows-11-arm,gcc,14,
 windows-11-arm,gcc,15,
+windows-11-arm,gcc,16,
 windows-2022,gcc,13,&check;
 windows-2022,gcc,14,&check;
 windows-2022,gcc,15,&check;
+windows-2022,gcc,16,&check;
 windows-2022,intel-classic,2021.1.2,
 windows-2022,intel-classic,2021.1,
 windows-2022,intel-classic,2021.10,&check;
@@ -280,6 +289,7 @@ windows-2022,lfortran,0.58.0,&check;
 windows-2025-vs2026,gcc,13,&check;
 windows-2025-vs2026,gcc,14,&check;
 windows-2025-vs2026,gcc,15,&check;
+windows-2025-vs2026,gcc,16,&check;
 windows-2025-vs2026,intel-classic,2021.1.2,
 windows-2025-vs2026,intel-classic,2021.1,
 windows-2025-vs2026,intel-classic,2021.2,
@@ -303,6 +313,7 @@ windows-2025-vs2026,lfortran,0.58.0,&check;
 windows-2025,gcc,13,&check;
 windows-2025,gcc,14,&check;
 windows-2025,gcc,15,&check;
+windows-2025,gcc,16,&check;
 windows-2025,intel-classic,2021.1.2,
 windows-2025,intel-classic,2021.1,
 windows-2025,intel-classic,2021.2,

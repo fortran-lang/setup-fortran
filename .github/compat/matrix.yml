@@ -121,6 +121,7 @@ include:
   - {os: windows-2025-vs2026, toolchain: {compiler: intel, version: '2021.1.2'}}
   - {os: windows-2025-vs2026, toolchain: {compiler: intel, version: '2021.1'}}
   # macos-14 (ARM): gcc, intel-classic full range, lfortran
+  - {os: macos-14, toolchain: {compiler: gcc, version: 16}}
   - {os: macos-14, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-14, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-14, toolchain: {compiler: gcc, version: 13}}
@@ -140,6 +141,7 @@ include:
   - {os: macos-14, toolchain: {compiler: lfortran, version: '0.58.0'}}
   - {os: macos-14, toolchain: {compiler: lfortran, version: '0.57.0'}}
   # macos-15 (ARM): gcc, intel-classic full range, lfortran
+  - {os: macos-15, toolchain: {compiler: gcc, version: 16}}
   - {os: macos-15, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-15, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-15, toolchain: {compiler: gcc, version: 13}}
@@ -159,6 +161,7 @@ include:
   - {os: macos-15, toolchain: {compiler: lfortran, version: '0.58.0'}}
   - {os: macos-15, toolchain: {compiler: lfortran, version: '0.57.0'}}
   # macos-15-intel: gcc, intel-classic full range, intel full range, lfortran
+  - {os: macos-15-intel, toolchain: {compiler: gcc, version: 16}}
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 15}}
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 14}}
   - {os: macos-15-intel, toolchain: {compiler: gcc, version: 13}}
@@ -207,3 +210,13 @@ include:
   - {os: ubuntu-22.04, toolchain: {compiler: flang, version: '20'}}
   - {os: macos-26, toolchain: {compiler: flang, version: '23'}}
   - {os: macos-15, toolchain: {compiler: flang, version: '23'}}
+  # gcc 16: kept out of the main cross-product to stay under the 256-job limit
+  # (macos-14, macos-15 and macos-15-intel are listed with their runners above)
+  - {os: ubuntu-24.04, toolchain: {compiler: gcc, version: 16}}
+  - {os: ubuntu-22.04, toolchain: {compiler: gcc, version: 16}}
+  - {os: macos-26-intel, toolchain: {compiler: gcc, version: 16}}
+  - {os: macos-26, toolchain: {compiler: gcc, version: 16}}
+  - {os: windows-2025, toolchain: {compiler: gcc, version: 16}}
+  - {os: windows-2025-vs2026, toolchain: {compiler: gcc, version: 16}}
+  - {os: windows-2022, toolchain: {compiler: gcc, version: 16}}
+  - {os: windows-11-arm, toolchain: {compiler: gcc, version: 16}}
