@@ -87,6 +87,8 @@ The action sets the following outputs:
 
 C/C++ compilers of the same toolchain/version are provided where available. If a standalone Fortran compiler is selected, the action will attempt to configure compatible C/C++ compilers (typically GCC, or MSVC on Windows), but this is not guaranteed &mdash; use at your own risk.
 
+With the `intel` and `intel-classic` toolchains on Windows, `CC` and `CXX` are set to MSVC's `cl`, which is ABI-compatible with the Intel Fortran compilers. Intel's Fortran-only Windows installers do not include a working `icx`, so it is not used.
+
 
 ## Environment variables
 

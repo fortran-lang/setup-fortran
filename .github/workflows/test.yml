@@ -102,7 +102,11 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-      
+
+      - name: Test mixed Fortran, C and C++ build
+        if: steps.setup-fortran.outcome == 'success' && runner.os == 'Windows' && contains(matrix.toolchain.compiler, 'intel')
+        uses: ./.github/actions/test-mixed
+
       - name: Test C compiler
         continue-on-error: true
         if: needs.options.outputs.mode == 'report' && steps.setup-fortran.outcome == 'success'
