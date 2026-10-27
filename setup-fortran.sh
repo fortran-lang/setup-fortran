@@ -511,19 +511,23 @@ install_aocc()
 install_flang_apt()
 {
   local major=$1
-  local codename
+  local codename os_version
   codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+  os_version=$(. /etc/os-release && echo "$VERSION_ID")
 
-  # LLVM apt repository (https://apt.llvm.org), if it builds this release for
-  # this Ubuntu release, otherwise the Ubuntu archive (e.g. LLVM 20 on 26.04)
+  # LLVM apt repository (https://apt.llvm.org). It does not build every release
+  # for every Ubuntu release (e.g. not LLVM 20 for 26.04), and Ubuntu's own
+  # flang packages are not usable (26.04's flang-20 cannot find libMLIR)
   require_fetch
-  if $fetch http://apt.llvm.org/${codename}/dists/ \
+  if ! $fetch http://apt.llvm.org/${codename}/dists/ \
       | grep -q "llvm-toolchain-${codename}-${major}/"; then
-    $fetch https://apt.llvm.org/llvm-snapshot.gpg.key \
-      | sudo_wrapper tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-    echo "deb http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${major} main" \
-      | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
+    echo "LLVM Flang $major is not available on Ubuntu $os_version: apt.llvm.org does not build it for $codename"
+    exit 1
   fi
+  $fetch https://apt.llvm.org/llvm-snapshot.gpg.key \
+    | sudo_wrapper tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+  echo "deb http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${major} main" \
+    | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
   sudo_wrapper apt-get update
 
   # clang is the matching C and C++ compiler, and -fopenmp needs LLVM's
