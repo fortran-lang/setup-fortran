@@ -220,3 +220,63 @@ include:
   - {os: windows-2025-vs2026, toolchain: {compiler: gcc, version: 16}}
   - {os: windows-2022, toolchain: {compiler: gcc, version: 16}}
   - {os: windows-11-arm, toolchain: {compiler: gcc, version: 16}}
+  # ubuntu-26.04: kept out of the main cross-product to stay under the
+  # 256-job limit, but tested with the same toolchains as ubuntu-24.04
+  - {os: ubuntu-26.04, toolchain: {compiler: gcc, version: 16}}
+  - {os: ubuntu-26.04, toolchain: {compiler: gcc, version: 15}}
+  - {os: ubuntu-26.04, toolchain: {compiler: gcc, version: 14}}
+  - {os: ubuntu-26.04, toolchain: {compiler: gcc, version: 13}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2026.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2026.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2025.3'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2025.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2025.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2024.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2024.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2023.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2023.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2023.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2022.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2022.2.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2022.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2022.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2021.4'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2021.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2021.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel, version: '2021.1.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.12'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.11'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.10'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.9'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.8'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.7.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.6'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.5'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.4'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.3'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: intel-classic, version: '2021.1.2'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: lfortran, version: '0.58.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: lfortran, version: '0.57.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '26.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '25.9'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '25.7'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '25.5'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '25.3'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '25.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '24.5'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '24.3'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '24.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.11'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.9'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.7'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.5'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.3'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: nvidia-hpc, version: '23.1'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: aocc, version: '5.2.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: aocc, version: '5.1.0'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: flang, version: '23'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: flang, version: '22'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: flang, version: '21'}}
+  - {os: ubuntu-26.04, toolchain: {compiler: flang, version: '20'}}

@@ -56,6 +56,9 @@ detect_runner_os()
       macos15-intel)
         echo "macos-15-intel"
         ;;
+      ubuntu26)
+        echo "ubuntu-26.04"
+        ;;
       ubuntu24)
         echo "ubuntu-24.04"
         ;;
@@ -511,12 +514,16 @@ install_flang_apt()
   local codename
   codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 
-  # LLVM apt repository (https://apt.llvm.org)
+  # LLVM apt repository (https://apt.llvm.org), if it builds this release for
+  # this Ubuntu release, otherwise the Ubuntu archive (e.g. LLVM 20 on 26.04)
   require_fetch
-  $fetch https://apt.llvm.org/llvm-snapshot.gpg.key \
-    | sudo_wrapper tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-  echo "deb http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${major} main" \
-    | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
+  if $fetch http://apt.llvm.org/${codename}/dists/ \
+      | grep -q "llvm-toolchain-${codename}-${major}/"; then
+    $fetch https://apt.llvm.org/llvm-snapshot.gpg.key \
+      | sudo_wrapper tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+    echo "deb http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${major} main" \
+      | sudo_wrapper tee /etc/apt/sources.list.d/llvm-toolchain-${major}.list > /dev/null
+  fi
   sudo_wrapper apt-get update
 
   # clang is the matching C and C++ compiler, and -fopenmp needs LLVM's
@@ -806,11 +813,13 @@ install_intel_apt()
   fi
 
   require_fetch
+  # apt-key is gone from Ubuntu 26.04: use a keyring referenced by signed-by
   local _KEY="GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB"
-  $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY > $_KEY
-  sudo_wrapper apt-key add $_KEY
-  rm $_KEY
-  echo "deb https://apt.repos.intel.com/oneapi all main" \
+  local _KEYRING=/usr/share/keyrings/oneapi-archive-keyring.gpg
+  $fetch https://apt.repos.intel.com/intel-gpg-keys/$_KEY \
+    | gpg --dearmor \
+    | sudo_wrapper tee $_KEYRING > /dev/null
+  echo "deb [signed-by=$_KEYRING] https://apt.repos.intel.com/oneapi all main" \
     | sudo_wrapper tee /etc/apt/sources.list.d/oneAPI.list
   sudo_wrapper apt-get update
 

@@ -197,6 +197,34 @@ jobs:
           name: compat-${{ matrix.os }}-${{ matrix.toolchain.compiler }}-${{ matrix.toolchain.version }}
           path: compat/*.csv
 
+  # ubuntu-26.04 has no rows in long_compat.csv yet, so assert mode would not
+  # test it: cover the installers that needed changes for it here
+  test-ubuntu-26:
+    name: Test ubuntu-26.04
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - {compiler: intel, version: '2025.3'}
+          - {compiler: flang, version: '20'}
+          - {compiler: flang, version: '23'}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Fortran
+        uses: ./
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
+      - name: Test Fortran compiler
+        uses: ./.github/actions/test-fc
+        with:
+          compiler: ${{ matrix.toolchain.compiler }}
+          version: ${{ matrix.toolchain.version }}
+
   test-latest:
     name: Test version latest resolution
     runs-on: ${{ matrix.os }}
