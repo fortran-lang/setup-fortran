@@ -246,6 +246,7 @@ ubuntu-24.04,nvidia-hpc,25.7,&check;
 ubuntu-24.04,nvidia-hpc,25.9,&check;
 ubuntu-24.04,nvidia-hpc,26.1,&check;
 ubuntu-26.04,flang,23,&check;
+ubuntu-26.04,intel-classic,2021.12,&check;
 ubuntu-26.04,intel,2025.3,&check;
 windows-11-arm,gcc,13,
 windows-11-arm,gcc,14,
