@@ -17,6 +17,13 @@ runs:
         # check $CXX == $FPM_CXX
         [[ "${{ env.CXX }}" == "${{ env.FPM_CXX }}" ]] && (echo "CXX and FPM_CXX match") || (echo "CXX and FPM_CXX don't match: ${{ env.CXX }} != ${{ env.FPM_CXX}}"; exit 1)
 
+        # cl has no Intel version to compare, confirm the MSVC banner instead
+        if [ "$RUNNER_OS" == "Windows" ] && [ "${{ env.CXX }}" == "cl" ]; then
+          banner=$(cl 2>&1 | head -n 1)
+          [[ "$banner" == *"Microsoft (R) C/C++"* ]] && (echo "found cl: $banner") || (echo "unexpected cl banner: $banner"; exit 1)
+          exit 0
+        fi
+
         # check compiler version
         if ([ "$RUNNER_OS" == "Windows" ] && [[ "${{ matrix.toolchain.compiler }}" =~ "intel" ]]); then
           # only last line of output captured by command substitution, write to temp file instead
@@ -39,8 +46,14 @@ runs:
       working-directory: test
       shell: bash
       run: |
-        ${{ env.CXX }} -o hw hw.cpp
-        output=$(./hw '2>&1')
+        if [ "$RUNNER_OS" == "Windows" ] && [ "${{ env.CXX }}" == "cl" ]; then
+          cl -nologo -EHsc -Fe:hw hw.cpp
+          output=$(./hw.exe '2>&1')
+          rm -f hw.exe hw.obj
+        else
+          ${{ env.CXX }} -o hw hw.cpp
+          output=$(./hw '2>&1')
+          rm hw
+        fi
         [[ "$output" == *"hello world"* ]] && echo "$output" || (echo "Unexpected C++ program output: $output"; exit 1)
-        rm hw
       

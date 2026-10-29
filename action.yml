@@ -110,13 +110,13 @@ runs:
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           if [[ "${{ inputs.compiler }}" == "intel" ]]; then
             FC=ifx
-            CC=icx
-            CXX=icx
+            CC=cl
+            CXX=cl
             echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           elif [[ "${{ inputs.compiler }}" == "intel-classic" ]]; then
             FC=ifort
-            CC=icl
-            CXX=icl
+            CC=cl
+            CXX=cl
             echo SETVARS_COMPLETED=1>>$GITHUB_ENV
           fi
         fi
