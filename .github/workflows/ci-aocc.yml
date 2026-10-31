@@ -16,7 +16,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                image: [ubuntu-26.04, ubuntu-24.04, ubuntu-22.04]
+                image: [ubuntu-26.04, ubuntu-24.04]
 
                 toolchain:
                     - { compiler: aocc, version: "5.2" }
@@ -24,6 +24,9 @@ jobs:
                     - { compiler: aocc, version: "5.0" }
                     - { compiler: aocc, version: "4.2" }
                     - { compiler: aocc, version: "4.1" }
+                include:
+                    - image: ubuntu-22.04
+                      toolchain: { compiler: aocc, version: "5.2" }
 
         steps:
             - uses: actions/checkout@v7

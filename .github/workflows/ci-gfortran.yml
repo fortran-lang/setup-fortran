@@ -20,10 +20,8 @@ jobs:
           [
             ubuntu-26.04,
             ubuntu-24.04,
-            ubuntu-22.04,
             ubuntu-26.04-arm,
             ubuntu-24.04-arm,
-            ubuntu-22.04-arm,
             macos-26,
             macos-26-intel,
             macos-15,
@@ -44,6 +42,10 @@ jobs:
           - image: ubuntu-26.04 # no compiler and version specified, defaults to the latest gfortran version
           - image: macos-latest # no compiler and version specified, defaults to the latest gfortran version
           - image: windows-latest # no compiler and version specified, defaults to the latest gfortran version
+          - image: ubuntu-22.04
+            toolchain: { compiler: gfortran, version: "16" }
+          - image: ubuntu-22.04-arm
+            toolchain: { compiler: gfortran, version: "16" }
           - image: ubuntu-24.04
             toolchain: { compiler: gcc } # test compatibility alias
           - image: windows-2025
