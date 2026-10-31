@@ -100407,6 +100407,7 @@ function addIntelCompilerBinFromPath(pathValue) {
 
 
 const CAPTURED_ENV_KEY_PATTERN = /^(PATH|LIB|INCLUDE|.*INTEL.*|.*ONEAPI.*|.*MKL.*|MKLROOT|CMPLR_ROOT)$/i;
+const PATH_LENGTH_WARNING_THRESHOLD = 4096;
 function intelEnvironmentBatchLines(setvarsBat) {
     return [
         `@echo off`,
@@ -100471,6 +100472,9 @@ async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
                 return true;
             })
                 .join(";");
+            if (filteredPath.length > PATH_LENGTH_WARNING_THRESHOLD) {
+                warning(`PATH is ${String(filteredPath.length)} characters. Do not re-run setvars.bat or vcvarsall.bat after this action; the environment is already set, and re-running can exceed the cmd.exe line limit of 8191 characters ("The input line is too long").`);
+            }
             exportVariable("PATH", filteredPath);
             addMsvcBinFromPath(filteredPath);
             addIntelCompilerBinFromPath(filteredPath);

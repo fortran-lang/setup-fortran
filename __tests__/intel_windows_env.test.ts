@@ -19,6 +19,9 @@ describe("captureIntelWindowsEnvironment", () => {
   const mockedAddPath = core.addPath as jest.MockedFunction<
     typeof core.addPath
   >;
+  const mockedWarning = core.warning as jest.MockedFunction<
+    typeof core.warning
+  >;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -82,5 +85,49 @@ describe("captureIntelWindowsEnvironment", () => {
     // re-prepended over it, so both bin dirs have to be addPath'ed as well.
     expect(mockedAddPath).toHaveBeenCalledWith(msvcBin);
     expect(mockedAddPath).toHaveBeenCalledWith(intelBin);
+  });
+
+  describe("PATH length warning", () => {
+    const pathOfLength = (length: number) => `C:\\${"a".repeat(length - 3)}`;
+
+    it.each([
+      [4096, false],
+      [4097, true],
+    ])(
+      "with an exported PATH of %i characters, warns: %s",
+      async (length, warns) => {
+        mockedExec.mockImplementation(async (commandLine, args, options) => {
+          options?.listeners?.stdout?.(
+            Buffer.from(`PATH=${pathOfLength(length)}`),
+          );
+          return 0;
+        });
+
+        await captureIntelWindowsEnvironment("C:\\setvars.bat", "dump.bat");
+
+        const warned = mockedWarning.mock.calls.some(([message]) =>
+          String(message).includes(
+            "Do not re-run setvars.bat or vcvarsall.bat",
+          ),
+        );
+        expect(warned).toBe(warns);
+      },
+    );
+
+    it("reports the PATH length and the cmd.exe error text", async () => {
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        options?.listeners?.stdout?.(Buffer.from(`PATH=${pathOfLength(5000)}`));
+        return 0;
+      });
+
+      await captureIntelWindowsEnvironment("C:\\setvars.bat", "dump.bat");
+
+      expect(mockedWarning).toHaveBeenCalledWith(
+        expect.stringContaining("PATH is 5000 characters"),
+      );
+      expect(mockedWarning).toHaveBeenCalledWith(
+        expect.stringContaining("The input line is too long"),
+      );
+    });
   });
 });
