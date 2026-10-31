@@ -99923,8 +99923,8 @@ async function verifyIntelAuthenticode(installerPath) {
 const GCC_RELEASES = [
     {
         version: "16",
-        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/16.1.0posix-14.0.0-ucrt-r1/winlibs-x86_64-posix-seh-gcc-16.1.0-mingw-w64ucrt-14.0.0-r1.zip",
-        sha256: "325771f545e89f62c0e1fafdbf0066cc49e3321aeca7b704c8d065e97a72f2fb",
+        url: "https://github.com/brechtsanders/winlibs_mingw/releases/download/16.2.0posix-14.0.0-ucrt-r2/winlibs-x86_64-posix-seh-gcc-16.2.0-mingw-w64ucrt-14.0.0-r2.zip",
+        sha256: "d5dbafc4a170e762ca6143151ec918fb9e2c72736fb14cd704abebc6bdd5276a",
     },
     {
         version: "15",
