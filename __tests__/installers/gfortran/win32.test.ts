@@ -133,6 +133,30 @@ describe("installWin32 (gfortran)", () => {
     });
   });
 
+  describe("release metadata", () => {
+    it.each(["16", "15", "14", "13", "12", "11"])(
+      "maps version %s to a matching winlibs archive and checksum",
+      async (version) => {
+        mockedTc.find.mockReturnValue("");
+        mockedTc.downloadTool.mockResolvedValue("C:\\Temp\\gcc.zip");
+        mockedTc.extractZip.mockResolvedValue("C:\\Temp\\extracted");
+        mockedTc.cacheDir.mockResolvedValue("C:\\Cache\\gfortran");
+
+        await installWin32({ ...baseInputs, version });
+
+        const url = mockedTc.downloadTool.mock.calls[0][0] as string;
+        const match = /\/download\/([^/]+)\/([^/]+\.zip)$/.exec(url);
+        expect(match).not.toBeNull();
+        expect(match?.[1]).toMatch(new RegExp(`^${version}\\.`));
+        expect(match?.[2]).toContain(`gcc-${version}.`);
+        expect(mockedVerifySha256).toHaveBeenCalledWith(
+          "C:\\Temp\\gcc.zip",
+          expect.stringMatching(/^[a-f0-9]{64}$/),
+        );
+      },
+    );
+  });
+
   describe("MSYS2", () => {
     const msys2Inputs = {
       ...baseInputs,
