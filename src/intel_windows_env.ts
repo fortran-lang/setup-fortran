@@ -67,6 +67,11 @@ export async function captureIntelWindowsEnvironment(
     },
   });
 
+  // Temporary notice to help v1 users migrate; remove after the transition period.
+  core.notice(
+    'setup-fortran v2 sets up the Intel environment itself. If your workflow still re-runs setvars.bat or vcvarsall.bat after this action (as with v1), remove those steps: they can push PATH past the cmd.exe limit and fail with "The input line is too long". See "Migration Guide" in the setup-fortran README.',
+  );
+
   for (const line of envOutput.split("\n")) {
     const eqIdx = line.indexOf("=");
     if (eqIdx === -1) continue;
