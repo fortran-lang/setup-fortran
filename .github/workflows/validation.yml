@@ -27,7 +27,7 @@ jobs:
         run: npm run lint
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev --audit-level=high
 
   unit-tests:
     name: unit tests (${{ matrix.os }})
