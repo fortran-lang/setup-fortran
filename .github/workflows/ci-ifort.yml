@@ -46,8 +46,6 @@ jobs:
             toolchain: { compiler: ifort, version: "2021.10" }
           - image: macos-15
             toolchain: { compiler: ifort, version: "2021.10" }
-          - image: macos-14
-            toolchain: { compiler: ifort, version: "2021.10" }
           - image: macos-26
             toolchain: { compiler: ifort, version: "2021.9" }
           - image: macos-15

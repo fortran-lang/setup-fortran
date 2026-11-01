@@ -25,7 +25,6 @@ jobs:
             macos-26-intel,
             macos-15,
             macos-15-intel,
-            macos-14,
             windows-2025,
             windows-2022,
           ]
