@@ -648,7 +648,6 @@ describe("leaf-aware CI coverage building blocks (negative cases)", () => {
     ["ubuntu-22.04", { os: "linux", arch: "x64" }],
     ["ubuntu-24.04-arm", { os: "linux", arch: "arm64" }],
     ["ubuntu-22.04-arm", { os: "linux", arch: "arm64" }],
-    ["macos-14", { os: "macos", arch: "arm64" }],
     ["macos-15", { os: "macos", arch: "arm64" }],
     ["macos-26", { os: "macos", arch: "arm64" }],
     ["macos-15-intel", { os: "macos", arch: "x64" }],
@@ -695,7 +694,7 @@ describe("leaf-aware CI coverage building blocks (negative cases)", () => {
     const x64Only = [
       combo("ubuntu-24.04", "0.65.0"),
       combo("ubuntu-22.04", "0.65.0"),
-      combo("macos-14", "0.65.0"),
+      combo("macos-15-intel", "0.65.0"),
       combo("windows-2025", "0.65.0"),
     ];
     expect(covered(spec, "0.65.0", x64Only)).toBe(false);
@@ -711,7 +710,9 @@ describe("leaf-aware CI coverage building blocks (negative cases)", () => {
     const spec = leafSpec("lfortran/debian[x64]");
     expect(
       covered(spec, "0.65.0", [
-        combo("macos-14", "0.65.0"),
+        // x64 macOS: matches the leaf's arch, so only the OS axis can reject
+        // it - an OS-blind matcher would wrongly report this as covered.
+        combo("macos-15-intel", "0.65.0"),
         combo("windows-2025", "0.65.0"),
       ]),
     ).toBe(false);
