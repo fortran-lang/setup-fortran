@@ -38753,7 +38753,7 @@ function utils_toCommandValue(input) {
  * @returns The command properties to send with the actual annotation command
  * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
  */
-function utils_toCommandProperties(annotationProperties) {
+function toCommandProperties(annotationProperties) {
     if (!Object.keys(annotationProperties).length) {
         return {};
     }
@@ -41567,7 +41567,7 @@ function core_debug(message) {
  * @param properties optional properties to add to the annotation.
  */
 function core_error(message, properties = {}) {
-    command_issueCommand('error', utils_toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    command_issueCommand('error', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Adds a warning issue
@@ -41575,7 +41575,7 @@ function core_error(message, properties = {}) {
  * @param properties optional properties to add to the annotation.
  */
 function warning(message, properties = {}) {
-    command_issueCommand('warning', utils_toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    command_issueCommand('warning', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Adds a notice issue
@@ -41583,7 +41583,7 @@ function warning(message, properties = {}) {
  * @param properties optional properties to add to the annotation.
  */
 function notice(message, properties = {}) {
-    issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+    command_issueCommand('notice', toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
  * Writes info to log with console.log.
@@ -100445,6 +100445,8 @@ async function captureIntelWindowsEnvironment(setvarsBat, batchFileName) {
             },
         },
     });
+    // Temporary notice to help v1 users migrate; remove after the transition period.
+    notice('setup-fortran v2 sets up the Intel environment itself. If your workflow still re-runs setvars.bat or vcvarsall.bat after this action (as with v1), remove those steps: they can push PATH past the cmd.exe limit and fail with "The input line is too long". See "Migration Guide" in the setup-fortran README.');
     for (const line of envOutput.split("\n")) {
         const eqIdx = line.indexOf("=");
         if (eqIdx === -1)

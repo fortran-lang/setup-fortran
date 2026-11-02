@@ -83,4 +83,18 @@ describe("captureIntelWindowsEnvironment", () => {
     expect(mockedAddPath).toHaveBeenCalledWith(msvcBin);
     expect(mockedAddPath).toHaveBeenCalledWith(intelBin);
   });
+
+  it("tells users not to re-run setvars.bat or vcvarsall.bat", async () => {
+    mockedExec.mockResolvedValue(0);
+
+    await captureIntelWindowsEnvironment("C:\\setvars.bat", "dump.bat");
+
+    expect(core.notice).toHaveBeenCalledTimes(1);
+    expect(core.notice).toHaveBeenCalledWith(
+      expect.stringContaining("setvars.bat or vcvarsall.bat"),
+    );
+    expect(core.notice).toHaveBeenCalledWith(
+      expect.stringContaining("The input line is too long"),
+    );
+  });
 });
