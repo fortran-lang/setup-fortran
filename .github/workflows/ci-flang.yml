@@ -65,8 +65,6 @@ jobs:
             toolchain: { compiler: flang } # only latest version available from brew
           - image: macos-15-intel
             toolchain: { compiler: flang } # only latest version available from brew
-          - image: macos-14
-            toolchain: { compiler: flang } # only latest version available from brew
           - image: macos-26
             toolchain: { compiler: flang, version: "21" }
           - image: macos-26
