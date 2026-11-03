@@ -14,9 +14,9 @@ Linux, macOS, and Windows.
 Migrating from `v1` requires only a few changes:
 
 - With Intel compilers, this action sets up the oneAPI environment. Do not re-run environment setup scripts such as `setvars.bat` or `vcvarsall.bat` after this action runs. Doing so can cause the `PATH` variable to exceed character limits on Windows, which fails with `The input line is too long`.
+- On Windows, Intel Fortran now uses MSVC (`cl`) as its C/C++ companion compiler. Remove hardcoded `CC`/`CXX` settings or CMake compiler selections pointing to Intel's C/C++ drivers (`icx`, `icx-cl`, etc.), and use MSVC-compatible flags (e.g. `/W4` and `/WX` instead of `-Werror` and `-Werror-all`).
 - `ifx` configurations on macOS were previously redirected to `ifort`. This behavior is no longer supported; `ifx` on macOS will fail. Remove these configurations from your workflow matrices.
 - In 2022, oneAPI release numbers differed from compiler version numbers. For example, oneAPI `2022.1` on Windows installed `ifx` version `2022.2.0`. Compiler versions are now used consistently, so `2022.1` is no longer listed as a supported version. Use `2022.2.0` instead.
-- Intel's Fortran-only installer for Windows does not come with a working `icx` backend, so the preferred C/C++ companion compiler has been changed to `cl`. If you have hardcoded `CC=icx`/`CXX=icx` anywhere in your own workflow, remove these settings and let the action provide the appropriate values.
 - The legacy compiler names `gcc`, `intel`, `intel-classic`, and `nvidia-hpc` remain supported as compatibility aliases. Migrating to the canonical names is recommended.
 
 ## Usage
