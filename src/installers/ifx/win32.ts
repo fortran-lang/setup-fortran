@@ -131,11 +131,13 @@ export const SUPPORTED_VERSIONS = {
     [Msystem.Native]: IFX_RELEASES.map((r) => r.version),
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [Msystem.Native]: undefined,
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: undefined,
   },
 } satisfies Record<Arch, Record<Msystem, readonly string[] | undefined>>;
 

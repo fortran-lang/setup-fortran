@@ -41701,6 +41701,7 @@ const Msystem = {
     Native: "native",
     UCRT64: "ucrt64",
     Clang64: "clang64",
+    ClangArm64: "clangarm64",
 };
 const types_LATEST = "latest";
 
@@ -99808,6 +99809,7 @@ const MSYS2_ROOT = "C:\\msys64";
 const PKG_PREFIX = {
     [Msystem.UCRT64]: "mingw-w64-ucrt-x86_64",
     [Msystem.Clang64]: "mingw-w64-clang-x86_64",
+    [Msystem.ClangArm64]: "mingw-w64-clang-aarch64",
     [Msystem.Native]: undefined,
 };
 async function setupMSYS2(msystem, packages) {
@@ -99957,11 +99959,13 @@ const win32_SUPPORTED_VERSIONS = {
         [Msystem.Native]: GCC_RELEASES.map((r) => r.version),
         [Msystem.UCRT64]: [types_LATEST],
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [Msystem.Native]: undefined,
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
 };
 async function installWin32(inputs) {
@@ -99972,6 +99976,7 @@ async function installWin32(inputs) {
         case Msystem.UCRT64:
             return await installMSYS2(inputs);
         case Msystem.Clang64:
+        case Msystem.ClangArm64:
             throw new Error(`Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
                 `Please use the "native" msystem to install the latest gfortran via conda-forge, or ` +
                 `use MSYS2 with msystem "ucrt64" for a rolling-release version of gfortran.`);
@@ -100656,11 +100661,13 @@ const ifx_win32_SUPPORTED_VERSIONS = {
         [Msystem.Native]: IFX_RELEASES.map((r) => r.version),
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [Msystem.Native]: undefined,
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
 };
 const ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
@@ -101562,11 +101569,13 @@ const ifort_win32_SUPPORTED_VERSIONS = {
         [Msystem.Native]: win32_IFORT_RELEASES.map((r) => r.version),
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [Msystem.Native]: undefined,
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: undefined,
     },
 };
 const win32_ONEAPI_ROOT = "C:\\Program Files (x86)\\Intel\\oneAPI";
@@ -102965,8 +102974,9 @@ async function flang_darwin_resolveInstalledVersion(flangBin) {
 //   `msiexec /a` administrative install because 7-Zip cannot resolve the
 //   WiX file table (it only exposes the embedded cabinet with mangled names).
 //
-// CLANG64 (MSYS2/pacman rolling release):
-//   x64 only — MSYS2 does not support ARM64.
+// CLANG64 / CLANGARM64 (MSYS2/pacman rolling release):
+//   CLANG64 is x64, CLANGARM64 is the ARM64 counterpart — MSYS2's ARM64 port
+//   only ships the clang toolchain, so it has no UCRT64/MINGW64 equivalents.
 //   Version is always LATEST since pacman tracks the rolling release.
 //   MSYS2 stopped building flang for UCRT64 with LLVM 23.
 //
@@ -102977,11 +102987,13 @@ const flang_win32_SUPPORTED_VERSIONS = {
         [Msystem.Native]: ["23", "22"],
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: [types_LATEST],
+        [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [Msystem.Native]: ["23", "22", "21", "20"],
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: [types_LATEST],
     },
 };
 // Windows installer suffix per arch, as used in official LLVM GitHub releases.
@@ -103093,10 +103105,11 @@ async function flang_win32_installWin32(inputs) {
         case Msystem.Native:
             return await win32_installNative(inputs);
         case Msystem.Clang64:
+        case Msystem.ClangArm64:
             return await win32_installMSYS2(inputs);
         case Msystem.UCRT64:
             throw new Error("Flang is not available in MSYS2 UCRT64: MSYS2 dropped the package " +
-                "with LLVM 23. Use msystem: clang64 (x64 only) or native instead.");
+                "with LLVM 23. Use msystem: clang64 (x64) or clangarm64 (arm64) instead.");
     }
 }
 async function win32_installNative(inputs) {
@@ -103711,14 +103724,16 @@ async function lfortran_darwin_resolveInstalledVersion(condaBin, condaPrefix) {
 // used as the default if no version was specified by the user.
 //
 // Native (conda-forge, default):
-//   Both x64 and ARM64. Conda-forge is the only source that provides current
-//   versioned lfortran binaries for Windows. The Miniforge installer is a
-//   native .exe that runs without MSYS2 or WSL.
+//   x64 only — Miniforge pins no Windows ARM64 installer, so conda-forge
+//   lfortran is not available there. Conda-forge is the only source that
+//   provides current versioned lfortran binaries for Windows. The Miniforge
+//   installer is a native .exe that runs without MSYS2 or WSL.
 //
-// UCRT64 (MSYS2/pacman, rolling release):
-//   x64 only — MSYS2 does not support ARM64. Version is always LATEST since
-//   pacman tracks the rolling release. The UCRT64 lfortran package tracks
-//   upstream closely (verified at 0.63.0).
+// UCRT64 / CLANG64 / CLANGARM64 (MSYS2/pacman, rolling release):
+//   UCRT64 and CLANG64 are x64, CLANGARM64 is the ARM64 subsystem. Version is
+//   always LATEST since pacman tracks the rolling release. The MSYS2 lfortran
+//   package tracks upstream closely; the ARM64 subsystem's frozen package
+//   database shipped 0.67.0-2 when it was probed (November 2026).
 const lfortran_win32_SUPPORTED_VERSIONS = {
     [Arch.X64]: {
         [Msystem.Native]: [
@@ -103737,11 +103752,13 @@ const lfortran_win32_SUPPORTED_VERSIONS = {
         ],
         [Msystem.UCRT64]: [types_LATEST],
         [Msystem.Clang64]: [types_LATEST],
+        [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: {
         [Msystem.Native]: undefined,
         [Msystem.UCRT64]: undefined,
         [Msystem.Clang64]: undefined,
+        [Msystem.ClangArm64]: [types_LATEST],
     },
 };
 async function lfortran_win32_installWin32(inputs) {
@@ -103750,11 +103767,12 @@ async function lfortran_win32_installWin32(inputs) {
             return await installConda(inputs);
         case Msystem.UCRT64:
         case Msystem.Clang64:
+        case Msystem.ClangArm64:
             return await lfortran_win32_installMSYS2(inputs);
     }
 }
 // Installs lfortran via Miniforge/conda-forge. This is the only install path
-// on Windows for both x64 and ARM64.
+// on Windows x64; ARM64 goes through MSYS2 clangarm64.
 //
 // Conda's directory layout on Windows differs from Linux/macOS:
 //   lfortran.exe lives in <prefix>\ (the prefix root itself), not bin\.

@@ -68,6 +68,14 @@ describe("setupMSYS2", () => {
     );
   });
 
+  it("uses the aarch64 prefix and CLANGARM64 subsystem for clangarm64", async () => {
+    await setupMSYS2(Msystem.ClangArm64, ["flang"]);
+
+    expectPacmanCall("mingw-w64-clang-aarch64-flang");
+    expect(core.addPath).toHaveBeenCalledWith("C:\\msys64\\clangarm64\\bin");
+    expect(core.exportVariable).toHaveBeenCalledWith("MSYSTEM", "CLANGARM64");
+  });
+
   it("does nothing when no packages are requested", async () => {
     await setupMSYS2(Msystem.UCRT64, []);
 

@@ -27,6 +27,7 @@ export const Msystem = {
   Native: "native",
   UCRT64: "ucrt64",
   Clang64: "clang64",
+  ClangArm64: "clangarm64",
 } as const;
 export type Msystem = (typeof Msystem)[keyof typeof Msystem];
 

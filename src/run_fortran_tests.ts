@@ -170,7 +170,8 @@ function getCxxLinkFlags(
         // directives for the CRT and the C++ runtime, which lld-link resolves
         // through the LIB paths the installer exports. mingw objects (MSYS2)
         // carry no such directives, so libstdc++ must be linked explicitly
-        // after the objects (GNU ld defaults to --as-needed).
+        // after the objects (GNU ld defaults to --as-needed). Proven on
+        // CLANG64; clangarm64 gets its first run on windows-11-arm.
         return { flags: isMSYS2 ? ["-lstdc++"] : [] };
       }
       if (platform === OS.MacOS && process.env.FLANG_VERSION !== LATEST) {
@@ -433,7 +434,8 @@ async function run(): Promise<void> {
     const flangVersion = parseFlangVersion(process.env.FLANG_VERSION);
     const msystem = process.env.WINDOWS_ENV as Msystem | undefined;
     const isUCRT64 = msystem === Msystem.UCRT64;
-    const isMSYS2 = isUCRT64 || msystem === Msystem.Clang64;
+    const isMSYS2 =
+      isUCRT64 || msystem === Msystem.Clang64 || msystem === Msystem.ClangArm64;
 
     const rawPlatform = process.platform;
     if (!Object.values(OS).includes(rawPlatform as OS)) {

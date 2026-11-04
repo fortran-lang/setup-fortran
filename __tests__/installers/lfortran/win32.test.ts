@@ -185,5 +185,37 @@ describe("installWin32 (LFortran)", () => {
       );
       expect(result.fc).toEqual(expect.stringContaining("clang64"));
     });
+
+    it("calls setupMSYS2 with ClangArm64 on ARM64", async () => {
+      const inputs = {
+        ...baseInputs,
+        arch: Arch.ARM64,
+        msystem: Msystem.ClangArm64,
+        version: "latest",
+      };
+      const result = await installWin32(inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.ClangArm64, [
+        "lfortran",
+      ]);
+      expect(mockedExportVariable).toHaveBeenCalledWith(
+        "WINDOWS_ENV",
+        Msystem.ClangArm64,
+      );
+      expect(result.fc).toEqual(expect.stringContaining("clangarm64"));
+    });
+
+    it("rejects clangarm64 on x64", async () => {
+      const inputs = {
+        ...baseInputs,
+        msystem: Msystem.ClangArm64,
+        version: "latest",
+      };
+
+      await expect(installWin32(inputs)).rejects.toThrow(
+        'The environment "clangarm64" is not supported for Windows x64.',
+      );
+      expect(mockedSetupMSYS2).not.toHaveBeenCalled();
+    });
   });
 });

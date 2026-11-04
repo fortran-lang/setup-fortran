@@ -186,5 +186,22 @@ describe("installWin32 (gfortran)", () => {
         "gcc-fortran",
       ]);
     });
+
+    it.each([Arch.X64, Arch.ARM64])(
+      "rejects clangarm64 on %s with the arch-accurate message, not the clang-cl hint",
+      async (arch) => {
+        const inputs = {
+          ...baseInputs,
+          version: "latest",
+          arch,
+          msystem: Msystem.ClangArm64,
+        };
+
+        await expect(installWin32(inputs)).rejects.toThrow(
+          `The environment "clangarm64" is not supported for Windows ${arch}.`,
+        );
+        expect(mockedSetupMSYS2).not.toHaveBeenCalled();
+      },
+    );
   });
 });

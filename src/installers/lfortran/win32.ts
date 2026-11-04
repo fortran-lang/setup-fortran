@@ -28,14 +28,16 @@ import { persistBinDirForBash } from "../../bash_env";
 // used as the default if no version was specified by the user.
 //
 // Native (conda-forge, default):
-//   Both x64 and ARM64. Conda-forge is the only source that provides current
-//   versioned lfortran binaries for Windows. The Miniforge installer is a
-//   native .exe that runs without MSYS2 or WSL.
+//   x64 only — Miniforge pins no Windows ARM64 installer, so conda-forge
+//   lfortran is not available there. Conda-forge is the only source that
+//   provides current versioned lfortran binaries for Windows. The Miniforge
+//   installer is a native .exe that runs without MSYS2 or WSL.
 //
-// UCRT64 (MSYS2/pacman, rolling release):
-//   x64 only — MSYS2 does not support ARM64. Version is always LATEST since
-//   pacman tracks the rolling release. The UCRT64 lfortran package tracks
-//   upstream closely (verified at 0.63.0).
+// UCRT64 / CLANG64 / CLANGARM64 (MSYS2/pacman, rolling release):
+//   UCRT64 and CLANG64 are x64, CLANGARM64 is the ARM64 subsystem. Version is
+//   always LATEST since pacman tracks the rolling release. The MSYS2 lfortran
+//   package tracks upstream closely; the ARM64 subsystem's frozen package
+//   database shipped 0.67.0-2 when it was probed (November 2026).
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: [
@@ -54,11 +56,13 @@ export const SUPPORTED_VERSIONS = {
     ],
     [Msystem.UCRT64]: [LATEST],
     [Msystem.Clang64]: [LATEST],
+    [Msystem.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [Msystem.Native]: undefined,
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: [LATEST],
   },
 } as const satisfies Record<
   Arch,
@@ -73,12 +77,13 @@ export async function installWin32(
       return await installConda(inputs);
     case Msystem.UCRT64:
     case Msystem.Clang64:
+    case Msystem.ClangArm64:
       return await installMSYS2(inputs);
   }
 }
 
 // Installs lfortran via Miniforge/conda-forge. This is the only install path
-// on Windows for both x64 and ARM64.
+// on Windows x64; ARM64 goes through MSYS2 clangarm64.
 //
 // Conda's directory layout on Windows differs from Linux/macOS:
 //   lfortran.exe lives in <prefix>\ (the prefix root itself), not bin\.

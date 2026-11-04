@@ -789,6 +789,7 @@ const IFX_WINDOWS: Record<
     ],
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: undefined,
   },
 };
 

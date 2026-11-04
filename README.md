@@ -34,7 +34,7 @@ Migrating from `v1` requires only a few changes:
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `compiler`           | Compiler to install (`gfortran`, `ifx`, `ifort`, `nvfortran`, `aocc`, `lfortran`, `flang`, `armflang`)                                                         | `gfortran` |
 | `version`            | Compiler version to install. Enclose the version string in quotation marks (e.g. `"2026.1.1"` or `"0.64.0"`)                                                   | `latest`   |
-| `msystem`            | Windows toolchain environment (`native`, `ucrt64`, `clang64`)                                                                                                  | `native`   |
+| `msystem`            | Windows toolchain environment (`native`, `ucrt64`, `clang64`, `clangarm64`)                                                                                    | `native`   |
 | `cleanup-disk`       | Free up disk space by removing large pre-installed toolkits during `nvfortran` setup (`true`, `false`)                                                         | `false`    |
 | `update-environment` | Whether to export toolchain environment variables (`FC`, `CC`, `CXX`, `FPM_*`, `F77`, `F90`, `FORTRAN_COMPILER`) into the runner environment (`true`, `false`) | `true`     |
 | `cache`              | Restore and save the installation with the GitHub Actions cache (`true`, `false`); no effect for `flang`, `lfortran`, and `gfortran` on macOS and Windows      | `true`     |
@@ -222,9 +222,9 @@ Notes:
 
 ### `lfortran`
 
-| Version | ubuntu-26.04 | ubuntu-24.04 | ubuntu-22.04 | ubuntu-26.04-arm | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) |
-| ------- | ------------ | ------------ | ------------ | ---------------- | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- |
-| latest  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      |
+| Version | ubuntu-26.04 | ubuntu-24.04 | ubuntu-22.04 | ubuntu-26.04-arm | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | windows-2025 | windows-2022 | windows-2025 (ucrt64) | windows-2022 (ucrt64) | windows-2025 (clang64) | windows-2022 (clang64) | windows-11-arm (clangarm64) |
+| ------- | ------------ | ------------ | ------------ | ---------------- | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | ------------ | ------------ | --------------------- | --------------------- | ---------------------- | ---------------------- | --------------------------- |
+| latest  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            | ✓                     | ✓                     | ✓                      | ✓                      | ✓                           |
 | 0.68.0  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            |                       |                       |                        |                        |
 | 0.67.0  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            |                       |                       |                        |                        |
 | 0.66.0  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            |                       |                       |                        |                        |
@@ -242,9 +242,9 @@ Notes:
 
 ### `flang` (LLVM Flang)
 
-| Version | ubuntu-26.04 | ubuntu-24.04 | ubuntu-22.04 | ubuntu-26.04-arm | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | windows-2025 | windows-2022 | windows-11-arm | windows-2025 (clang64) | windows-2022 (clang64) |
-| ------- | ------------ | ------------ | ------------ | ---------------- | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | ------------ | ------------ | -------------- | ---------------------- | ---------------------- |
-| latest  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            | ✓              | ✓                      | ✓                      |
+| Version | ubuntu-26.04 | ubuntu-24.04 | ubuntu-22.04 | ubuntu-26.04-arm | ubuntu-24.04-arm | ubuntu-22.04-arm | macos-26 | macos-26-intel | macos-15 | macos-15-intel | windows-2025 | windows-2022 | windows-11-arm | windows-2025 (clang64) | windows-2022 (clang64) | windows-11-arm (clangarm64) |
+| ------- | ------------ | ------------ | ------------ | ---------------- | ---------------- | ---------------- | -------- | -------------- | -------- | -------------- | ------------ | ------------ | -------------- | ---------------------- | ---------------------- | --------------------------- |
+| latest  | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                | ✓        | ✓              | ✓        | ✓              | ✓            | ✓            | ✓              | ✓                      | ✓                      | ✓                           |
 | 23      | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                |          |                |          |                | ✓            | ✓            | ✓              |                        |                        |
 | 22      | ✓            | ✓            | ✓            | ✓                | ✓                | ✓                |          |                |          |                | ✓            | ✓            | ✓              |                        |                        |
 | 21      |              | ✓            | ✓            |                  | ✓                | ✓                | ✓        |                | ✓        |                |              |              | ✓              |                        |                        |
@@ -324,6 +324,9 @@ jobs:
 ```
 
 ### Windows with MSYS2
+
+`ucrt64` and `clang64` are the x64 environments. On `windows-11-arm` use
+`clangarm64`.
 
 ```yaml
 - uses: fortran-lang/setup-fortran@v2

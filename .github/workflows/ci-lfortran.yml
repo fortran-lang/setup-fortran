@@ -80,6 +80,8 @@ jobs:
             toolchain: { compiler: lfortran, msystem: clang64 } # only latest version available from Pacman
           - image: windows-2022
             toolchain: { compiler: lfortran, msystem: clang64 } # only latest version available from Pacman
+          - image: windows-11-arm
+            toolchain: { compiler: lfortran, msystem: clangarm64 } # only latest version available from Pacman
     steps:
       - uses: actions/checkout@v7
 

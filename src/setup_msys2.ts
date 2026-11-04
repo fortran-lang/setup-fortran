@@ -8,6 +8,7 @@ export const MSYS2_ROOT = "C:\\msys64";
 const PKG_PREFIX: Record<Msystem, string | undefined> = {
   [Msystem.UCRT64]: "mingw-w64-ucrt-x86_64",
   [Msystem.Clang64]: "mingw-w64-clang-x86_64",
+  [Msystem.ClangArm64]: "mingw-w64-clang-aarch64",
   [Msystem.Native]: undefined,
 };
 

@@ -201,7 +201,8 @@ describe("supported version tables are ordered newest-first", () => {
 //                   `macos-*` => arm64 since macos-14);
 //        - msystem: Windows leaves carry the table's msystem key; `native`
 //                   (and non-Windows leaves) match toolchain entries without
-//                   an `msystem`, `ucrt64`/`clang64` match entries with it.
+//                   an `msystem`, `ucrt64`/`clang64`/`clangarm64` match
+//                   entries with it.
 //      Version matching is by *family* (exact, or one token extends the other
 //      by a dotted-segment boundary) so a table entry is satisfied by an exact
 //      CI pin OR a fuller CI spelling (e.g. table `21` <-> CI `21.1.6`;
@@ -210,9 +211,9 @@ describe("supported version tables are ordered newest-first", () => {
 //      A version tested only on the wrong OS/arch/msystem does NOT cover the
 //      leaf — this is what guards e.g. the ubuntu-arm `include:` entries.
 //   2. Rolling-only cells: a leaf list of exactly `[LATEST]` (the
-//      present-only-for-latest platforms, e.g. Windows `ucrt64`/`clang64`) must
-//      have a matching no-`version` CI entry, on the same `msystem` when one is
-//      present.
+//      present-only-for-latest platforms, e.g. Windows `ucrt64`, `clang64` and
+//      `clangarm64`) must have a matching no-`version` CI entry, on the same
+//      `msystem` when one is present.
 //
 // The TS `SUPPORTED_VERSIONS` tables are the source of truth (they are what
 // `resolveVersion` enforces at runtime and what Test A already guards); the
@@ -261,10 +262,10 @@ function findMatrix(doc: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-// Extract a Windows msystem (`ucrt64`/`clang64`/`native`) from a table leaf
-// label like "flang/win32[x64][ucrt64]".
+// Extract a Windows msystem (`ucrt64`/`clang64`/`clangarm64`/`native`) from a
+// table leaf label like "flang/win32[x64][ucrt64]".
 function msystemOf(label: string): string | undefined {
-  const m = /\[(ucrt64|clang64|native)\]/.exec(label);
+  const m = /\[(ucrt64|clangarm64|clang64|native)\]/.exec(label);
   return m ? m[1] : undefined;
 }
 
@@ -303,7 +304,7 @@ interface LeafSpec {
 //   "flang/win32[x64][ucrt64]"          -> windows/x64, ucrt64
 function leafSpec(label: string): LeafSpec {
   const m =
-    /^([a-z0-9]+)\/(debian|darwin|win32)\[(x64|arm64)\](?:\[(ucrt64|clang64|native)\])?$/.exec(
+    /^([a-z0-9]+)\/(debian|darwin|win32)\[(x64|arm64)\](?:\[(ucrt64|clangarm64|clang64|native)\])?$/.exec(
       label,
     );
   if (!m) throw new Error(`Unrecognized version table label: ${label}`);
@@ -589,6 +590,22 @@ describe("Test B coverage predicates detect gaps (negative cases)", () => {
         ci.hasLatest,
       ),
     ).toBe(true);
+    // clangarm64 is its own msystem: a clang64 latest entry must not be read as
+    // covering the ARM64 leaf.
+    expect(
+      latestCellCovered(
+        "flang/win32[arm64][clangarm64]",
+        ci.latestMsystrings,
+        ci.hasLatest,
+      ),
+    ).toBe(false);
+    expect(
+      latestCellCovered(
+        "flang/win32[arm64][clangarm64]",
+        new Set(["clangarm64"]),
+        true,
+      ),
+    ).toBe(true);
   });
 
   it("flags a [LATEST]-only cell when CI ships no latest entry at all", () => {
@@ -681,6 +698,10 @@ describe("leaf-aware CI coverage building blocks (negative cases)", () => {
     [
       "lfortran/win32[x64][clang64]",
       { os: "windows", arch: "x64", msystem: "clang64" },
+    ],
+    [
+      "flang/win32[arm64][clangarm64]",
+      { os: "windows", arch: "arm64", msystem: "clangarm64" },
     ],
   ])("leafSpec(%p) => %p", (label, expected) => {
     expect(leafSpec(label)).toEqual(expected);

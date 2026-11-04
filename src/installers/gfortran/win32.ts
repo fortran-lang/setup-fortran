@@ -54,11 +54,13 @@ export const SUPPORTED_VERSIONS = {
     [Msystem.Native]: GCC_RELEASES.map((r) => r.version),
     [Msystem.UCRT64]: [LATEST],
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [Msystem.Native]: undefined,
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: undefined,
   },
 } as const satisfies Record<
   Arch,
@@ -76,6 +78,7 @@ export async function installWin32(
     case Msystem.UCRT64:
       return await installMSYS2(inputs);
     case Msystem.Clang64:
+    case Msystem.ClangArm64:
       throw new Error(
         `Clang/LLVM's clang-cl does not include gfortran and is not supported by this installer. ` +
           `Please use the "native" msystem to install the latest gfortran via conda-forge, or ` +

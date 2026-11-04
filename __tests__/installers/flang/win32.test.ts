@@ -352,5 +352,37 @@ describe("installWin32 (Flang)", () => {
         Msystem.Clang64,
       );
     });
+
+    it("routes ARM64 clangarm64 to the MSYS2 installer", async () => {
+      const inputs = {
+        ...baseInputs,
+        version: "latest",
+        arch: Arch.ARM64,
+        msystem: Msystem.ClangArm64,
+      };
+      const result = await installWin32(inputs);
+
+      expect(mockedSetupMSYS2).toHaveBeenCalledWith(Msystem.ClangArm64, [
+        "flang",
+        "llvm-openmp",
+      ]);
+      expect(core.exportVariable).toHaveBeenCalledWith(
+        "WINDOWS_ENV",
+        Msystem.ClangArm64,
+      );
+      expect(result.fc).toContain("clangarm64");
+    });
+
+    it("rejects clangarm64 on x64", async () => {
+      const inputs = {
+        ...baseInputs,
+        version: "latest",
+        msystem: Msystem.ClangArm64,
+      };
+      await expect(installWin32(inputs)).rejects.toThrow(
+        'The environment "clangarm64" is not supported for Windows x64.',
+      );
+      expect(mockedSetupMSYS2).not.toHaveBeenCalled();
+    });
   });
 });

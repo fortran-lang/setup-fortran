@@ -408,13 +408,22 @@ describe("parseInputs", () => {
       expect(result.msystem).toBe(Msystem.UCRT64);
     });
 
+    it("parses clangarm64, the MSYS2 subsystem for Windows ARM64", () => {
+      mockedGetInput.mockImplementation((name) => {
+        if (name === "msystem") return "CLANGARM64";
+        return "";
+      });
+      const result = parseInputs();
+      expect(result.msystem).toBe(Msystem.ClangArm64);
+    });
+
     it("throws error for unknown msystem", () => {
       mockedGetInput.mockImplementation((name) => {
         if (name === "msystem") return "msys"; // incomplete
         return "";
       });
       expect(() => parseInputs()).toThrow(
-        'Unknown msystem "msys". Valid options: native, ucrt64',
+        'Unknown msystem "msys". Valid options: native, ucrt64, clang64, clangarm64',
       );
     });
   });

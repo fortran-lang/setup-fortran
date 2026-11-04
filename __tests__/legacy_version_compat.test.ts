@@ -328,6 +328,7 @@ function winTable(
       [Msystem.Native]: versions,
       [Msystem.UCRT64]: [LATEST],
       [Msystem.Clang64]: [LATEST],
+      [Msystem.ClangArm64]: undefined,
     },
     [Arch.ARM64]: undefined,
   };

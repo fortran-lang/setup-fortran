@@ -33,8 +33,9 @@ import { verifySha256 } from "../../verify_download";
 //   `msiexec /a` administrative install because 7-Zip cannot resolve the
 //   WiX file table (it only exposes the embedded cabinet with mangled names).
 //
-// CLANG64 (MSYS2/pacman rolling release):
-//   x64 only — MSYS2 does not support ARM64.
+// CLANG64 / CLANGARM64 (MSYS2/pacman rolling release):
+//   CLANG64 is x64, CLANGARM64 is the ARM64 counterpart — MSYS2's ARM64 port
+//   only ships the clang toolchain, so it has no UCRT64/MINGW64 equivalents.
 //   Version is always LATEST since pacman tracks the rolling release.
 //   MSYS2 stopped building flang for UCRT64 with LLVM 23.
 //
@@ -45,11 +46,13 @@ export const SUPPORTED_VERSIONS = {
     [Msystem.Native]: ["23", "22"],
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: [LATEST],
+    [Msystem.ClangArm64]: undefined,
   },
   [Arch.ARM64]: {
     [Msystem.Native]: ["23", "22", "21", "20"],
     [Msystem.UCRT64]: undefined,
     [Msystem.Clang64]: undefined,
+    [Msystem.ClangArm64]: [LATEST],
   },
 } as const satisfies Record<
   Arch,
@@ -207,11 +210,12 @@ export async function installWin32(
     case Msystem.Native:
       return await installNative(inputs);
     case Msystem.Clang64:
+    case Msystem.ClangArm64:
       return await installMSYS2(inputs);
     case Msystem.UCRT64:
       throw new Error(
         "Flang is not available in MSYS2 UCRT64: MSYS2 dropped the package " +
-          "with LLVM 23. Use msystem: clang64 (x64 only) or native instead.",
+          "with LLVM 23. Use msystem: clang64 (x64) or clangarm64 (arm64) instead.",
       );
   }
 }

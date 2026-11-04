@@ -103,6 +103,8 @@ jobs:
             toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
           - image: windows-2022
             toolchain: { compiler: flang, msystem: clang64 } # only latest version available from Pacman
+          - image: windows-11-arm
+            toolchain: { compiler: flang, msystem: clangarm64 } # only latest version available from Pacman
     steps:
       - uses: actions/checkout@v7
 
