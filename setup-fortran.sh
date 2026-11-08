@@ -518,8 +518,11 @@ install_flang_apt()
   # LLVM apt repository (https://apt.llvm.org). It does not build every release
   # for every Ubuntu release (e.g. not LLVM 20 for 26.04), and Ubuntu's own
   # flang packages are not usable (26.04's flang-20 cannot find libMLIR)
+  # apt.llvm.org's CDN can serve this listing gzip-encoded even when it was
+  # not asked to: gzip -dcf decompresses it, and passes plain text through
   require_fetch
   if ! $fetch http://apt.llvm.org/${codename}/dists/ \
+      | gzip -dcf \
       | grep -q "llvm-toolchain-${codename}-${major}/"; then
     echo "LLVM Flang $major is not available on Ubuntu $os_version: apt.llvm.org does not build it for $codename"
     exit 1
