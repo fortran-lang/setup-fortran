@@ -19,6 +19,7 @@ jobs:
                 image: [ubuntu-26.04, ubuntu-24.04, ubuntu-22.04]
 
                 toolchain:
+                    - { compiler: aocc, version: "6.0" }
                     - { compiler: aocc, version: "5.2" }
                     - { compiler: aocc, version: "5.1" }
                     - { compiler: aocc, version: "5.0" }

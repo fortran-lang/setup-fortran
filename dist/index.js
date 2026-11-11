@@ -102173,6 +102173,10 @@ const aocc_debian_APT_TIMEOUT_OPTS = [
 ];
 const AOCC_RELEASES = [
     {
+        version: "6.0",
+        sha256: "917c0228eb662ccd6ddb023e4b59a70578769804c853d9bb24e20aefed503e5e",
+    },
+    {
         version: "5.2",
         sha256: "10e8287be61d0181caf6bf00603a15b143ec79a5010f3fb7642036cc08763cb3",
     },

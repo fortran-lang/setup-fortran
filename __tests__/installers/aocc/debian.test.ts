@@ -360,7 +360,7 @@ describe("installDebian (AOCC)", () => {
   it("rejects non-zero patch versions like 5.1.1", async () => {
     const inputs: Inputs = { ...baseInputs, version: "5.1.1" };
     await expect(installDebian(inputs)).rejects.toThrow(
-      "aocc 5.1.1 is not supported on linux (x64). Supported versions: 5.2, 5.1, 5.0, 4.2, 4.1",
+      "aocc 5.1.1 is not supported on linux (x64). Supported versions: 6.0, 5.2, 5.1, 5.0, 4.2, 4.1",
     );
   });
 
