@@ -327,6 +327,7 @@ jobs:
 
   cache-gfortran-save:
     name: cache save (gfortran 11, ubuntu-24.04)
+    needs: [validation]
     runs-on: ubuntu-24.04
     if: github.actor != 'dependabot[bot]'
     outputs:
