@@ -98850,7 +98850,7 @@ async function addAptRepositoryWithRetry(ppa, maxAttempts = 3) {
         catch (err) {
             if (attempt === maxAttempts)
                 throw err;
-            info(`add-apt-repository failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 10).toString()}s...`);
+            info(`add-apt-repository failed (attempt ${attempt.toString()}/${maxAttempts.toString()}), retrying in ${(attempt * 5).toString()}s...`);
             await new Promise((res) => setTimeout(res, attempt * 5_000));
         }
     }
