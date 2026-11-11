@@ -41,6 +41,7 @@ import { persistBinDirForBash } from "../../bash_env";
 export const SUPPORTED_VERSIONS = {
   [Arch.X64]: {
     [Msystem.Native]: [
+      "0.69.0",
       "0.68.0",
       "0.67.0",
       "0.66.0",
