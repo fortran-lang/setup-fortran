@@ -5,6 +5,8 @@ import {
   resolveLatestPatchWithAsset,
   verifyAssetExists,
   stripTrailingPatchZero,
+  isListedVersion,
+  unavailableVersionError,
 } from "../src/resolve_version";
 import { Arch, Compiler, LATEST, OS, Msystem } from "../src/types";
 import type { Inputs } from "../src/types";
@@ -85,6 +87,55 @@ describe("resolveVersion", () => {
       const inputs: Inputs = { ...baseInputs, version: "9" };
       expect(() => resolveVersion(inputs, SUPPORTED)).toThrow(
         "gfortran 9 is not supported on linux (x64). Supported versions: 15, 14, 13",
+      );
+    });
+  });
+
+  describe("allowUnlisted option", () => {
+    const inputsFor = (version: string): Inputs => ({ ...baseInputs, version });
+
+    it("passes an unlisted numeric version through", () => {
+      expect(
+        resolveVersion(inputsFor("16"), SUPPORTED, { allowUnlisted: true }),
+      ).toBe("16");
+      expect(
+        resolveVersion(inputsFor("16.1.0"), SUPPORTED, { allowUnlisted: true }),
+      ).toBe("16.1.0");
+    });
+
+    it("still rejects unlisted versions by default", () => {
+      expect(() => resolveVersion(inputsFor("16"), SUPPORTED)).toThrow(
+        "gfortran 16 is not supported on linux (x64). Supported versions: 15, 14, 13",
+      );
+    });
+
+    it("rejects values that are not version numbers", () => {
+      expect(() =>
+        resolveVersion(inputsFor("latest-ish"), SUPPORTED, {
+          allowUnlisted: true,
+        }),
+      ).toThrow(/is not supported/);
+    });
+
+    it("still resolves LATEST to the first table entry", () => {
+      expect(
+        resolveVersion(inputsFor(LATEST), SUPPORTED, { allowUnlisted: true }),
+      ).toBe("15");
+    });
+  });
+
+  describe("isListedVersion", () => {
+    it("is true only for table entries", () => {
+      expect(isListedVersion(["15", "14"], "14")).toBe(true);
+      expect(isListedVersion(["15", "14"], "16")).toBe(false);
+      expect(isListedVersion(undefined, "16")).toBe(false);
+    });
+  });
+
+  describe("unavailableVersionError", () => {
+    it("names the compiler, version, source and platform", () => {
+      expect(unavailableVersionError(baseInputs, "16", "apt").message).toBe(
+        "gfortran 16 is not available from apt on linux (x64).",
       );
     });
   });
