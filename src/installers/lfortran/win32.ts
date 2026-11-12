@@ -10,11 +10,12 @@ import {
   type InstallationResult,
   type Inputs,
 } from "../../types";
-import { resolveWindowsVersion } from "../../resolve_version";
+import { isListedVersion, resolveWindowsVersion } from "../../resolve_version";
 import { setupMSYS2 } from "../../setup_msys2";
 import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
 import { verifySha256 } from "../../verify_download";
 import {
+  assertLFortranOnConda,
   condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
@@ -91,7 +92,9 @@ export async function installWin32(
 //   Scripts\ holds Python entry-point wrappers; Library\bin\ holds DLLs.
 //   All three need to be on PATH for the toolchain to work correctly.
 async function installConda(inputs: Inputs): Promise<InstallationResult> {
-  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveWindowsVersion(inputs, SUPPORTED_VERSIONS, {
+    allowUnlisted: true,
+  });
 
   core.info(
     `Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`,
@@ -146,6 +149,12 @@ async function installConda(inputs: Inputs): Promise<InstallationResult> {
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
+    }
+
+    if (
+      !isListedVersion(SUPPORTED_VERSIONS[inputs.arch][Msystem.Native], version)
+    ) {
+      await assertLFortranOnConda(inputs, environment, version);
     }
 
     await condaCreateWithRetry(environment.conda, [
