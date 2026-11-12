@@ -41939,7 +41939,7 @@ function stripTrailingPatchZero(version) {
     const match = /^(\d+\.\d+)\.0$/.exec(version);
     return match ? match[1] : version;
 }
-function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, } = {}) {
+function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, stripPatchZero = false, allowUnlisted = false, } = {}) {
     const versions = supportedVersions[inputs.arch];
     if (!versions) {
         throw new Error(`No supported versions found for ${inputs.compiler} on ${inputs.os} (${inputs.arch}).`);
@@ -41999,12 +41999,23 @@ function resolveVersion(inputs, supportedVersions, { matchMajorIfPatch = false, 
                 `in quotes. (gfortran and flang accept bare integer majors such as ` +
                 `"14" or "19".) Supported versions: ${versions.join(", ")}`);
         }
+        if (allowUnlisted && /^\d+(\.\d+)*$/.test(version)) {
+            info(`${inputs.compiler} ${version} is not in the tested version list; ` +
+                `passing it to the package manager as requested.`);
+            return version;
+        }
         throw new Error(`${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
             `Supported versions: ${versions.join(", ")}`);
     }
     return version;
 }
-function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, } = {}) {
+function isListedVersion(listed, version) {
+    return listed?.includes(version) ?? false;
+}
+function unavailableVersionError(inputs, version, source) {
+    return new Error(`${inputs.compiler} ${version} is not available from ${source} on ${inputs.os} (${inputs.arch}).`);
+}
+function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = false, resolveMinorToLatestPatch = false, allowUnlisted = false, } = {}) {
     const archVersions = supportedVersions[inputs.arch];
     if (!archVersions) {
         throw new Error(`Architecture "${inputs.arch}" is not supported for ${inputs.compiler} on Windows.`);
@@ -42014,7 +42025,7 @@ function resolveWindowsVersion(inputs, supportedVersions, { matchMajorIfPatch = 
     if (!versions) {
         throw new Error(`The environment "${msystem}" is not supported for Windows ${inputs.arch}.`);
     }
-    return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch });
+    return resolveVersion(inputs, { [inputs.arch]: versions }, { matchMajorIfPatch, resolveMinorToLatestPatch, allowUnlisted });
 }
 // FIX: Handles string segmentation gracefully for minor versions (length === 2)
 function parseMajorOrPatch(input) {
@@ -98585,7 +98596,9 @@ const APT_TIMEOUT_OPTS = [
     "Acquire::Retries=0",
 ];
 async function installDebian(inputs) {
-    const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
     const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
     const cacheDir = aptCacheDir(inputs, version);
@@ -98599,6 +98612,9 @@ async function installDebian(inputs) {
     // APT expects this directory to exist beneath its archive directory.
     external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
     const revision = await candidateVersion(`gfortran-${version}`);
+    if (!revision && !isListedVersion(SUPPORTED_VERSIONS[inputs.arch], version)) {
+        throw unavailableVersionError(inputs, version, "apt");
+    }
     const plan = await downloadPlan(packages, cacheDir);
     const cacheKey = revision && plan && plan.files > 0
         ? aptCacheKey(inputs, version, `${revision}-${plan.fingerprint}`)
@@ -98880,7 +98896,9 @@ const darwin_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["16", "15", "14", "13", "12", "11"],
 };
 async function installDarwin(inputs) {
-    const version = resolveVersion(inputs, darwin_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, darwin_SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     info(`Installing GFortran ${version} on macOS (${inputs.arch}) via Homebrew...`);
     const formula = `gcc@${version}`;
     let listOutput = "";
@@ -102445,6 +102463,7 @@ const flang_debian_SUPPORTED_VERSIONS = {
     [Arch.ARM64]: ["23", "22", "21", "20", "19", "18", "17"],
 };
 const LLVM_APT_KEY_SHA256 = "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const CURL_HTTP_ERROR = 22;
 const LLVM_SOURCE_LIST_FILE = "llvm.list";
 const debian_APT_NETWORK_OPTIONS = [
     "-o",
@@ -102553,7 +102572,9 @@ function resolveFlangBinaryPath(major, version) {
         candidates.map((c) => `  ${c}`).join("\n"));
 }
 async function flang_debian_installDebian(inputs) {
-    const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, flang_debian_SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     const major = parseInt(version, 10);
     const codename = ubuntuCodename(inputs.osVersion);
     if (major < 22 && codename === "resolute") {
@@ -102564,6 +102585,22 @@ async function flang_debian_installDebian(inputs) {
             `Use an ${alternativeRunners} runner, or request Flang 22 or newer.`);
     }
     info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
+    if (!isListedVersion(flang_debian_SUPPORTED_VERSIONS[inputs.arch], version)) {
+        const exitCode = await exec_exec("curl", [
+            "-4",
+            "-fsSI",
+            "--connect-timeout",
+            "10",
+            "--max-time",
+            "30",
+            "-o",
+            "/dev/null",
+            `https://apt.llvm.org/${codename}/dists/llvm-toolchain-${codename}-${version}/Release`,
+        ], { ignoreReturnCode: true, silent: true });
+        if (exitCode === CURL_HTTP_ERROR) {
+            throw unavailableVersionError(inputs, version, "apt.llvm.org");
+        }
+    }
     info(`Adding the verified LLVM ${version} apt repository...`);
     await configureLlvmAptRepository(version, codename);
     await flang_debian_aptGetUpdateWithRetry();
@@ -103312,6 +103349,7 @@ function miniforgeInstaller(os, arch) {
 
 
 
+
 function lfortranEnvironment(inputs, version) {
     const windows = inputs.os === OS.Windows;
     const p = windows ? external_path_namespaceObject.win32 : external_path_namespaceObject.posix;
@@ -103387,6 +103425,18 @@ function createInstallerTempDir() {
     external_fs_namespaceObject.mkdirSync(runnerTemp, { recursive: true });
     return external_fs_namespaceObject.mkdtempSync(external_path_namespaceObject.join(runnerTemp, "setup-fortran-lfortran-"));
 }
+async function assertLFortranOnConda(inputs, environment, version) {
+    const exitCode = await exec_exec(environment.conda, [
+        "search",
+        "-c",
+        "conda-forge",
+        "--override-channels",
+        `lfortran==${version}`,
+    ], { ignoreReturnCode: true, silent: true });
+    if (exitCode !== 0) {
+        throw unavailableVersionError(inputs, version, "conda-forge");
+    }
+}
 // `conda create` fetches channel repodata and downloads packages over the
 // network, both of which can fail transiently (read timeouts, 5xx, rate
 // limits). Retrying the whole command is safe: conda reuses its package cache,
@@ -103451,7 +103501,9 @@ const lfortran_debian_SUPPORTED_VERSIONS = {
 // We avoid installing into $CONDA_PREFIX or any pre-existing conda environment
 // to prevent interference with other runner toolchains.
 async function lfortran_debian_installDebian(inputs) {
-    const version = resolveVersion(inputs, lfortran_debian_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, lfortran_debian_SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
     const environment = lfortranEnvironment(inputs, version);
     const miniforge = miniforgeInstaller(OS.Linux, inputs.arch);
@@ -103500,6 +103552,9 @@ async function lfortran_debian_installDebian(inputs) {
             finally {
                 external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
             }
+        }
+        if (!isListedVersion(lfortran_debian_SUPPORTED_VERSIONS[inputs.arch], version)) {
+            await assertLFortranOnConda(inputs, environment, version);
         }
         await condaCreateWithRetry(environment.conda, [
             "create",
@@ -103593,7 +103648,9 @@ const lfortran_darwin_SUPPORTED_VERSIONS = {
     ],
 };
 async function lfortran_darwin_installDarwin(inputs) {
-    const version = resolveVersion(inputs, lfortran_darwin_SUPPORTED_VERSIONS);
+    const version = resolveVersion(inputs, lfortran_darwin_SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     info(`Installing LFortran ${version} on macOS (${inputs.arch})...`);
     const environment = lfortranEnvironment(inputs, version);
     const miniforge = miniforgeInstaller(OS.MacOS, inputs.arch);
@@ -103640,6 +103697,9 @@ async function lfortran_darwin_installDarwin(inputs) {
             finally {
                 external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
             }
+        }
+        if (!isListedVersion(lfortran_darwin_SUPPORTED_VERSIONS[inputs.arch], version)) {
+            await assertLFortranOnConda(inputs, environment, version);
         }
         await condaCreateWithRetry(environment.conda, [
             "create",
@@ -103787,7 +103847,9 @@ async function lfortran_win32_installWin32(inputs) {
 //   Scripts\ holds Python entry-point wrappers; Library\bin\ holds DLLs.
 //   All three need to be on PATH for the toolchain to work correctly.
 async function installConda(inputs) {
-    const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS);
+    const version = resolveWindowsVersion(inputs, lfortran_win32_SUPPORTED_VERSIONS, {
+        allowUnlisted: true,
+    });
     info(`Installing LFortran ${version} on Windows (${inputs.arch}) via conda-forge...`);
     const environment = lfortranEnvironment(inputs, version);
     const miniforge = miniforgeInstaller(OS.Windows, inputs.arch);
@@ -103832,6 +103894,9 @@ async function installConda(inputs) {
             finally {
                 external_fs_namespaceObject.rmSync(tempDir, { recursive: true, force: true });
             }
+        }
+        if (!isListedVersion(lfortran_win32_SUPPORTED_VERSIONS[inputs.arch][Msystem.Native], version)) {
+            await assertLFortranOnConda(inputs, environment, version);
         }
         await condaCreateWithRetry(environment.conda, [
             "create",
