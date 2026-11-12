@@ -5,7 +5,11 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
-import { resolveVersion } from "../../resolve_version";
+import {
+  isListedVersion,
+  resolveVersion,
+  unavailableVersionError,
+} from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { indexFetchFailed } from "../../apt_sources";
 import {
@@ -71,7 +75,9 @@ const APT_TIMEOUT_OPTS: string[] = [
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+    allowUnlisted: true,
+  });
   core.info(`Installing GFortran ${version} on Linux (${inputs.arch})...`);
 
   const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
@@ -90,6 +96,9 @@ export async function installDebian(
   fs.mkdirSync(path.join(cacheDir, "partial"), { recursive: true });
 
   const revision = await candidateVersion(`gfortran-${version}`);
+  if (!revision && !isListedVersion(SUPPORTED_VERSIONS[inputs.arch], version)) {
+    throw unavailableVersionError(inputs, version, "apt");
+  }
   const plan = await downloadPlan(packages, cacheDir);
   const cacheKey =
     revision && plan && plan.files > 0
