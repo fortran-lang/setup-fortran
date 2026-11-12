@@ -15,7 +15,9 @@ export const SUPPORTED_VERSIONS = {
 export async function installDarwin(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+    allowUnlisted: true,
+  });
   core.info(
     `Installing GFortran ${version} on macOS (${inputs.arch}) via Homebrew...`,
   );
