@@ -147,10 +147,63 @@ describe("installDebian (LFortran)", () => {
     );
   });
 
-  it("rejects ARM64 versions that conda-forge does not publish for aarch64", async () => {
+  it("passes a version missing from the table through to conda", async () => {
+    const inputs = { ...baseInputs, version: "0.99.0" };
+    await installDebian(inputs);
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      expect.stringContaining("conda"),
+      expect.arrayContaining(["create", "lfortran==0.99.0"]),
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
+  });
+
+  it("checks conda-forge before creating an unlisted version", async () => {
+    await installDebian({ ...baseInputs, version: "0.99.0" });
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      expect.stringContaining("conda"),
+      [
+        "search",
+        "-c",
+        "conda-forge",
+        "--override-channels",
+        "lfortran==0.99.0",
+      ],
+      expect.objectContaining({ ignoreReturnCode: true }),
+    );
+  });
+
+  it("does not search conda-forge for a listed version", async () => {
+    await installDebian({ ...baseInputs, version: "0.68.0" });
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(["search"]),
+      expect.anything(),
+    );
+  });
+
+  it("rejects before creating when conda-forge has no build for the platform", async () => {
+    mockedExec.mockImplementation((_cmd, args) =>
+      Promise.resolve(args?.[0] === "search" ? 1 : 0),
+    );
     const inputs = { ...baseInputs, arch: Arch.ARM64, version: "0.63.0" };
+
     await expect(installDebian(inputs)).rejects.toThrow(
-      "lfortran 0.63.0 is not supported on linux (arm64). Supported versions: 0.69.0, 0.68.0, 0.67.0, 0.66.0, 0.65.0, 0.64.0",
+      "lfortran 0.63.0 is not available from conda-forge on linux (arm64).",
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(["create"]),
+      expect.anything(),
+    );
+  });
+
+  it("still rejects a malformed version", async () => {
+    const inputs = { ...baseInputs, version: "0.63.0; rm -rf" };
+    await expect(installDebian(inputs)).rejects.toThrow(
+      "lfortran 0.63.0; rm -rf is not supported on linux (x64)",
     );
   });
 

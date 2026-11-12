@@ -3,11 +3,12 @@ import * as exec from "@actions/exec";
 import * as fs from "fs";
 import * as path from "path";
 import { Arch, OS, type InstallationResult } from "../../types";
-import { resolveVersion } from "../../resolve_version";
+import { isListedVersion, resolveVersion } from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { miniforgeInstaller as resolveMiniforgeInstaller } from "../../miniforge";
 import { verifySha256 } from "../../verify_download";
 import {
+  assertLFortranOnConda,
   condaCreateWithRetry,
   createInstallerTempDir,
   isReusableLFortranEnvironment,
@@ -53,7 +54,9 @@ export const SUPPORTED_VERSIONS = {
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+    allowUnlisted: true,
+  });
 
   core.info(`Installing LFortran ${version} on Linux (${inputs.arch})...`);
 
@@ -107,6 +110,10 @@ export async function installDebian(
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
+    }
+
+    if (!isListedVersion(SUPPORTED_VERSIONS[inputs.arch], version)) {
+      await assertLFortranOnConda(inputs, environment, version);
     }
 
     await condaCreateWithRetry(environment.conda, [
