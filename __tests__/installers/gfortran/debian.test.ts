@@ -5,10 +5,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import {
-  installDebian,
-  needsPpa,
-} from "../../../src/installers/gfortran/debian";
+import { installDebian } from "../../../src/installers/gfortran/debian";
 import { Arch, Compiler, OS, Msystem, type Inputs } from "../../../src/types";
 
 jest.mock("@actions/core");
@@ -99,37 +96,23 @@ describe("GFortran Debian Installer", () => {
     fs.rmSync(testRunnerTemp, { recursive: true, force: true });
   });
 
-  describe("needsPpa", () => {
-    it("returns true for version >= 15 on Ubuntu 24.04", () => {
-      expect(needsPpa("15", "24.04")).toBe(true);
-      expect(needsPpa("16", "24.04")).toBe(true);
-    });
-
-    it("returns false for version < 15 on Ubuntu 24.04", () => {
-      expect(needsPpa("14", "24.04")).toBe(false);
-      expect(needsPpa("13", "24.04")).toBe(false);
-    });
-
-    it("returns true for version >= 13 on Ubuntu 22.04", () => {
-      expect(needsPpa("13", "22.04")).toBe(true);
-      expect(needsPpa("14", "22.04")).toBe(true);
-    });
-
-    it("returns false for version < 13 on Ubuntu 22.04", () => {
-      expect(needsPpa("12", "22.04")).toBe(false);
-      expect(needsPpa("11", "22.04")).toBe(false);
-    });
-
-    it("returns true for other OS versions regardless of compiler version", () => {
-      expect(needsPpa("11", "20.04")).toBe(true);
-      expect(needsPpa("16", "20.04")).toBe(true);
-      expect(needsPpa("14", "debian-12")).toBe(true);
-    });
-  });
-
   describe("installDebian", () => {
-    it("adds PPA when needsPpa returns true", async () => {
-      const inputs = { ...baseInputs, version: "15", osVersion: "24.04" };
+    // The PPA decision is candidate-based: the base archive's index answers
+    // whether the archive carries the requested gcc/gfortran, and the PPA —
+    // with its Launchpad dependency — is only added when it does not.
+    it("adds the toolchain PPA when the base archive has no candidate", async () => {
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "apt-cache" && args?.[0] === "policy") {
+          options?.listeners?.stdout?.(
+            Buffer.from(`${args[1]}:\n  Candidate: (none)\n`),
+          );
+          return 0;
+        }
+        emitCandidate(commandLine, args, options);
+        return 0;
+      });
+
+      const inputs = { ...baseInputs, version: "16", osVersion: "26.04" };
       await installDebian(inputs);
 
       expect(mockedExec).toHaveBeenCalledWith("sudo", [
@@ -140,7 +123,23 @@ describe("GFortran Debian Installer", () => {
       ]);
     });
 
-    it("does not add PPA when needsPpa returns false", async () => {
+    it("does not add the toolchain PPA when the base archive already carries the version", async () => {
+      // Regression test for https://github.com/fortran-lang/setup-fortran/pull/245#issuecomment-6863487020:
+      // Ubuntu 26.04's archive carries every supported GCC version (11-16),
+      // but the old osVersion-threshold table fell through to "always add the
+      // PPA" on 26.04 — a Launchpad fetch that installed nothing.
+      const inputs = { ...baseInputs, version: "16", osVersion: "26.04" };
+      await installDebian(inputs);
+
+      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        "ppa:ubuntu-toolchain-r/test",
+      ]);
+    });
+
+    it("does not add the toolchain PPA when the base archive has a candidate on older releases either", async () => {
       const inputs = { ...baseInputs, version: "14", osVersion: "24.04" };
       await installDebian(inputs);
 
@@ -312,7 +311,22 @@ describe("GFortran Debian Installer", () => {
         });
 
       let updateAttempts = 0;
+      // The PPA gate consults the baked image index first, where gcc-16 has
+      // no candidate — that is what adds the PPA. After apt-get update the
+      // PPA provides the candidate used for the cache key.
+      let policyCalls = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "apt-cache" && args?.[0] === "policy") {
+          policyCalls++;
+          options?.listeners?.stdout?.(
+            Buffer.from(
+              policyCalls === 1
+                ? "gfortran-16:\n  Candidate: (none)\n"
+                : `gfortran-16:\n  Candidate: ${revision}\n`,
+            ),
+          );
+          return 0;
+        }
         emitCandidate(commandLine, args, options);
         if (commandLine === "gfortran" && args?.[0] === "--version") {
           options?.listeners?.stdout?.(
@@ -465,19 +479,30 @@ describe("GFortran Debian Installer", () => {
       );
     });
 
-    it("reads the candidate and restores the cache after apt-get update", async () => {
+    it("gates the PPA on the baked index before apt-get update, and reads the cache-key candidate after it", async () => {
       await installDebian(baseInputs);
 
       const updateCall = mockedExec.mock.calls.findIndex(
         ([cmd, args]) => cmd === "sudo" && args?.includes("update"),
       );
-      const policyCall = mockedExec.mock.calls.findIndex(
+      const firstPolicyCall = mockedExec.mock.calls.findIndex(
         ([cmd]) => cmd === "apt-cache",
       );
+      let lastPolicyCall = -1;
+      mockedExec.mock.calls.forEach((call, index) => {
+        if (call[0] === "apt-cache") lastPolicyCall = index;
+      });
       const updateOrder = mockedExec.mock.invocationCallOrder[updateCall];
-      expect(mockedExec.mock.invocationCallOrder[policyCall]).toBeGreaterThan(
+      // The PPA gate consults the baked image index BEFORE the update (that
+      // is the whole point — it decides whether the PPA is added at all)...
+      expect(mockedExec.mock.invocationCallOrder[firstPolicyCall]).toBeLessThan(
         updateOrder,
       );
+      // ...and the revision used for the cache key is read from the
+      // refreshed index after the update.
+      expect(
+        mockedExec.mock.invocationCallOrder[lastPolicyCall],
+      ).toBeGreaterThan(updateOrder);
       expect(
         mockedCache.restoreCache.mock.invocationCallOrder[0],
       ).toBeGreaterThan(updateOrder);
@@ -734,7 +759,13 @@ describe("GFortran Debian Installer", () => {
       jest.useFakeTimers();
       const installPromise = installDebian(baseInputs);
 
-      // Flush microtasks to allow the first attempt to fail and reach the setTimeout
+      // Let the first install attempt fail and schedule its retry sleep. The
+      // candidate-based PPA gate adds an extra await to the flow, so a fixed
+      // microtask budget is too brittle here — wait on the counter itself
+      // (bounded, so an unexpected early rejection still fails the test).
+      for (let i = 0; i < 1000 && attempts === 0; i++) {
+        await Promise.resolve();
+      }
       for (let i = 0; i < 10; i++) await Promise.resolve();
 
       // Fast-forward past the 10s delay for the first retry
@@ -766,7 +797,11 @@ describe("GFortran Debian Installer", () => {
       jest.useFakeTimers();
       const installPromise = installDebian(inputs);
 
-      // Flush microtasks
+      // Let the first add-apt-repository attempt fail and schedule its retry
+      // sleep (bounded wait — same reasoning as the install-retry test above).
+      for (let i = 0; i < 1000 && attempts === 0; i++) {
+        await Promise.resolve();
+      }
       for (let i = 0; i < 10; i++) await Promise.resolve();
 
       // Fast-forward past the 5s delay for the first retry

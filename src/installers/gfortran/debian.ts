@@ -78,9 +78,23 @@ export async function installDebian(
   const cacheDir = aptCacheDir(inputs, version);
   const cachePaths = [cacheDir];
 
-  const ppaAdded = needsPpa(version, inputs.osVersion);
+  // Decide whether the toolchain PPA is needed by consulting the base
+  // archive's index first. A released Ubuntu series does not gain new GCC
+  // majors, so the image's baked apt lists reliably answer "does the archive
+  // carry gfortran-<version>?" — e.g. Ubuntu 26.04's archive carries every
+  // version we support (11-16), and unconditionally adding the PPA there was
+  // a pure Launchpad dependency that installed nothing (our most common
+  // external CI failure since ubuntu-latest moved to 26.04:
+  // https://github.com/fortran-lang/setup-fortran/pull/245#issuecomment-6863487020).
+  // No candidate → the PPA may carry it; candidate → the PPA — and its
+  // Launchpad dependency — is skipped entirely, for this and future Ubuntu
+  // releases without another threshold table.
+  const baseArchiveCandidate = await candidateVersion(`gfortran-${version}`);
+  const ppaAdded = baseArchiveCandidate === undefined;
   if (ppaAdded) {
-    core.info(`Adding PPA for GFortran ${version}...`);
+    core.info(
+      `GFortran ${version} is not in the base archive; adding ppa:ubuntu-toolchain-r/test...`,
+    );
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
   }
 
@@ -363,13 +377,6 @@ async function verifyInstalledToolchain(version: string): Promise<void> {
   for (const tool of ["gcc", "g++", "gfortran"]) {
     await exec.exec(`${tool}-${version}`, ["--version"], { silent: true });
   }
-}
-
-export function needsPpa(version: string, osVersion: string): boolean {
-  const v = parseInt(version);
-  if (osVersion.includes("24")) return v >= 15;
-  if (osVersion.includes("22")) return v >= 13;
-  return true;
 }
 
 async function addAptRepositoryWithRetry(
