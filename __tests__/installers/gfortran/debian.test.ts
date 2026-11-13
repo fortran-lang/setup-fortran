@@ -140,6 +140,35 @@ describe("GFortran Debian Installer", () => {
       ]);
     });
 
+    it("installs a version missing from the table via apt", async () => {
+      await installDebian({ ...baseInputs, version: "99", osVersion: "24.04" });
+
+      expect(mockedExec).toHaveBeenCalledWith(
+        "sudo",
+        expect.arrayContaining(["gfortran-99", "gcc-99", "g++-99"]),
+      );
+    });
+
+    it("rejects an unlisted version that apt has no candidate for", async () => {
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "apt-cache") {
+          options?.listeners?.stdout?.(Buffer.from("  Candidate: (none)\n"));
+        }
+        return 0;
+      });
+
+      await expect(
+        installDebian({ ...baseInputs, version: "99", osVersion: "24.04" }),
+      ).rejects.toThrow(
+        "gfortran 99 is not available from apt on linux (x64).",
+      );
+      expect(mockedExec).not.toHaveBeenCalledWith(
+        "sudo",
+        expect.arrayContaining(["gfortran-99"]),
+        expect.anything(),
+      );
+    });
+
     it("does not add PPA when needsPpa returns false", async () => {
       const inputs = { ...baseInputs, version: "14", osVersion: "24.04" };
       await installDebian(inputs);

@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { OS, type Inputs } from "./types";
+import { unavailableVersionError } from "./resolve_version";
 
 export interface LFortranEnvironment {
   root: string;
@@ -119,6 +120,27 @@ export function createInstallerTempDir(): string {
   const runnerTemp = process.env.RUNNER_TEMP ?? os.tmpdir();
   fs.mkdirSync(runnerTemp, { recursive: true });
   return fs.mkdtempSync(path.join(runnerTemp, "setup-fortran-lfortran-"));
+}
+
+export async function assertLFortranOnConda(
+  inputs: Inputs,
+  environment: LFortranEnvironment,
+  version: string,
+): Promise<void> {
+  const exitCode = await exec.exec(
+    environment.conda,
+    [
+      "search",
+      "-c",
+      "conda-forge",
+      "--override-channels",
+      `lfortran==${version}`,
+    ],
+    { ignoreReturnCode: true, silent: true },
+  );
+  if (exitCode !== 0) {
+    throw unavailableVersionError(inputs, version, "conda-forge");
+  }
 }
 
 // `conda create` fetches channel repodata and downloads packages over the

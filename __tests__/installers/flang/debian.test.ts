@@ -63,6 +63,50 @@ describe("installDebian (Flang)", () => {
     process.env = originalEnv;
   });
 
+  it("rejects an unlisted major whose LLVM apt repository does not exist", async () => {
+    mockedExec.mockImplementation(async (commandLine, args) =>
+      commandLine === "curl" && args?.includes("-fsSI") ? 22 : 0,
+    );
+
+    await expect(
+      installDebian({ ...baseInputs, version: "99" }),
+    ).rejects.toThrow(
+      "flang 99 is not available from apt.llvm.org on linux (x64).",
+    );
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["apt-get"]),
+      expect.anything(),
+    );
+  });
+
+  it("checks the repository for an unlisted major, then installs it via apt", async () => {
+    await installDebian({ ...baseInputs, version: "99" });
+
+    expect(mockedExec).toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining([
+        "https://apt.llvm.org/jammy/dists/llvm-toolchain-jammy-99/Release",
+      ]),
+      expect.anything(),
+    );
+    expect(mockedExec).toHaveBeenCalledWith(
+      "sudo",
+      expect.arrayContaining(["flang-99", "clang-99"]),
+      expect.anything(),
+    );
+  });
+
+  it("does not probe the repository for a listed major", async () => {
+    await installDebian(baseInputs);
+
+    expect(mockedExec).not.toHaveBeenCalledWith(
+      "curl",
+      expect.arrayContaining(["-fsSI"]),
+      expect.anything(),
+    );
+  });
+
   it("configures the explicit LLVM repository without executing llvm.sh", async () => {
     await installDebian(baseInputs);
 
