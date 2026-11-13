@@ -30,5 +30,13 @@ export function indexFetchFailed(
   output: string,
   repositoryHost: string,
 ): boolean {
-  return output.includes("Failed to fetch") && output.includes(repositoryHost);
+  // Match per line: a "Hit:" success line for this host must not combine
+  // with an unrelated repository's "Failed to fetch" line elsewhere in the
+  // output to produce a false positive.
+  return output
+    .split("\n")
+    .some(
+      (line) =>
+        line.includes("Failed to fetch") && line.includes(repositoryHost),
+    );
 }

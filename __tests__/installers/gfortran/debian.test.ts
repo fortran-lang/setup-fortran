@@ -202,6 +202,146 @@ describe("GFortran Debian Installer", () => {
       expect(updateAttempts).toBe(2); // failed once, succeeded on retry
     });
 
+    it("continues when a leftover PPA keeps failing on the pre-gate update", async () => {
+      // A previous step may have left the toolchain PPA configured. On 26.04
+      // nothing needs it, so its repeated index failures must not fail the
+      // job — the gate decides from whatever index it can see.
+      let updateAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 16.0.0"),
+          );
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          updateAttempts++;
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "E: Failed to fetch https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/resolute/InRelease  503  Service Unavailable\n",
+            ),
+          );
+          return 100;
+        }
+        return 0;
+      });
+
+      jest.useFakeTimers();
+      const installPromise = installDebian({
+        ...baseInputs,
+        version: "16",
+        osVersion: "26.04",
+      });
+      for (let i = 0; i < 1000 && updateAttempts < 3; i++) {
+        await Promise.resolve();
+        jest.advanceTimersByTime(10000);
+      }
+      await installPromise;
+      jest.useRealTimers();
+
+      expect(updateAttempts).toBe(3); // retried, then tolerated on exhaustion
+      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        "ppa:ubuntu-toolchain-r/test",
+      ]);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("still could not be fetched"),
+      );
+    });
+
+    it("fails when the PPA added by this step keeps failing on its update", async () => {
+      let ppaConfigured = false;
+      let ppaUpdateAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "apt-cache" && args?.[0] === "policy") {
+          options?.listeners?.stdout?.(
+            Buffer.from(`${args[1]}:\n  Candidate: (none)\n`),
+          );
+          return 0;
+        }
+        if (commandLine === "sudo" && args?.[0] === "add-apt-repository") {
+          ppaConfigured = true;
+          return 0;
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update") &&
+          ppaConfigured
+        ) {
+          ppaUpdateAttempts++;
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "E: Failed to fetch https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/InRelease  503  Service Unavailable\n",
+            ),
+          );
+          return 100;
+        }
+        return 0;
+      });
+
+      jest.useFakeTimers();
+      const installPromise = installDebian(baseInputs);
+      for (let i = 0; i < 1000 && ppaUpdateAttempts < 3; i++) {
+        await Promise.resolve();
+        jest.advanceTimersByTime(10000);
+      }
+      await expect(installPromise).rejects.toThrow(
+        "apt-get update failed after 3 attempts",
+      );
+      jest.useRealTimers();
+
+      expect(mockedExec).toHaveBeenCalledWith("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        "ppa:ubuntu-toolchain-r/test",
+      ]);
+      expect(ppaUpdateAttempts).toBe(3);
+    });
+
+    it("does not misread an unrelated failure plus a PPA success line as a PPA failure", async () => {
+      let updateAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          updateAttempts++;
+          options?.listeners?.stderr?.(
+            Buffer.from(
+              "Hit:2 https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu noble InRelease\n" +
+                "E: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  403  Forbidden\n",
+            ),
+          );
+          return 100;
+        }
+        return 0;
+      });
+
+      await installDebian(baseInputs);
+
+      // Tolerated immediately — per-line matching sees the PPA index was
+      // fetched fine and only the unrelated repository failed.
+      expect(updateAttempts).toBe(1);
+      expect(core.info).toHaveBeenCalledWith(
+        expect.stringContaining("continuing with cached/stale package index"),
+      );
+    });
+
     it("does not add the PPA as a fallback when the install fails after a candidate was found", async () => {
       // A candidate in the refreshed index is authoritative: an install
       // failure is not re-interpreted as a missing version, so no PPA is

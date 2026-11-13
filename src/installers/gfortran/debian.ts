@@ -91,7 +91,7 @@ export async function installDebian(
       `GFortran ${version} is not in the base archive; adding ppa:ubuntu-toolchain-r/test...`,
     );
     await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
-    await aptGetUpdateWithRetry();
+    await aptGetUpdateWithRetry(true);
   }
 
   // APT expects this directory to exist beneath its archive directory.
@@ -228,7 +228,10 @@ async function prepareCacheForSave(cacheDir: string): Promise<void> {
   });
 }
 
-async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
+async function aptGetUpdateWithRetry(
+  ppaFetchIsFatal = false,
+  maxAttempts = 3,
+): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let output = "";
     const exitCode = await exec.exec(
@@ -258,14 +261,14 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
 
     // Repositories baked into the runner image that have nothing to do with
     // the toolchain (e.g. packages.microsoft.com returning a transient 403)
-    // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
-    // PPA — whose index is required to resolve the gcc packages whenever it
-    // is configured — is fatal and must be retried, even on a cache hit: the
-    // .deb cache alone is useless without a fresh package index (apt still
-    // needs the index to resolve package names, so --no-download would fail
-    // with "Unable to locate package"). Note apt-get update can exit 0 even
-    // when the PPA's index failed (it only logs a W: warning), so the PPA
-    // check has to happen before any early return on exit code.
+    // must not fail the job. A fetch failure of the ubuntu-toolchain-r PPA
+    // index is retried, and fatal only when this update runs after the PPA
+    // was just added — a leftover PPA from a previous step must not fail the
+    // job where nothing needs it. Even on a cache hit the index must be
+    // fresh: apt still needs it to resolve package names, so --no-download
+    // would fail with "Unable to locate package". Note apt-get update can
+    // exit 0 even when the PPA's index failed (it only logs a W: warning),
+    // so the check has to happen before any early return on exit code.
     const ppaFetchFailed = indexFetchFailed(output, "ppa.launchpad");
     if (exitCode === 0 && !ppaFetchFailed) return;
 
@@ -277,6 +280,12 @@ async function aptGetUpdateWithRetry(maxAttempts = 3): Promise<void> {
     }
 
     if (attempt === maxAttempts) {
+      if (!ppaFetchIsFatal) {
+        core.info(
+          "The toolchain PPA's index still could not be fetched; continuing with the index as-is.",
+        );
+        return;
+      }
       throw new Error(
         `apt-get update failed after ${maxAttempts.toString()} attempts with exit code ${exitCode.toString()}.`,
       );
