@@ -98590,17 +98590,12 @@ async function installDebian(inputs) {
     const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
     const cacheDir = aptCacheDir(inputs, version);
     const cachePaths = [cacheDir];
-    // Decide whether the toolchain PPA is needed by consulting the base
-    // archive's index first. A released Ubuntu series does not gain new GCC
-    // majors, so the image's baked apt lists reliably answer "does the archive
-    // carry gfortran-<version>?" — e.g. Ubuntu 26.04's archive carries every
-    // version we support (11-16), and unconditionally adding the PPA there was
-    // a pure Launchpad dependency that installed nothing (our most common
-    // external CI failure since ubuntu-latest moved to 26.04:
-    // https://github.com/fortran-lang/setup-fortran/pull/245#issuecomment-6863487020).
-    // No candidate → the PPA may carry it; candidate → the PPA — and its
-    // Launchpad dependency — is skipped entirely, for this and future Ubuntu
-    // releases without another threshold table.
+    // Ask apt whether the base archive already provides the requested
+    // gcc/gfortran version, and add the PPA only when it does not. This works
+    // without an apt-get update first: a released Ubuntu series never gains
+    // new GCC majors, so the index shipped with the runner image already
+    // reflects the archive — no hardcoded per-release thresholds, and future
+    // Ubuntu releases need no changes here.
     const baseArchiveCandidate = await candidateVersion(`gfortran-${version}`);
     const ppaAdded = baseArchiveCandidate === undefined;
     if (ppaAdded) {
