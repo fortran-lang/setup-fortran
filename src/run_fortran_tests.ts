@@ -4,6 +4,10 @@ import * as path from "path";
 import * as fs from "fs";
 import { Compiler, LATEST, OS, Msystem, type Latest } from "./types";
 import { MSYS2_ROOT } from "./setup_msys2";
+import {
+  parseBundledClangMajor,
+  windowsFlangCxxSkipReason,
+} from "./integration_skips";
 
 interface CompilerFlags {
   module: string[];
@@ -262,6 +266,7 @@ interface TestContext {
   isUCRT64: boolean;
   isMSYS2: boolean;
   flangVersion: Latest | number | undefined;
+  bundledClangMajor: number | undefined;
   glibcVersion: number | undefined;
   nvcxxVersion: NvcxxVersion | undefined;
   cppFlags: string[];
@@ -324,6 +329,9 @@ function buildTestManifest(): TestCase[] {
           ctx.glibcVersion,
           ctx.nvcxxVersion,
         ).flags,
+      // MSVC STL 14.52 requires Clang 22+; native Windows flang toolchains
+      // bundle a clang of the same major, so older ones cannot build the C++
+      // companion. macOS pinned flang is already skipped via getCxxLinkFlags.
       skipReason: (ctx) =>
         getCxxLinkFlags(
           ctx.compiler,
@@ -331,7 +339,7 @@ function buildTestManifest(): TestCase[] {
           ctx.isMSYS2,
           ctx.glibcVersion,
           ctx.nvcxxVersion,
-        ).skip,
+        ).skip ?? windowsFlangCxxSkipReason(ctx),
     },
     {
       name: "polymorphism_test",
@@ -432,6 +440,7 @@ async function run(): Promise<void> {
     }
 
     const flangVersion = parseFlangVersion(process.env.FLANG_VERSION);
+    const bundledClangMajor = parseBundledClangMajor(cxx);
     const msystem = process.env.WINDOWS_ENV as Msystem | undefined;
     const isUCRT64 = msystem === Msystem.UCRT64;
     const isMSYS2 =
@@ -606,6 +615,7 @@ async function run(): Promise<void> {
       isUCRT64,
       isMSYS2,
       flangVersion,
+      bundledClangMajor,
       glibcVersion,
       nvcxxVersion,
       cppFlags,
