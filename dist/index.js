@@ -98590,19 +98590,19 @@ async function installDebian(inputs) {
     const packages = [`gcc-${version}`, `g++-${version}`, `gfortran-${version}`];
     const cacheDir = aptCacheDir(inputs, version);
     const cachePaths = [cacheDir];
-    // Ask apt whether the base archive already provides the requested
-    // gcc/gfortran version, and add the PPA only when it does not. This works
-    // without an apt-get update first: a released Ubuntu series never gains
-    // new GCC majors, so the index shipped with the runner image already
-    // reflects the archive — no hardcoded per-release thresholds, and future
-    // Ubuntu releases need no changes here.
+    // Refresh the package index, then ask apt whether the base archive
+    // already provides the requested gcc/gfortran version, adding the PPA
+    // only when it does not. Deciding on a freshly updated index (rather than
+    // the one baked into the runner image) keeps the answer correct on stale
+    // or cleared lists too — no per-release thresholds to maintain.
+    await aptGetUpdateWithRetry();
     const baseArchiveCandidate = await candidateVersion(`gfortran-${version}`);
     const ppaAdded = baseArchiveCandidate === undefined;
     if (ppaAdded) {
         info(`GFortran ${version} is not in the base archive; adding ppa:ubuntu-toolchain-r/test...`);
         await addAptRepositoryWithRetry("ppa:ubuntu-toolchain-r/test");
+        await aptGetUpdateWithRetry();
     }
-    await aptGetUpdateWithRetry(ppaAdded);
     // APT expects this directory to exist beneath its archive directory.
     external_fs_namespaceObject.mkdirSync(external_path_namespaceObject.join(cacheDir, "partial"), { recursive: true });
     const revision = await candidateVersion(`gfortran-${version}`);
@@ -98722,7 +98722,7 @@ async function prepareCacheForSave(cacheDir) {
         force: true,
     });
 }
-async function aptGetUpdateWithRetry(ppaAdded, maxAttempts = 3) {
+async function aptGetUpdateWithRetry(maxAttempts = 3) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         let output = "";
         const exitCode = await exec_exec("sudo", [
@@ -98748,14 +98748,14 @@ async function aptGetUpdateWithRetry(ppaAdded, maxAttempts = 3) {
         // Repositories baked into the runner image that have nothing to do with
         // the toolchain (e.g. packages.microsoft.com returning a transient 403)
         // must not fail the job. Only a fetch failure of the ubuntu-toolchain-r
-        // PPA — whose index is required to resolve the gcc packages — is fatal
-        // and must be retried, even on a cache hit: the .deb cache alone is
-        // useless without a fresh package index (apt still needs the index to
-        // resolve package names, so --no-download would fail with
-        // "Unable to locate package"). Note apt-get update can exit 0 even
+        // PPA — whose index is required to resolve the gcc packages whenever it
+        // is configured — is fatal and must be retried, even on a cache hit: the
+        // .deb cache alone is useless without a fresh package index (apt still
+        // needs the index to resolve package names, so --no-download would fail
+        // with "Unable to locate package"). Note apt-get update can exit 0 even
         // when the PPA's index failed (it only logs a W: warning), so the PPA
         // check has to happen before any early return on exit code.
-        const ppaFetchFailed = ppaAdded && indexFetchFailed(output, "ppa.launchpad");
+        const ppaFetchFailed = indexFetchFailed(output, "ppa.launchpad");
         if (exitCode === 0 && !ppaFetchFailed)
             return;
         if (!ppaFetchFailed) {

@@ -101,12 +101,20 @@ describe("GFortran Debian Installer", () => {
     // whether the archive carries the requested gcc/gfortran, and the PPA —
     // with its Launchpad dependency — is only added when it does not.
     it("adds the toolchain PPA when the base archive has no candidate", async () => {
+      let updateAttempts = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
         if (commandLine === "apt-cache" && args?.[0] === "policy") {
           options?.listeners?.stdout?.(
             Buffer.from(`${args[1]}:\n  Candidate: (none)\n`),
           );
           return 0;
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          updateAttempts++;
         }
         emitCandidate(commandLine, args, options);
         return 0;
@@ -121,6 +129,8 @@ describe("GFortran Debian Installer", () => {
         "--no-update",
         "ppa:ubuntu-toolchain-r/test",
       ]);
+      // One update before the gate, one after the PPA brings its index in.
+      expect(updateAttempts).toBe(2);
     });
 
     it("does not add the toolchain PPA when the base archive already carries the version", async () => {
@@ -130,6 +140,97 @@ describe("GFortran Debian Installer", () => {
       // PPA" on 26.04 — a Launchpad fetch that installed nothing.
       const inputs = { ...baseInputs, version: "16", osVersion: "26.04" };
       await installDebian(inputs);
+
+      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        "ppa:ubuntu-toolchain-r/test",
+      ]);
+    });
+
+    it("retries a PPA index failure even when the gate did not add the PPA", async () => {
+      // A previous step may already have configured the toolchain PPA; the
+      // gate then sees its candidate and skips add-apt-repository — but the
+      // PPA's index fetch is still a dependency and must be retried.
+      const timeoutSpy = jest
+        .spyOn(global, "setTimeout")
+        .mockImplementation((callback) => {
+          if (typeof callback === "function") callback();
+          return 0 as unknown as NodeJS.Timeout;
+        });
+
+      let updateAttempts = 0;
+      mockedExec.mockImplementation(async (commandLine, args, options) => {
+        emitCandidate(commandLine, args, options);
+        if (commandLine === "gfortran" && args?.[0] === "--version") {
+          options?.listeners?.stdout?.(
+            Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
+          );
+        }
+        if (
+          commandLine === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("update")
+        ) {
+          updateAttempts++;
+          if (updateAttempts === 1) {
+            options?.listeners?.stderr?.(
+              Buffer.from(
+                "E: Failed to fetch https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/InRelease  503  Service Unavailable\n",
+              ),
+            );
+            return 100;
+          }
+        }
+        return 0;
+      });
+
+      try {
+        const result = await installDebian(baseInputs);
+        expect(result.fc).toBe("gfortran-14");
+      } finally {
+        timeoutSpy.mockRestore();
+      }
+
+      expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
+        "add-apt-repository",
+        "--yes",
+        "--no-update",
+        "ppa:ubuntu-toolchain-r/test",
+      ]);
+      expect(updateAttempts).toBe(2); // failed once, succeeded on retry
+    });
+
+    it("does not add the PPA as a fallback when the install fails after a candidate was found", async () => {
+      // A candidate in the refreshed index is authoritative: an install
+      // failure is not re-interpreted as a missing version, so no PPA is
+      // added as a fallback.
+      let installAttempts = 0;
+      mockedExec.mockImplementation(async (cmd, args, options) => {
+        emitCandidate(cmd, args, options);
+        if (
+          cmd === "sudo" &&
+          args?.includes("apt-get") &&
+          args?.includes("install") &&
+          !args?.includes("--no-download") &&
+          !args?.includes("--print-uris")
+        ) {
+          installAttempts++;
+          throw new Error("Apt failure");
+        }
+        return 0;
+      });
+
+      jest.useFakeTimers();
+      const installPromise = installDebian(baseInputs);
+      // Advance the retry sleeps (10s, 20s) until all attempts are spent.
+      for (let i = 0; i < 1000 && installAttempts < 3; i++) {
+        await Promise.resolve();
+        jest.advanceTimersByTime(10000);
+      }
+      await expect(installPromise).rejects.toThrow("Apt failure");
+      jest.useRealTimers();
 
       expect(mockedExec).not.toHaveBeenCalledWith("sudo", [
         "add-apt-repository",
@@ -260,7 +361,16 @@ describe("GFortran Debian Installer", () => {
         });
 
       let updateAttempts = 0;
+      // The gate finds no candidate in the refreshed base-archive index, so
+      // the PPA is added and a second update fetches its index — which is
+      // the one that fails and must be retried.
       mockedExec.mockImplementation(async (commandLine, args, options) => {
+        if (commandLine === "apt-cache" && args?.[0] === "policy") {
+          options?.listeners?.stdout?.(
+            Buffer.from(`${args[1]}:\n  Candidate: (none)\n`),
+          );
+          return 0;
+        }
         if (commandLine === "gfortran" && args?.[0] === "--version") {
           options?.listeners?.stdout?.(
             Buffer.from("GNU Fortran (Ubuntu) 14.2.0"),
@@ -272,7 +382,7 @@ describe("GFortran Debian Installer", () => {
           args?.includes("update")
         ) {
           updateAttempts++;
-          if (updateAttempts === 1) {
+          if (updateAttempts === 2) {
             options?.listeners?.stderr?.(
               Buffer.from(
                 "E: Failed to fetch https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/InRelease  503  Service Unavailable\n",
@@ -290,7 +400,8 @@ describe("GFortran Debian Installer", () => {
         timeoutSpy.mockRestore();
       }
 
-      expect(updateAttempts).toBe(2); // failed once, succeeded on retry
+      // Pre-gate update + failed PPA update + successful retry.
+      expect(updateAttempts).toBe(3);
       expect(core.info).toHaveBeenCalledWith(
         expect.stringContaining("apt-get update failed (attempt 1/3)"),
       );
@@ -311,9 +422,9 @@ describe("GFortran Debian Installer", () => {
         });
 
       let updateAttempts = 0;
-      // The PPA gate consults the baked image index first, where gcc-16 has
-      // no candidate — that is what adds the PPA. After apt-get update the
-      // PPA provides the candidate used for the cache key.
+      // The gate finds no candidate on the refreshed index, so the PPA is
+      // added and the second update brings in the candidate used for the
+      // cache key.
       let policyCalls = 0;
       mockedExec.mockImplementation(async (commandLine, args, options) => {
         if (commandLine === "apt-cache" && args?.[0] === "policy") {
@@ -355,7 +466,8 @@ describe("GFortran Debian Installer", () => {
         const inputs = { ...baseInputs, version: "16", osVersion: "24.04" };
         const result = await installDebian(inputs);
 
-        expect(updateAttempts).toBe(2); // failed once, succeeded on retry
+        // Pre-gate update + failed PPA update + successful retry.
+        expect(updateAttempts).toBe(3);
         expect(core.info).toHaveBeenCalledWith(
           expect.stringContaining("apt-get update failed (attempt 1/3)"),
         );
@@ -414,7 +526,7 @@ describe("GFortran Debian Installer", () => {
         const inputs = { ...baseInputs, version: "16", osVersion: "24.04" };
         const result = await installDebian(inputs);
 
-        expect(updateAttempts).toBe(2);
+        expect(updateAttempts).toBe(3);
         expect(core.info).toHaveBeenCalledWith(
           expect.stringContaining("apt-get update failed (attempt 1/3)"),
         );
@@ -450,7 +562,9 @@ describe("GFortran Debian Installer", () => {
 
       await installDebian(baseInputs);
 
-      expect(updateAttempts).toBe(1);
+      // Two updates happen (pre-gate and post-PPA); neither is retried —
+      // warning-only failures in unrelated repositories are tolerated.
+      expect(updateAttempts).toBe(2);
       expect(core.info).not.toHaveBeenCalledWith(
         expect.stringContaining("apt-get update failed"),
       );
@@ -479,7 +593,7 @@ describe("GFortran Debian Installer", () => {
       );
     });
 
-    it("gates the PPA on the baked index before apt-get update, and reads the cache-key candidate after it", async () => {
+    it("gates the PPA on a refreshed index and reads the cache-key candidate from it", async () => {
       await installDebian(baseInputs);
 
       const updateCall = mockedExec.mock.calls.findIndex(
@@ -493,13 +607,13 @@ describe("GFortran Debian Installer", () => {
         if (call[0] === "apt-cache") lastPolicyCall = index;
       });
       const updateOrder = mockedExec.mock.invocationCallOrder[updateCall];
-      // The PPA gate consults the baked image index BEFORE the update (that
-      // is the whole point — it decides whether the PPA is added at all)...
-      expect(mockedExec.mock.invocationCallOrder[firstPolicyCall]).toBeLessThan(
-        updateOrder,
-      );
-      // ...and the revision used for the cache key is read from the
-      // refreshed index after the update.
+      // The PPA gate runs AFTER the first apt-get update, so it decides from
+      // a refreshed index (not the one baked into the image)...
+      expect(
+        mockedExec.mock.invocationCallOrder[firstPolicyCall],
+      ).toBeGreaterThan(updateOrder);
+      // ...and the revision used for the cache key is read from the same
+      // refreshed index.
       expect(
         mockedExec.mock.invocationCallOrder[lastPolicyCall],
       ).toBeGreaterThan(updateOrder);
