@@ -4,7 +4,11 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Arch, type InstallationResult } from "../../types";
-import { resolveVersion } from "../../resolve_version";
+import {
+  isListedVersion,
+  resolveVersion,
+  unavailableVersionError,
+} from "../../resolve_version";
 import type { Inputs } from "../../types";
 import { scopedSourceListOptions } from "../../apt_sources";
 import { verifySha256 } from "../../verify_download";
@@ -32,6 +36,7 @@ export const SUPPORTED_VERSIONS = {
 
 const LLVM_APT_KEY_SHA256 =
   "8b2a587ffd672c4687e7581dad4b2f6c1bb2ad6b480cd9771ba2ff48e0b8c75d";
+const CURL_HTTP_ERROR = 22;
 const LLVM_SOURCE_LIST_FILE = "llvm.list";
 const APT_NETWORK_OPTIONS = [
   "-o",
@@ -162,7 +167,9 @@ function resolveFlangBinaryPath(major: number, version: string): string {
 export async function installDebian(
   inputs: Inputs,
 ): Promise<InstallationResult> {
-  const version = resolveVersion(inputs, SUPPORTED_VERSIONS);
+  const version = resolveVersion(inputs, SUPPORTED_VERSIONS, {
+    allowUnlisted: true,
+  });
   const major = parseInt(version, 10);
   const codename = ubuntuCodename(inputs.osVersion);
 
@@ -178,6 +185,27 @@ export async function installDebian(
   }
 
   core.info(`Installing Flang ${version} on Linux (${inputs.arch})...`);
+
+  if (!isListedVersion(SUPPORTED_VERSIONS[inputs.arch], version)) {
+    const exitCode = await exec.exec(
+      "curl",
+      [
+        "-4",
+        "-fsSI",
+        "--connect-timeout",
+        "10",
+        "--max-time",
+        "30",
+        "-o",
+        "/dev/null",
+        `https://apt.llvm.org/${codename}/dists/llvm-toolchain-${codename}-${version}/Release`,
+      ],
+      { ignoreReturnCode: true, silent: true },
+    );
+    if (exitCode === CURL_HTTP_ERROR) {
+      throw unavailableVersionError(inputs, version, "apt.llvm.org");
+    }
+  }
 
   core.info(`Adding the verified LLVM ${version} apt repository...`);
   await configureLlvmAptRepository(version, codename);

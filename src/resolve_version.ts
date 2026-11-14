@@ -168,10 +168,12 @@ export function resolveVersion<T extends readonly string[]>(
     matchMajorIfPatch = false,
     resolveMinorToLatestPatch = false,
     stripPatchZero = false,
+    allowUnlisted = false,
   }: {
     matchMajorIfPatch?: boolean;
     resolveMinorToLatestPatch?: boolean;
     stripPatchZero?: boolean;
+    allowUnlisted?: boolean;
   } = {},
 ): string {
   const versions = supportedVersions[inputs.arch];
@@ -252,6 +254,14 @@ export function resolveVersion<T extends readonly string[]>(
       );
     }
 
+    if (allowUnlisted && /^\d+(\.\d+)*$/.test(version)) {
+      core.info(
+        `${inputs.compiler} ${version} is not in the tested version list; ` +
+          `passing it to the package manager as requested.`,
+      );
+      return version;
+    }
+
     throw new Error(
       `${inputs.compiler} ${version} is not supported on ${inputs.os} (${inputs.arch}). ` +
         `Supported versions: ${versions.join(", ")}`,
@@ -259,6 +269,23 @@ export function resolveVersion<T extends readonly string[]>(
   }
 
   return version;
+}
+
+export function isListedVersion(
+  listed: readonly string[] | undefined,
+  version: string,
+): boolean {
+  return listed?.includes(version) ?? false;
+}
+
+export function unavailableVersionError(
+  inputs: Inputs,
+  version: string,
+  source: string,
+): Error {
+  return new Error(
+    `${inputs.compiler} ${version} is not available from ${source} on ${inputs.os} (${inputs.arch}).`,
+  );
 }
 
 export function resolveWindowsVersion(
@@ -270,7 +297,12 @@ export function resolveWindowsVersion(
   {
     matchMajorIfPatch = false,
     resolveMinorToLatestPatch = false,
-  }: { matchMajorIfPatch?: boolean; resolveMinorToLatestPatch?: boolean } = {},
+    allowUnlisted = false,
+  }: {
+    matchMajorIfPatch?: boolean;
+    resolveMinorToLatestPatch?: boolean;
+    allowUnlisted?: boolean;
+  } = {},
 ): string {
   const archVersions = supportedVersions[inputs.arch];
   if (!archVersions) {
@@ -290,7 +322,7 @@ export function resolveWindowsVersion(
   return resolveVersion(
     inputs,
     { [inputs.arch]: versions },
-    { matchMajorIfPatch, resolveMinorToLatestPatch },
+    { matchMajorIfPatch, resolveMinorToLatestPatch, allowUnlisted },
   );
 }
 
