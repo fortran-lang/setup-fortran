@@ -36,7 +36,7 @@ jobs:
           - {compiler: intel-classic, version: '2021.10'}
           - {compiler: nvidia-hpc, version: 'latest'}
           - {compiler: lfortran, version: '0.45.0'}
-          - {compiler: aocc, version: '5.1.0'}
+          - {compiler: aocc, version: '6.0.0'}
         exclude:
           - os: macos-latest
             toolchain: {compiler: intel}
