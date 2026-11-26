@@ -2,7 +2,8 @@
 # DO NOT EDIT MANUALLY - Run .github/compat/update_latest_versions.py to regenerate
 
 # Latest supported aocc versions by runner
-LATEST_aocc_ubuntu_24_04="5.2.0"
+LATEST_aocc_ubuntu_24_04="6.0.0"
+LATEST_aocc_ubuntu_26_04="6.0.0"
 
 # Latest supported flang versions by runner
 LATEST_flang_macos_15="23"

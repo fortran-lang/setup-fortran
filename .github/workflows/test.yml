@@ -228,6 +228,8 @@ jobs:
             compiler: nvidia-hpc
           - os: ubuntu-24.04
             compiler: aocc
+          - os: ubuntu-26.04
+            compiler: aocc
           - os: ubuntu-24.04
             compiler: flang
           - os: macos-26
