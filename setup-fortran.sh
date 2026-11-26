@@ -420,6 +420,22 @@ detect_aocc_root()
   echo ""
 }
 
+# Remove a dependency from a .deb's control file, in place.
+drop_deb_dependency()
+{
+  local deb=$1
+  local dep=$2
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+
+  dpkg-deb -R "$deb" "$tmp_dir"
+  # Remove "dep" or "dep:arch" (with optional version) from the Depends list
+  sed -i -E "/^Depends:/{s/ ${dep}(:[a-z0-9]+)?( \([^)]*\))?(,|$)//;s/,$//;}" \
+    "$tmp_dir/DEBIAN/control"
+  dpkg-deb -b "$tmp_dir" "$deb"
+  rm -rf "$tmp_dir"
+}
+
 install_aocc_linux()
 {
   local root
@@ -446,6 +462,11 @@ install_aocc_linux()
       aocc_url="https://download.amd.com/developer/eula/aocc/aocc-5-2/${aocc_deb}"
       aocc_sha256="10e8287be61d0181caf6bf00603a15b143ec79a5010f3fb7642036cc08763cb3"
       ;;
+    6.0.0)
+      aocc_deb="aocc-compiler-6.0.0_1_amd64.deb"
+      aocc_url="https://download.amd.com/developer/eula/aocc/aocc-6-0/${aocc_deb}"
+      aocc_sha256="917c0228eb662ccd6ddb023e4b59a70578769804c853d9bb24e20aefed503e5e"
+      ;;
     *)
       echo "Unsupported AOCC version: $resolved_version"
       exit 1
@@ -463,6 +484,13 @@ install_aocc_linux()
     $fetch "$aocc_url" > "$aocc_deb"
 
     echo "${aocc_sha256}  ${aocc_deb}" | sha256sum -c -
+
+    # The AOCC .deb declares a dependency on libxml2 (libxml2.so.2), but no
+    # AOCC binary links against it. Ubuntu 26.04 and newer ship only
+    # libxml2-16, so drop the dependency there to let apt install the package.
+    if ! apt-cache policy libxml2 2>/dev/null | grep -q 'Candidate: [0-9]'; then
+      drop_deb_dependency "$aocc_deb" libxml2
+    fi
 
     # Install the AOCC .deb
     sudo_wrapper apt-get install -y "./${aocc_deb}"
